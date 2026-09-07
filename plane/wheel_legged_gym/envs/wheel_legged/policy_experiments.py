@@ -61,6 +61,107 @@ EXPERIMENTS = {
         "save_interval": 100,
     },
 }
+
+
+# The active replacement for the old H-series.  H3/H7 remain above as frozen
+# compatibility profiles so historical checkpoints can still be inspected.
+METHOD_V1_PHASES = {
+    "stand": {
+        "linear_limit": 0.0,
+        "yaw_limit": 0.0,
+        "randomization_level": 0,
+        "fractions": (1.0, 0.0, 0.0, 0.0),
+        "track_vx": (0.50, 0.25, -0.125),
+        "track_yaw": (0.50, 0.25, -0.125),
+        "stand_still_scale": -0.20,
+    },
+    "translate": {
+        "linear_levels": (0.5, 1.0, 2.0, 3.0, 4.0),
+        "yaw_limit": 0.0,
+        "randomization_level": 0,
+        "fractions": (0.20, 0.20, 0.30, 0.30),
+        "track_vx": (1.00, 0.50, -0.25),
+        "track_yaw": (0.50, 0.25, -0.15),
+        "stand_still_scale": 0.0,
+    },
+    "yaw": {
+        "linear_limit": 0.0,
+        "yaw_levels": (0.5, 1.0, 2.0, 3.0, 4.0),
+        "randomization_level": 1,
+        "fractions": (0.20, 0.20, 0.30, 0.30),
+        "track_vx": (0.25, 0.10, -0.10),
+        "track_yaw": (1.00, 0.50, -0.25),
+        "stand_still_scale": 0.0,
+    },
+    "combined": {
+        "combined_levels": ((0.5, 0.5), (1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (4.0, 4.0)),
+        "randomization_level": 2,
+        "fractions": (0.10, 0.0, 0.20, 0.70),
+        "track_vx": (1.00, 0.50, -0.25),
+        "track_yaw": (1.00, 0.50, -0.25),
+        "stand_still_scale": 0.0,
+    },
+}
+
+METHOD_V1_BASE_REWARD_SCALES = {
+    "track_vx_coarse": 1.0,
+    "track_vx_fine": 0.5,
+    "track_vx_gap": -0.25,
+    "track_yaw_coarse": 0.75,
+    "track_yaw_fine": 0.35,
+    "track_yaw_gap": -0.15,
+    "orientation": -2.0,
+    "height_cost": -1.0,
+    "lin_vel_z": -0.2,
+    "ang_vel_xy": -0.2,
+    "lateral_velocity": -0.2,
+    "wheel_slip": -1.5,
+    "airborne_wheel_spin": -0.75,
+    "wheel_contact_loss": -1.0,
+    "forbidden_contact": -3.0,
+    "torque_cost": -0.01,
+    "power_cost": -0.005,
+    "action_rate": -0.01,
+    "action_second_diff": -0.005,
+    "zero_base_velocity": -1.0,
+    "zero_wheel_velocity": -1.0,
+    "method_termination": -5.0,
+}
+
+
+def _apply_method_randomization(env_cfg, level: int) -> None:
+    """Configure creation-time Isaac Gym randomization for one relay level."""
+
+    if level < 0 or level > 3:
+        raise ValueError("method_v1 randomization level must be in [0, 3]")
+    rand = env_cfg.domain_rand
+    enabled = level > 0
+    rand.randomize_friction = enabled
+    rand.randomize_base_mass = enabled
+    rand.randomize_inertia = enabled
+    rand.randomize_base_com = enabled
+    rand.randomize_Kp = enabled
+    rand.randomize_Kd = enabled
+    rand.randomize_motor_torque = enabled
+    rand.push_robots = level >= 3
+    if level == 0:
+        return
+    if level == 1:
+        rand.friction_range = [0.95, 1.05]
+        rand.added_mass_range = [-0.25, 0.25]
+        rand.randomize_inertia_range = [0.98, 1.02]
+        rand.rand_com_vec = [0.005, 0.005, 0.005]
+        rand.randomize_Kp_range = [0.99, 1.01]
+        rand.randomize_Kd_range = [0.99, 1.01]
+        rand.randomize_motor_torque_range = [0.98, 1.02]
+    else:
+        rand.friction_range = [0.85, 1.15]
+        rand.added_mass_range = [-0.5, 0.5]
+        rand.randomize_inertia_range = [0.95, 1.05]
+        rand.rand_com_vec = [0.01, 0.01, 0.01]
+        rand.randomize_Kp_range = [0.97, 1.03]
+        rand.randomize_Kd_range = [0.97, 1.03]
+        rand.randomize_motor_torque_range = [0.95, 1.05]
 """Legacy experiment definitions retained only in repository history.
 
 The active CLI surface intentionally exposes only H3 and H7 below. Historical
@@ -336,6 +437,14 @@ runs and checkpoints remain untouched on disk.
 def apply_policy_experiment(env_cfg, name: str | None, train_cfg=None) -> dict:
     if name is None:
         return {"name": "baseline", "description": "unmodified baseline"}
+    if str(name).lower() in {"method_v1", "method"}:
+        return apply_training_profile(
+            env_cfg,
+            train_cfg,
+            profile="method_v1",
+            phase=getattr(env_cfg.commands, "training_phase", "stand"),
+            level=getattr(env_cfg.commands, "method_v1_level", 0),
+        )
     normalized = name.upper()
     if normalized not in EXPERIMENTS:
         raise ValueError(
@@ -424,6 +533,138 @@ def apply_policy_experiment(env_cfg, name: str | None, train_cfg=None) -> dict:
     return {"name": normalized, **experiment}
 
 
+def apply_training_profile(
+    env_cfg,
+    train_cfg=None,
+    *,
+    profile: str = "method_v1",
+    phase: str = "stand",
+    level: int | None = None,
+) -> dict:
+    """Apply the versioned staged method profile without changing contracts."""
+
+    normalized = profile.lower()
+    if normalized in {"h3", "h7"}:
+        return apply_policy_experiment(env_cfg, normalized, train_cfg)
+    if normalized not in {"method_v1", "method"}:
+        raise ValueError("unknown training profile; expected method_v1, H3, or H7")
+    phase = str(phase).lower()
+    if phase not in METHOD_V1_PHASES:
+        raise ValueError(f"unknown method_v1 phase: {phase}")
+    if train_cfg is None:
+        raise ValueError("method_v1 requires train_cfg")
+
+    phase_cfg = METHOD_V1_PHASES[phase]
+    env_cfg.rewards.reward_pipeline = "normalized_v1"
+    env_cfg.commands.sampling_strategy = "method_v1"
+    env_cfg.commands.training_profile = "method_v1"
+    env_cfg.commands.training_phase = phase
+    env_cfg.commands.hold_command_until_reset = True
+    env_cfg.commands.curriculum = False
+    env_cfg.commands.curriculum_mode = "method_v1"
+    env_cfg.commands.curriculum_stages = ()
+    command_level = 0 if level is None else int(level)
+    if command_level < 0:
+        raise ValueError("method_v1 command level must be non-negative")
+    env_cfg.commands.method_v1_level = command_level
+    env_cfg.commands.method_v1_phase_config = dict(phase_cfg)
+
+    if phase == "stand":
+        linear_limit = yaw_limit = 0.0
+    elif phase == "translate":
+        levels = phase_cfg["linear_levels"]
+        if command_level >= len(levels):
+            raise ValueError("method_v1 translate command level is out of range")
+        idx = command_level
+        linear_limit, yaw_limit = float(levels[idx]), 0.0
+    elif phase == "yaw":
+        levels = phase_cfg["yaw_levels"]
+        if command_level >= len(levels):
+            raise ValueError("method_v1 yaw command level is out of range")
+        idx = command_level
+        linear_limit, yaw_limit = 0.0, float(levels[idx])
+    else:
+        levels = phase_cfg["combined_levels"]
+        if command_level >= len(levels):
+            raise ValueError("method_v1 combined command level is out of range")
+        idx = command_level
+        linear_limit, yaw_limit = map(float, levels[idx])
+
+    env_cfg.commands.ranges.lin_vel_x = [-linear_limit, linear_limit]
+    env_cfg.commands.ranges.ang_vel_yaw = [-yaw_limit, yaw_limit]
+    env_cfg.commands.ranges.height = [0.40, 0.40]
+    env_cfg.commands.mixture_zero_fraction = phase_cfg["fractions"][0]
+    env_cfg.commands.mixture_small_fraction = phase_cfg["fractions"][1]
+    env_cfg.commands.mixture_reverse_fraction = phase_cfg["fractions"][2]
+    env_cfg.commands.mixture_forward_fraction = phase_cfg["fractions"][3]
+    env_cfg.commands.mixture_small_linear_limit = min(0.10, linear_limit)
+    env_cfg.commands.mixture_small_yaw_limit = min(0.10, yaw_limit)
+    env_cfg.commands.mixture_endpoint_anchor_fraction = 0.50
+    env_cfg.commands.mixture_endpoint_linear_anchors = (
+        (-linear_limit, linear_limit) if linear_limit > 0.0 else None
+    )
+    env_cfg.commands.mixture_small_linear_anchors = (-0.10, -0.05, 0.05, 0.10)
+    env_cfg.commands.mixture_small_yaw_anchors = (-0.05, 0.05)
+
+    for name in dir(env_cfg.rewards.scales):
+        if not name.startswith("_") and isinstance(getattr(env_cfg.rewards.scales, name), (int, float)):
+            setattr(env_cfg.rewards.scales, name, 0.0)
+    for name, value in METHOD_V1_BASE_REWARD_SCALES.items():
+        setattr(env_cfg.rewards.scales, name, value)
+    vx_coarse, vx_fine, vx_gap = phase_cfg["track_vx"]
+    yaw_coarse, yaw_fine, yaw_gap = phase_cfg["track_yaw"]
+    env_cfg.rewards.scales.track_vx_coarse = vx_coarse
+    env_cfg.rewards.scales.track_vx_fine = vx_fine
+    env_cfg.rewards.scales.track_vx_gap = vx_gap
+    env_cfg.rewards.scales.track_yaw_coarse = yaw_coarse
+    env_cfg.rewards.scales.track_yaw_fine = yaw_fine
+    env_cfg.rewards.scales.track_yaw_gap = yaw_gap
+    env_cfg.rewards.scales.stand_still = phase_cfg["stand_still_scale"]
+    env_cfg.rewards.scales.tracking_lin_vel = 0.0
+    env_cfg.rewards.scales.tracking_ang_vel = 0.0
+    env_cfg.rewards.scales.high_speed_tracking = 0.0
+    env_cfg.rewards.scales.high_speed_yaw_tracking = 0.0
+    env_cfg.rewards.scales.high_speed_yaw_penalty = 0.0
+    env_cfg.rewards.scales.high_speed_slip = 0.0
+    env_cfg.rewards.scales.nominal_state = 0.0
+    env_cfg.rewards.scales.base_height = 0.0
+    env_cfg.rewards.scales.termination = 0.0
+    env_cfg.rewards.scales.method_termination = -5.0
+    env_cfg.rewards.scales.zero_yaw_wheel_symmetry = 0.0
+    env_cfg.asset.penalize_contacts_on = ["base_link", "leg_0_link", "leg_1_link"]
+    env_cfg.asset.terminate_after_contacts_on = ["base_link", "leg_0_link", "leg_1_link"]
+    env_cfg.rewards.only_positive_rewards = False
+    env_cfg.domain_rand_level = int(phase_cfg["randomization_level"])
+    _apply_method_randomization(env_cfg, env_cfg.domain_rand_level)
+
+    train_cfg.algorithm.learning_rate = 1.0e-4
+    train_cfg.algorithm.extra_learning_rate = 1.0e-5
+    train_cfg.algorithm.schedule = "adaptive"
+    train_cfg.algorithm.entropy_coef = 0.005
+    train_cfg.runner.save_interval = 100
+    active_scales = {
+        name: getattr(env_cfg.rewards.scales, name)
+        for name in dir(env_cfg.rewards.scales)
+        if not name.startswith("_")
+        and isinstance(getattr(env_cfg.rewards.scales, name), (int, float))
+    }
+    return {
+        "name": "method_v1",
+        "profile": "method_v1",
+        "phase": phase,
+        "level": int(env_cfg.commands.method_v1_level),
+        "reward_version": "normalized_v1",
+        "command_limits": (linear_limit, yaw_limit),
+        "reward_scales": active_scales,
+        "optimizer": {
+            "learning_rate": 1.0e-4,
+            "extra_learning_rate": 1.0e-5,
+            "schedule": "adaptive",
+            "entropy_coef": 0.005,
+        },
+    }
+
+
 def enforce_optimizer_overrides(runner, manifest: dict) -> None:
     optimizer = manifest.get("optimizer")
     if optimizer is None:
@@ -451,6 +692,11 @@ def write_experiment_manifest(path: Path, manifest: dict, env_cfg, train_cfg, ar
         "checkpoint": int(train_cfg.runner.checkpoint),
         "run_name": train_cfg.runner.run_name,
         "sampling_strategy": env_cfg.commands.sampling_strategy,
+        "reward_pipeline": getattr(env_cfg.rewards, "reward_pipeline", "legacy_v0"),
+        "training_profile": getattr(env_cfg.commands, "training_profile", "legacy"),
+        "training_phase": getattr(env_cfg.commands, "training_phase", "legacy"),
+        "command_level": int(getattr(env_cfg.commands, "method_v1_level", 0)),
+        "randomization_level": int(getattr(env_cfg, "domain_rand_level", 0)),
         "reward_scales": {
             "zero_base_velocity": env_cfg.rewards.scales.zero_base_velocity,
             "zero_wheel_velocity": env_cfg.rewards.scales.zero_wheel_velocity,
@@ -464,6 +710,12 @@ def write_experiment_manifest(path: Path, manifest: dict, env_cfg, train_cfg, ar
             ),
             "tracking_lin_vel": env_cfg.rewards.scales.tracking_lin_vel,
             "tracking_ang_vel": env_cfg.rewards.scales.tracking_ang_vel,
+            **{
+                name: getattr(env_cfg.rewards.scales, name)
+                for name in dir(env_cfg.rewards.scales)
+                if not name.startswith("_")
+                and isinstance(getattr(env_cfg.rewards.scales, name), (int, float))
+            },
         },
         "command_fractions": {
             "zero": env_cfg.commands.mixture_zero_fraction,

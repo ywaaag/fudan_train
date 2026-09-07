@@ -73,6 +73,11 @@ class WheelLeggedCfg(LeggedRobotCfg):
         mixture_small_yaw_anchors = None
         mixture_endpoint_anchor_fraction = 0.0
         mixture_endpoint_linear_anchors = None
+        training_profile = "legacy"
+        training_phase = "legacy"
+        hold_command_until_reset = False
+        method_v1_level = 0
+        method_v1_phase_config = {}
         
         class ranges:
             # Motion phase: start with small commands while preserving the
@@ -140,6 +145,24 @@ class WheelLeggedCfg(LeggedRobotCfg):
             zero_wheel_velocity = -1.0
             low_speed_tracking = 0.0
             zero_yaw_wheel_symmetry = 0.0
+            # method_v1 normalized reward groups.  They stay disabled for the
+            # legacy baseline and are enabled atomically by the profile.
+            track_vx_coarse = 0.0
+            track_vx_fine = 0.0
+            track_vx_gap = 0.0
+            track_yaw_coarse = 0.0
+            track_yaw_fine = 0.0
+            track_yaw_gap = 0.0
+            height_cost = 0.0
+            lateral_velocity = 0.0
+            wheel_slip = 0.0
+            airborne_wheel_spin = 0.0
+            wheel_contact_loss = 0.0
+            forbidden_contact = 0.0
+            torque_cost = 0.0
+            power_cost = 0.0
+            action_second_diff = 0.0
+            method_termination = 0.0
             
         dof_pos_target = 0.0  # 目标关节角度（0=-直腿）
         zero_command_threshold = 1.0e-2
@@ -157,6 +180,23 @@ class WheelLeggedCfg(LeggedRobotCfg):
         wheel_slip_sigma = 0.25
         yaw_penalty_sigma = 0.5
         unclipped_reward_names = ()
+        reward_pipeline = "legacy_v0"
+        tracking_linear_cap = 1.0
+        tracking_yaw_cap = 0.8
+        tracking_coarse_sigma = 1.0
+        tracking_fine_sigma = 0.25
+        tracking_gap_delta = 1.0
+        tracking_gap_clip = 4.0
+        upright_gate_tolerance = 0.35
+        height_gate_tolerance = 0.05
+        wheel_slip_scale = 0.50
+        wheel_air_spin_scale = 1.0
+        contact_force_threshold = 1.0
+        forbidden_contact_force_threshold = 5.0
+        forbidden_contact_grace_s = 0.15
+        wheel_loss_grace_s = 0.15
+        contact_warmup_s = 0.50
+        contact_history_length = 4
 
     class domain_rand(LeggedRobotCfg.domain_rand):
         # Robustness phase: keep perturbations moderate near the validated

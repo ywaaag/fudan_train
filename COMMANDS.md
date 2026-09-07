@@ -202,6 +202,43 @@ python sim2sim_closed_policy.py --help
 
 ## 11. 停止进程
 
+## 12. method_v1 分阶段训练
+
+`method_v1` 保持 25D observation、5 帧 history 和 6D action contract。旧 H3/H7
+仍用于历史 checkpoint 复现；新训练使用显式 phase/command level：
+
+```bash
+source /home/kellen/anaconda3/etc/profile.d/conda.sh
+conda activate fudan_leg
+export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
+export PYTHONPATH=/home/kellen/fudan_train/plane
+export CUDA_VISIBLE_DEVICES=0
+cd /home/kellen/fudan_train/plane
+
+python wheel_legged_gym/scripts/train.py \
+  --task=wheel_legged --headless --num_envs=4096 \
+  --policy_experiment=method_v1 --phase=stand --command_level=0 \
+  --max_iterations=5000 --run_name=method_v1_stand_v1
+```
+
+阶段顺序为 `stand`、`translate`、`yaw`、`combined`；translate/yaw 的
+`command_level` 依次对应 `0.5/1/2/3/4`。从旧 checkpoint 迁移时只加载
+actor/encoder，不加载旧 critic、optimizer 或课程状态：
+
+```bash
+python wheel_legged_gym/scripts/train.py \
+  --task=wheel_legged --headless --num_envs=4096 \
+  --resume --resume_mode=policy \
+  --load_run=Sep06_17-58-00_H7_unclipped_global_slip_from16600_v2 \
+  --checkpoint=17600 --policy_experiment=method_v1 \
+  --phase=stand --command_level=0 \
+  --max_iterations=5000 --run_name=method_v1_from_h7_v1
+```
+
+先进行 64-env、1 iteration smoke，再进行 100--300 iteration probe；只有
+zero/translation/yaw/contact/slip 指标稳定后才延长训练。`method_v1` 不允许未显式
+指定 `--resume_mode=policy` 时加载旧 reward 语义的完整 checkpoint。
+
 训练终端使用 `Ctrl+C`。TensorBoard 是独立进程；查看 PID：
 
 ```bash

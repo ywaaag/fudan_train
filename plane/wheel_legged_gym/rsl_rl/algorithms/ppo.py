@@ -80,6 +80,8 @@ class PPO:
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
         self.symmetry_loss_coef = float(symmetry_loss_coef)
+        self.last_encoder_grad_norm = 0.0
+        self.last_encoder_parameter_delta = 0.0
 
     def init_storage(
         self,
@@ -274,6 +276,8 @@ class PPO:
 
         num_updates_extra = 0
         mean_extra_loss = 0
+        mean_encoder_grad_norm = 0.0
+        mean_encoder_parameter_delta = 0.0
         if self.extra_optimizer is not None:
             generator = self.storage.encoder_mini_batch_generator(
                 self.num_mini_batches, self.num_learning_epochs
@@ -314,12 +318,29 @@ class PPO:
                             + self.symmetry_loss_coef * mirrored_velocity_loss
                         )
 
+                before = [
+                    parameter.detach().clone()
+                    for parameter in self.actor_critic.encoder.parameters()
+                ]
                 self.extra_optimizer.zero_grad()
                 extra_loss.backward()
-                nn.utils.clip_grad_norm_(self.actor_critic.parameters(), 0.1)
+                grad_norm = nn.utils.clip_grad_norm_(
+                    self.actor_critic.encoder.parameters(), 0.1
+                )
                 self.extra_optimizer.step()
 
+                parameter_delta = torch.sqrt(
+                    sum(
+                        torch.sum(torch.square(parameter.detach() - previous))
+                        for parameter, previous in zip(
+                            self.actor_critic.encoder.parameters(), before
+                        )
+                    )
+                )
+
                 mean_extra_loss += extra_loss.item()
+                mean_encoder_grad_norm += float(grad_norm)
+                mean_encoder_parameter_delta += float(parameter_delta)
                 num_updates_extra += 1
 
         mean_value_loss /= num_updates
@@ -328,6 +349,10 @@ class PPO:
         mean_symmetry_loss /= num_updates
         if num_updates_extra > 0:
             mean_extra_loss /= num_updates_extra
+            mean_encoder_grad_norm /= num_updates_extra
+            mean_encoder_parameter_delta /= num_updates_extra
+        self.last_encoder_grad_norm = mean_encoder_grad_norm
+        self.last_encoder_parameter_delta = mean_encoder_parameter_delta
         self.storage.clear()
 
         return (

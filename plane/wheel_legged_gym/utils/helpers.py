@@ -155,6 +155,8 @@ def update_cfg_from_args(env_cfg, cfg_train, args):
             cfg_train.runner.load_run = args.load_run
         if args.checkpoint is not None:
             cfg_train.runner.checkpoint = args.checkpoint
+        if getattr(args, "resume_mode", None) is not None:
+            cfg_train.runner.resume_mode = args.resume_mode
 
     return env_cfg, cfg_train
 
@@ -230,6 +232,25 @@ def get_args():
             "name": "--policy_experiment",
             "type": str,
             "help": "Named zero/reverse policy experiment: A, B, or C.",
+        },
+        {
+            "name": "--phase",
+            "type": str,
+            "default": "stand",
+            "help": "method_v1 phase: stand, translate, yaw, or combined.",
+        },
+        {
+            "name": "--command_level",
+            "type": int,
+            "default": 0,
+            "help": "method_v1 command level index.",
+        },
+        {
+            "name": "--resume_mode",
+            "type": str,
+            "choices": ("full", "policy"),
+            "default": "full",
+            "help": "Checkpoint migration mode; policy loads actor/encoder only.",
         },
         {"name": "--exptid", "type": str, "default": "", "help": "exptid"},
     ]

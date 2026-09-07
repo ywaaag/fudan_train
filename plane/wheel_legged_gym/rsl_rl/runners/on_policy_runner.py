@@ -225,6 +225,14 @@ class OnPolicyRunner:
         )
         self.writer.add_scalar("Loss/encoder", locs["mean_extra_loss"], locs["it"])
         self.writer.add_scalar(
+            "Loss/encoder_grad_norm", self.alg.last_encoder_grad_norm, locs["it"]
+        )
+        self.writer.add_scalar(
+            "Loss/encoder_parameter_delta",
+            self.alg.last_encoder_parameter_delta,
+            locs["it"],
+        )
+        self.writer.add_scalar(
             "Loss/surrogate", locs["mean_surrogate_loss"], locs["it"]
         )
         self.writer.add_scalar("Loss/learning_rate", self.alg.learning_rate, locs["it"])
@@ -309,9 +317,34 @@ class OnPolicyRunner:
             path,
         )
 
-    def load(self, path, load_optimizer=True):
-        loaded_dict = torch.load(path)
-        self.alg.actor_critic.load_state_dict(loaded_dict["model_state_dict"])
+    def load(self, path, load_optimizer=True, load_env_state=True, resume_mode="full"):
+        loaded_dict = torch.load(path, map_location=self.device)
+        model_state = loaded_dict["model_state_dict"]
+        if resume_mode == "policy":
+            policy_state = {
+                key: value
+                for key, value in model_state.items()
+                if key.startswith("actor.") or key.startswith("encoder.")
+            }
+            required_prefixes = ("actor.", "encoder.")
+            missing_prefixes = [
+                prefix
+                for prefix in required_prefixes
+                if not any(key.startswith(prefix) for key in policy_state)
+            ]
+            if missing_prefixes:
+                raise ValueError(
+                    "policy-only checkpoint is missing required weights: "
+                    + ", ".join(missing_prefixes)
+                )
+            self.alg.actor_critic.load_state_dict(policy_state, strict=False)
+            # A reward/profile migration starts a fresh PPO trajectory.  Do not
+            # inherit the old critic, optimizers, iteration, or env curriculum.
+            self.current_learning_iteration = 0
+            return loaded_dict.get("infos")
+        if resume_mode != "full":
+            raise ValueError(f"unknown checkpoint resume mode: {resume_mode}")
+        self.alg.actor_critic.load_state_dict(model_state)
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
             extra_state = loaded_dict.get("extra_optimizer_state_dict")
@@ -326,7 +359,7 @@ class OnPolicyRunner:
         # progress from the immutable model_<iteration>.pt filename.
         self.current_learning_iteration = max(stored_iteration, filename_iteration)
         env_state = loaded_dict.get("env_state")
-        if env_state is not None and hasattr(self.env, "load_checkpoint_state"):
+        if load_env_state and env_state is not None and hasattr(self.env, "load_checkpoint_state"):
             self.env.load_checkpoint_state(env_state)
         return loaded_dict["infos"]
 

@@ -231,7 +231,11 @@ class TaskRegistry:
                 checkpoint=train_cfg.runner.checkpoint,
             )
             print(f"Loading model from: {resume_path}")
-            runner.load(resume_path)
+            runner.load(
+                resume_path,
+                resume_mode=getattr(train_cfg.runner, "resume_mode", "full"),
+                load_env_state=getattr(train_cfg.runner, "resume_mode", "full") == "full",
+            )
         return runner, train_cfg
 
 

@@ -14,6 +14,7 @@ from wheel_legged_gym.envs.base.command_sampling import (
 )
 from wheel_legged_gym.envs.wheel_legged.policy_experiments import (
     apply_policy_experiment,
+    apply_training_profile,
 )
 from wheel_legged_gym.envs.wheel_legged.wheel_legged_config import (
     WheelLeggedCfg,
@@ -173,6 +174,47 @@ class PolicyExperimentTest(unittest.TestCase):
         self.assertEqual(score["passed_commands"], 7)
         self.assertAlmostEqual(score["max_normalized_error"], 2.0 / 3.0)
         self.assertEqual(score["termination_count"], 0)
+
+    def test_method_v1_profile_preserves_contract_and_enables_normalized_terms(self):
+        cfg = WheelLeggedCfg()
+        train_cfg = WheelLeggedCfgPPO()
+        manifest = apply_training_profile(
+            cfg, train_cfg, profile="method_v1", phase="translate", level=0
+        )
+        self.assertEqual(manifest["reward_version"], "normalized_v1")
+        self.assertEqual(cfg.env.num_observations, 25)
+        self.assertEqual(cfg.env.num_actions, 6)
+        self.assertEqual(cfg.env.obs_history_length, 5)
+        self.assertEqual(cfg.commands.ranges.lin_vel_x, [-0.5, 0.5])
+        self.assertEqual(cfg.commands.ranges.ang_vel_yaw, [0.0, 0.0])
+        self.assertEqual(cfg.rewards.scales.track_vx_coarse, 1.0)
+        self.assertEqual(cfg.rewards.scales.method_termination, -5.0)
+        self.assertEqual(train_cfg.algorithm.extra_learning_rate, 1.0e-5)
+
+    def test_method_v1_rejects_invalid_command_level(self):
+        cfg = WheelLeggedCfg()
+        with self.assertRaises(ValueError):
+            apply_training_profile(
+                cfg, WheelLeggedCfgPPO(), profile="method_v1", phase="yaw", level=99
+            )
+
+    def test_method_v1_command_sampling_uses_slot_ids(self):
+        ranges = torch.tensor([[-1.0, 1.0]])
+        yaw_ranges = torch.tensor([[-1.0, 1.0]])
+        from wheel_legged_gym.envs.base.command_sampling import sample_method_v1
+
+        linear, _, _ = sample_method_v1(
+            ranges, yaw_ranges, phase="translate", slot_ids=torch.tensor([7])
+        )
+        self.assertGreater(float(torch.abs(linear[0])), 0.0)
+        linear, _, _ = sample_method_v1(
+            ranges.repeat(10, 1),
+            yaw_ranges.repeat(10, 1),
+            phase="translate",
+            slot_ids=torch.arange(10),
+        )
+        self.assertTrue(torch.any(linear < 0.0))
+        self.assertTrue(torch.any(linear > 0.0))
 
 
 if __name__ == "__main__":

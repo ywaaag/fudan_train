@@ -12,6 +12,109 @@ MODE_FORWARD = 3
 MODE_NAMES = ("zero", "small", "reverse", "forward")
 
 
+def _signed_endpoint(limit: torch.Tensor, sign: torch.Tensor) -> torch.Tensor:
+    """Return an endpoint command with deterministic sign coverage."""
+
+    return sign * limit
+
+
+def sample_method_v1(
+    linear_ranges: torch.Tensor,
+    yaw_ranges: torch.Tensor,
+    *,
+    phase: str,
+    small_linear_limit: float = 0.10,
+    small_yaw_limit: float = 0.10,
+    slot_ids: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Sample the staged method_v1 command modes.
+
+    Commands are sampled once per episode by the environment.  The sampler is
+    intentionally stratified instead of relying on a single uniform draw so
+    both signs and pure-axis modes remain visible to the curriculum evaluator.
+    """
+
+    if linear_ranges.ndim != 2 or linear_ranges.shape[1] != 2:
+        raise ValueError("linear_ranges must have shape (N,2)")
+    if yaw_ranges.shape != linear_ranges.shape:
+        raise ValueError("yaw_ranges must match linear_ranges")
+    if phase not in {"stand", "translate", "yaw", "combined"}:
+        raise ValueError(f"unknown method_v1 phase: {phase}")
+
+    count = linear_ranges.shape[0]
+    device = linear_ranges.device
+    dtype = linear_ranges.dtype
+    if slot_ids is None:
+        slot_ids = torch.arange(count, device=device)
+    if slot_ids.shape != (count,):
+        raise ValueError("slot_ids must have shape (N,)")
+    linear = torch.zeros(count, device=device, dtype=dtype)
+    yaw = torch.zeros(count, device=device, dtype=dtype)
+    mode = torch.full((count,), MODE_ZERO, device=device, dtype=torch.long)
+    if phase == "stand":
+        return linear, yaw, mode
+
+    lin_limit = torch.maximum(torch.abs(linear_ranges[:, 0]), torch.abs(linear_ranges[:, 1]))
+    yaw_limit = torch.maximum(torch.abs(yaw_ranges[:, 0]), torch.abs(yaw_ranges[:, 1]))
+    sign = torch.where(
+        slot_ids % 2 == 0,
+        torch.ones(count, device=device, dtype=dtype),
+        -torch.ones(count, device=device, dtype=dtype),
+    )
+
+    if phase == "translate":
+        # 20% exact zero, 20% small anchors, then balanced reverse/forward.
+        bucket = slot_ids % 10
+        small = (bucket >= 2) & (bucket < 4)
+        reverse = (bucket >= 4) & (bucket < 7)
+        forward = bucket >= 7
+        linear[small] = torch.clamp(
+            sign[small] * torch.minimum(lin_limit[small], lin_limit[small].new_tensor(small_linear_limit)),
+            min=linear_ranges[small, 0],
+            max=linear_ranges[small, 1],
+        )
+        linear[reverse] = torch.minimum(linear_ranges[reverse, 1], -lin_limit[reverse])
+        linear[forward] = torch.maximum(linear_ranges[forward, 0], lin_limit[forward])
+        mode[small] = MODE_SMALL
+        mode[reverse] = MODE_REVERSE
+        mode[forward] = MODE_FORWARD
+        return linear, yaw, mode
+
+    if phase == "yaw":
+        bucket = slot_ids % 10
+        small = (bucket >= 2) & (bucket < 4)
+        turning = bucket >= 4
+        yaw[small] = sign[small] * torch.minimum(
+            yaw_limit[small], yaw_limit[small].new_tensor(small_yaw_limit)
+        )
+        yaw[turning] = sign[turning] * yaw_limit[turning]
+        mode[small] = MODE_SMALL
+        mode[turning] = torch.where(sign[turning] < 0, MODE_REVERSE, MODE_FORWARD)
+        return linear, yaw, mode
+
+    # Combined phase: 10% zero, 20% pure translation, 20% pure yaw, 50%
+    # simultaneous signed translation and yaw.  The caller controls the
+    # command envelope through the configured stage limits.
+    bucket = slot_ids % 10
+    pure_translation = (bucket >= 1) & (bucket < 3)
+    pure_yaw = (bucket >= 3) & (bucket < 5)
+    combined = bucket >= 5
+    linear[pure_translation] = sign[pure_translation] * lin_limit[pure_translation]
+    blend = 0.25 + 0.50 * torch.rand(count, device=device, dtype=dtype)
+    linear[combined] = sign[combined] * lin_limit[combined] * blend[combined]
+    yaw[pure_yaw] = sign[pure_yaw] * yaw_limit[pure_yaw]
+    yaw_sign = torch.where(slot_ids % 4 < 2, torch.ones_like(sign), -torch.ones_like(sign))
+    yaw[combined] = (
+        yaw_sign[combined]
+        * yaw_limit[combined]
+        * (1.0 - blend[combined])
+    )
+    mode[pure_translation] = torch.where(sign[pure_translation] < 0, MODE_REVERSE, MODE_FORWARD)
+    mode[pure_yaw] = MODE_SMALL
+    mode[combined] = MODE_FORWARD
+    return linear, yaw, mode
+
+
 def _uniform(lower: torch.Tensor, upper: torch.Tensor) -> torch.Tensor:
     return lower + (upper - lower) * torch.rand_like(lower)
 

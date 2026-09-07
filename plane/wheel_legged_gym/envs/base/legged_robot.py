@@ -50,7 +50,19 @@ from wheel_legged_gym.utils.math import (
     torch_rand_sqrt_float,
 )
 from wheel_legged_gym.utils.helpers import class_to_dict
-from wheel_legged_gym.envs.base.command_sampling import sample_zero_reverse_mixture
+from wheel_legged_gym.envs.base.command_sampling import (
+    sample_method_v1,
+    sample_zero_reverse_mixture,
+)
+from wheel_legged_gym.envs.base.reward_terms import (
+    CMD_HEIGHT,
+    CMD_VX,
+    CMD_YAW,
+    capped_tracking_terms,
+    normalized_huber,
+    smooth_gate,
+    wheel_rolling_terms,
+)
 from wheel_legged_gym.envs.base.command_curriculum import (
     evaluate_curriculum_window,
     validate_curriculum_stages,
@@ -86,6 +98,7 @@ class LeggedRobot(BaseTask):
         if not self.headless:
             self.set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
         self._init_buffers()
+        self._method_v1 = getattr(self.cfg.rewards, "reward_pipeline", "legacy_v0") == "normalized_v1"
         self._prepare_reward_function()
         self.init_done = True
 
@@ -160,6 +173,14 @@ class LeggedRobot(BaseTask):
         self.gym.refresh_net_contact_force_tensor(self.sim)
         self.gym.refresh_rigid_body_state_tensor(self.sim)
 
+        if self._method_v1 and self.feet_indices.numel() == 2:
+            contact_now = torch.norm(
+                self.contact_forces[:, self.feet_indices, :], dim=-1
+            ) > float(self.cfg.rewards.contact_force_threshold)
+            self.wheel_contact_history[:, 1:] = self.wheel_contact_history[:, :-1]
+            self.wheel_contact_history[:, 0] = contact_now
+            self.wheel_contact_seen |= contact_now.any(dim=1)
+
         self.episode_length_buf += 1
         self.common_step_counter += 1
 
@@ -196,8 +217,14 @@ class LeggedRobot(BaseTask):
         self.L0 = torch.sqrt(end_x**2 + end_y**2)
         self.theta0 = torch.arctan2(end_y, end_x) - self.pi / 2
 
-        self._post_physics_step_callback()
-        self._accumulate_command_tracking_metrics()
+        if self._method_v1:
+            # Attribute this physics step to the command that was active during
+            # it.  The callback may prepare the next command for observations.
+            self._accumulate_command_tracking_metrics()
+            self._post_physics_step_callback()
+        else:
+            self._post_physics_step_callback()
+            self._accumulate_command_tracking_metrics()
         # print(self.base_height)
         # compute observations, rewards, resets, ...
         self.check_termination()
@@ -217,14 +244,49 @@ class LeggedRobot(BaseTask):
 
     def check_termination(self):
         """Check if environments need to be reset"""
-        fail_buf = torch.any(
-            torch.norm(
-                self.contact_forces[:, self.termination_contact_indices, :], dim=-1
+        if self._method_v1:
+            forbidden = torch.any(
+                torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1)
+                > float(self.cfg.rewards.forbidden_contact_force_threshold),
+                dim=1,
+            ) if self.termination_contact_indices.numel() else torch.zeros(
+                self.num_envs, dtype=torch.bool, device=self.device
             )
-            > 10.0,
-            dim=1,
-        )
-        fail_buf |= self.projected_gravity[:, 2] > -0.1
+            upright_bad = self.projected_gravity[:, 2] > -0.1
+            warmup = self.episode_length_buf < (
+                float(self.cfg.rewards.contact_warmup_s) / self.dt
+            )
+            wheel_loss = (
+                self.wheel_contact_seen
+                & ~warmup
+                & (self.wheel_contact_history[:, 0].sum(dim=1) < 1.0)
+                & (getattr(self.cfg.commands, "training_phase", "legacy") != "stand")
+            )
+            self.forbidden_contact_streak = torch.where(
+                forbidden, self.forbidden_contact_streak + 1.0, torch.zeros_like(self.forbidden_contact_streak)
+            )
+            self.upright_streak = torch.where(
+                upright_bad, self.upright_streak + 1.0, torch.zeros_like(self.upright_streak)
+            )
+            self.wheel_loss_streak = torch.where(
+                wheel_loss, self.wheel_loss_streak + 1.0, torch.zeros_like(self.wheel_loss_streak)
+            )
+            forbidden_limit = float(self.cfg.rewards.forbidden_contact_grace_s) / self.dt
+            wheel_limit = float(self.cfg.rewards.wheel_loss_grace_s) / self.dt
+            fail_buf = (
+                (self.forbidden_contact_streak >= forbidden_limit)
+                | (self.upright_streak >= forbidden_limit)
+                | (self.wheel_loss_streak >= wheel_limit)
+            )
+        else:
+            fail_buf = torch.any(
+                torch.norm(
+                    self.contact_forces[:, self.termination_contact_indices, :], dim=-1
+                )
+                > 10.0,
+                dim=1,
+            )
+            fail_buf |= self.projected_gravity[:, 2] > -0.1
         self.fail_buf *= fail_buf
         self.fail_buf += fail_buf
         self.time_out_buf = (
@@ -235,11 +297,14 @@ class LeggedRobot(BaseTask):
             self.edge_reset_buf |= self.base_position[:, 0] < self.terrain_x_min + 1
             self.edge_reset_buf |= self.base_position[:, 1] > self.terrain_y_max - 1
             self.edge_reset_buf |= self.base_position[:, 1] < self.terrain_y_min + 1
-        self.reset_buf = (
-            (self.fail_buf > self.cfg.env.fail_to_terminal_time_s / self.dt)
-            | self.time_out_buf
-            | self.edge_reset_buf
-        )
+        if self._method_v1:
+            self.reset_buf = fail_buf | self.time_out_buf | self.edge_reset_buf
+        else:
+            self.reset_buf = (
+                (self.fail_buf > self.cfg.env.fail_to_terminal_time_s / self.dt)
+                | self.time_out_buf
+                | self.edge_reset_buf
+            )
 
     def reset_idx(self, env_ids):
         """Reset some environments.
@@ -298,7 +363,17 @@ class LeggedRobot(BaseTask):
             / forward_count,
             "wheel_slip_m_s2": self.command_metric_wheel_slip_sum[env_ids].sum()
             / metric_count,
+            "wheel_slip_rms_m_s": self.command_metric_wheel_slip_rms_sum[env_ids].sum()
+            / metric_count,
+            "wheel_contact_fraction": self.command_metric_wheel_contact_fraction_sum[
+                env_ids
+            ].sum()
+            / metric_count,
             "torque_saturation_fraction": self.command_metric_torque_saturation_sum[
+                env_ids
+            ].sum()
+            / metric_count,
+            "preclip_torque_saturation_fraction": self.command_metric_preclip_torque_saturation_sum[
                 env_ids
             ].sum()
             / metric_count,
@@ -332,6 +407,12 @@ class LeggedRobot(BaseTask):
         self.episode_length_buf[env_ids] = 0
         self.reset_buf[env_ids] = 1
         self.fail_buf[env_ids] = 0
+        if self._method_v1:
+            self.forbidden_contact_streak[env_ids] = 0.0
+            self.upright_streak[env_ids] = 0.0
+            self.wheel_loss_streak[env_ids] = 0.0
+            self.wheel_contact_history[env_ids] = False
+            self.wheel_contact_seen[env_ids] = False
         self.envs_steps_buf[env_ids] = 0
         self.last_dof_pos[env_ids] = self.dof_pos[env_ids]
         self.last_base_position[env_ids] = self.base_position[env_ids]
@@ -422,12 +503,20 @@ class LeggedRobot(BaseTask):
         self.command_metric_yaw_count += yaw
         self.command_metric_yaw_command_abs_sum += yaw * torch.abs(self.commands[:, 1])
         self.command_metric_yaw_error_sum += yaw * yaw_error
-        wheel_speed = -torch.mean(self.dof_vel[:, [2, 5]], dim=1) * float(
-            self.cfg.rewards.wheel_radius
-        )
-        slip = torch.square(wheel_speed - base_vx)
+        if self._method_v1:
+            wheel_terms = self._method_wheel_terms()
+            slip = wheel_terms["residual_rms"]
+            contact_fraction = self.wheel_contact_history[:, 0].float().mean(dim=1)
+        else:
+            wheel_speed = -torch.mean(self.dof_vel[:, [2, 5]], dim=1) * float(
+                self.cfg.rewards.wheel_radius
+            )
+            slip = torch.square(wheel_speed - base_vx)
+            contact_fraction = torch.zeros_like(slip)
         # Keep this diagnostic unmasked so low-speed/zero-command wheel spin is visible.
         self.command_metric_wheel_slip_sum += slip
+        self.command_metric_wheel_slip_rms_sum += slip
+        self.command_metric_wheel_contact_fraction_sum += contact_fraction
         self.command_metric_torque_saturation_sum += (
             torch.abs(self.torques) >= self.torque_limits * 0.99
         ).float().mean(dim=1)
@@ -442,7 +531,9 @@ class LeggedRobot(BaseTask):
         for i in range(len(self.reward_functions)):
             name = self.reward_names[i]
             rew = self.reward_functions[i]() * self.reward_scales[name]
-            if name not in getattr(self.cfg.rewards, "unclipped_reward_names", ()):
+            if self.reward_pipeline != "normalized_v1" and name not in getattr(
+                self.cfg.rewards, "unclipped_reward_names", ()
+            ):
                 rew = torch.clip(
                     rew,
                     -self.cfg.rewards.clip_single_reward * self.dt,
@@ -452,11 +543,20 @@ class LeggedRobot(BaseTask):
             self.episode_sums[name] += rew
         if self.cfg.rewards.only_positive_rewards:
             self.rew_buf[:] = torch.clip(self.rew_buf[:], min=0.0)
-        # add termination reward after clipping
-        if "termination" in self.reward_scales:
-            rew = self._reward_termination() * self.reward_scales["termination"]
+        termination_name = (
+            "method_termination"
+            if self.reward_pipeline == "normalized_v1"
+            else "termination"
+        )
+        if self.raw_reward_scales.get(termination_name, 0.0) != 0:
+            terminal_scale = (
+                self.raw_reward_scales[termination_name]
+                if self.reward_pipeline == "normalized_v1"
+                else self.reward_scales.get(termination_name, 0.0)
+            )
+            rew = self._reward_termination() * terminal_scale
             self.rew_buf += rew
-            self.episode_sums["termination"] += rew
+            self.episode_sums[termination_name] += rew
 
     def compute_proprioception_observations(self):
         # note that observation noise need to modified accordingly !!!
@@ -763,7 +863,8 @@ class LeggedRobot(BaseTask):
             .nonzero(as_tuple=False)
             .flatten()
         )
-        self._resample_commands(env_ids)
+        if not getattr(self.cfg.commands, "hold_command_until_reset", False):
+            self._resample_commands(env_ids)
         if self.cfg.commands.heading_command:
             forward = quat_apply(self.base_quat, self.forward_vec)
             heading = torch.atan2(forward[:, 1], forward[:, 0])
@@ -808,7 +909,24 @@ class LeggedRobot(BaseTask):
             env_ids (List[int]): Environments ids for which new commands are needed
         """
         strategy = getattr(self.cfg.commands, "sampling_strategy", "uniform")
-        if strategy == "zero_reverse_mixture":
+        if strategy == "method_v1":
+            linear, yaw, mode = sample_method_v1(
+                self.command_ranges["lin_vel_x"][env_ids],
+                self.command_ranges["ang_vel_yaw"][env_ids],
+                phase=getattr(self.cfg.commands, "training_phase", "stand"),
+                small_linear_limit=float(
+                    getattr(self.cfg.commands, "mixture_small_linear_limit", 0.10)
+                ),
+                small_yaw_limit=float(
+                    getattr(self.cfg.commands, "mixture_small_yaw_limit", 0.10)
+                ),
+                slot_ids=self.method_v1_segment_counter[env_ids],
+            )
+            self.commands[env_ids, 0] = linear
+            self.commands[env_ids, 1] = yaw
+            self.command_sample_mode[env_ids] = mode
+            self.method_v1_segment_counter[env_ids] += 1
+        elif strategy == "zero_reverse_mixture":
             linear, yaw, mode = sample_zero_reverse_mixture(
                 self.command_ranges["lin_vel_x"][env_ids],
                 self.command_ranges["ang_vel_yaw"][env_ids],
@@ -899,9 +1017,12 @@ class LeggedRobot(BaseTask):
         torques = self.p_gains * (
             pos_ref + self.default_dof_pos - self.dof_pos
         ) + self.d_gains * (vel_ref - self.dof_vel)
-        return torch.clip(
-            torques * self.torques_scale, -self.torque_limits, self.torque_limits
-        )
+        raw_torques = torques * self.torques_scale
+        if self._method_v1:
+            self.command_metric_preclip_torque_saturation_sum += (
+                torch.abs(raw_torques) >= self.torque_limits * 0.99
+            ).float().mean(dim=1) / float(self.cfg.control.decimation)
+        return torch.clip(raw_torques, -self.torque_limits, self.torque_limits)
 
     def _reset_dofs(self, env_ids):
         """Resets DOF position and velocities of selected environmments
@@ -1243,6 +1364,15 @@ class LeggedRobot(BaseTask):
         return metrics
 
     def get_checkpoint_state(self):
+        if self._method_v1:
+            return {
+                "reward_pipeline": "normalized_v1",
+                "training_profile": "method_v1",
+                "training_phase": getattr(self.cfg.commands, "training_phase", "stand"),
+                "command_level": int(getattr(self.cfg.commands, "method_v1_level", 0)),
+                "randomization_level": int(getattr(self.cfg, "domain_rand_level", 0)),
+                "segment_counter": self.method_v1_segment_counter.detach().cpu(),
+            }
         if not self._uses_staged_curriculum():
             return {}
         return {
@@ -1254,6 +1384,17 @@ class LeggedRobot(BaseTask):
         }
 
     def load_checkpoint_state(self, state):
+        if self._method_v1:
+            if not state:
+                return
+            if state.get("reward_pipeline") not in {None, "normalized_v1"}:
+                raise ValueError("checkpoint reward pipeline is incompatible with method_v1")
+            counter = state.get("segment_counter")
+            if counter is not None:
+                counter = torch.as_tensor(counter, device=self.device, dtype=torch.long)
+                if counter.shape == self.method_v1_segment_counter.shape:
+                    self.method_v1_segment_counter[:] = counter
+            return
         if not self._uses_staged_curriculum() or not state:
             return
         curriculum = state.get("staged_command_curriculum")
@@ -1319,9 +1460,11 @@ class LeggedRobot(BaseTask):
         actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
         dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
         net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
+        rigid_body_state_tensor = self.gym.acquire_rigid_body_state_tensor(self.sim)
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
 
         # create some wrapper tensors for different slices
         self.root_states = gymtorch.wrap_tensor(actor_root_state)
@@ -1334,6 +1477,9 @@ class LeggedRobot(BaseTask):
         self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(
             self.num_envs, -1, 3
         )  # shape: num_envs, num_bodies, xyz axis
+        self.rigid_body_states = gymtorch.wrap_tensor(rigid_body_state_tensor).view(
+            self.num_envs, self.num_bodies, 13
+        )
 
         # initialize some data used later on
         self.common_step_counter = 0
@@ -1407,6 +1553,9 @@ class LeggedRobot(BaseTask):
             device=self.device,
             requires_grad=False,
         )
+        self.method_v1_segment_counter = torch.arange(
+            self.num_envs, dtype=torch.long, device=self.device
+        )
         metric_names = (
             "command_metric_count",
             "command_metric_command_x_sum",
@@ -1428,7 +1577,10 @@ class LeggedRobot(BaseTask):
             "command_metric_yaw_command_abs_sum",
             "command_metric_yaw_error_sum",
             "command_metric_wheel_slip_sum",
+            "command_metric_wheel_slip_rms_sum",
+            "command_metric_wheel_contact_fraction_sum",
             "command_metric_torque_saturation_sum",
+            "command_metric_preclip_torque_saturation_sum",
             "command_metric_action_clip_sum",
         )
         self.command_metric_buffers = []
@@ -1493,6 +1645,26 @@ class LeggedRobot(BaseTask):
             device=self.device,
             requires_grad=False,
         )
+        history_length = int(getattr(self.cfg.rewards, "contact_history_length", 4))
+        self.wheel_contact_history = torch.zeros(
+            self.num_envs,
+            history_length,
+            len(self.feet_indices),
+            dtype=torch.bool,
+            device=self.device,
+            requires_grad=False,
+        )
+        self.wheel_contact_seen = torch.zeros(
+            self.num_envs, dtype=torch.bool, device=self.device, requires_grad=False
+        )
+        self.command_metric_preclip_torque_saturation_sum = torch.zeros(
+            self.num_envs, dtype=torch.float, device=self.device, requires_grad=False
+        )
+        self.forbidden_contact_streak = torch.zeros(
+            self.num_envs, dtype=torch.float, device=self.device, requires_grad=False
+        )
+        self.upright_streak = torch.zeros_like(self.forbidden_contact_streak)
+        self.wheel_loss_streak = torch.zeros_like(self.forbidden_contact_streak)
         self.base_lin_vel = quat_rotate_inverse(
             self.base_quat, self.root_states[:, 7:10]
         )
@@ -1629,18 +1801,24 @@ class LeggedRobot(BaseTask):
         """Prepares a list of reward functions, whcih will be called to compute the total reward.
         Looks for self._reward_<REWARD_NAME>, where <REWARD_NAME> are names of all non zero reward scales in the cfg.
         """
-        # remove zero scales + multiply non-zero ones by dt
+        self.raw_reward_scales = dict(self.reward_scales)
+        self.reward_pipeline = getattr(self.cfg.rewards, "reward_pipeline", "legacy_v0")
+        # Remove zero scales and multiply each normalized term by dt exactly once.
         for key in list(self.reward_scales.keys()):
             scale = self.reward_scales[key]
             if scale == 0:
                 self.reward_scales.pop(key)
             else:
-                self.reward_scales[key] *= self.dt
+                if not (
+                    self.reward_pipeline == "normalized_v1"
+                    and key == "method_termination"
+                ):
+                    self.reward_scales[key] *= self.dt
         # prepare list of functions
         self.reward_functions = []
         self.reward_names = []
         for name, scale in self.reward_scales.items():
-            if name == "termination":
+            if name in {"termination", "method_termination"}:
                 continue
             self.reward_names.append(name)
             name = "_reward_" + name
@@ -1838,6 +2016,38 @@ class LeggedRobot(BaseTask):
             self.feet_indices[i] = self.gym.find_actor_rigid_body_handle(
                 self.envs[0], self.actor_handles[0], feet_names[i]
             )
+
+        if getattr(self.cfg.rewards, "reward_pipeline", "legacy_v0") == "normalized_v1":
+            expected_dofs = (
+                "left_leg_0",
+                "left_leg_1",
+                "left_wheel",
+                "right_leg_0",
+                "right_leg_1",
+                "right_wheel",
+            )
+            expected_wheel_dofs = ("left_wheel", "right_wheel")
+            expected_wheels = ("left_wheel_link", "right_wheel_link")
+            missing_dofs = [name for name in expected_dofs if name not in self.dof_names]
+            missing_wheels = [name for name in expected_wheels if name not in body_names]
+            if missing_dofs or missing_wheels:
+                raise ValueError(
+                    "method_v1 asset contract mismatch: "
+                    f"missing_dofs={missing_dofs}, missing_wheels={missing_wheels}"
+                )
+            if len(expected_wheels) != 2:
+                raise ValueError("method_v1 requires exactly two wheel bodies")
+            self.wheel_dof_indices = torch.tensor(
+                [self.dof_names.index(name) for name in expected_wheel_dofs],
+                dtype=torch.long,
+                device=self.device,
+            )
+            self.wheel_body_indices = torch.tensor(
+                [body_names.index(name) for name in expected_wheels],
+                dtype=torch.long,
+                device=self.device,
+            )
+            self.feet_indices = self.wheel_body_indices.clone()
 
         self.penalised_contact_indices = torch.zeros(
             len(penalized_contact_names),
@@ -2079,16 +2289,172 @@ class LeggedRobot(BaseTask):
         self.rwd_angVelTrackPrev = self._reward_tracking_ang_vel()
 
     # ------------ reward functions----------------
+    def _method_task_gate(self):
+        """Smoothly suppress task bonus when the body is badly tilted/fallen."""
+
+        upright_error = torch.norm(self.projected_gravity[:, :2], dim=1)
+        upright = smooth_gate(
+            upright_error, float(self.cfg.rewards.upright_gate_tolerance)
+        )
+        height = smooth_gate(
+            torch.abs(self.base_height - self.commands[:, CMD_HEIGHT]),
+            float(self.cfg.rewards.height_gate_tolerance),
+        )
+        # Keep a small floor so a recovery trajectory still has a gradient;
+        # safety/contact/termination costs remain ungated.
+        return 0.1 + 0.9 * upright * height
+
+    def _method_wheel_terms(self):
+        if not hasattr(self, "wheel_dof_indices"):
+            raise RuntimeError("method_v1 requires resolved wheel DOF indices")
+        wheel_body_pos = self.rigid_body_states[:, self.wheel_body_indices, :3]
+        relative = wheel_body_pos - self.root_states[:, :3].unsqueeze(1)
+        base_quat = self.base_quat.unsqueeze(1).expand(-1, relative.shape[1], -1)
+        relative_body = quat_rotate_inverse(
+            base_quat.reshape(-1, 4), relative.reshape(-1, 3)
+        ).reshape(self.num_envs, -1, 3)
+        wheel_y = relative_body[:, :, 1]
+        contact = self.wheel_contact_history[:, 0]
+        return wheel_rolling_terms(
+            self.base_lin_vel[:, CMD_VX],
+            self.base_ang_vel[:, 2],
+            self.dof_vel[:, self.wheel_dof_indices],
+            wheel_y,
+            float(self.cfg.rewards.wheel_radius),
+            contact,
+            slip_scale=float(self.cfg.rewards.wheel_slip_scale),
+            air_spin_scale=float(self.cfg.rewards.wheel_air_spin_scale),
+        )
+
+    def _reward_track_vx_coarse(self):
+        terms = capped_tracking_terms(
+            self.commands[:, CMD_VX] - self.base_lin_vel[:, CMD_VX],
+            float(self.cfg.rewards.tracking_linear_cap),
+            coarse_sigma=float(self.cfg.rewards.tracking_coarse_sigma),
+            fine_sigma=float(self.cfg.rewards.tracking_fine_sigma),
+            gap_delta=float(self.cfg.rewards.tracking_gap_delta),
+            gap_clip=float(self.cfg.rewards.tracking_gap_clip),
+        )
+        return terms["coarse"] * self._method_task_gate()
+
+    def _reward_track_vx_fine(self):
+        error = self.commands[:, CMD_VX] - self.base_lin_vel[:, CMD_VX]
+        terms = capped_tracking_terms(
+            error,
+            float(self.cfg.rewards.tracking_linear_cap),
+            coarse_sigma=float(self.cfg.rewards.tracking_coarse_sigma),
+            fine_sigma=float(self.cfg.rewards.tracking_fine_sigma),
+            gap_delta=float(self.cfg.rewards.tracking_gap_delta),
+            gap_clip=float(self.cfg.rewards.tracking_gap_clip),
+        )
+        return terms["fine"] * self._method_task_gate()
+
+    def _reward_track_vx_gap(self):
+        error = self.commands[:, CMD_VX] - self.base_lin_vel[:, CMD_VX]
+        terms = capped_tracking_terms(
+            error,
+            float(self.cfg.rewards.tracking_linear_cap),
+            coarse_sigma=float(self.cfg.rewards.tracking_coarse_sigma),
+            fine_sigma=float(self.cfg.rewards.tracking_fine_sigma),
+            gap_delta=float(self.cfg.rewards.tracking_gap_delta),
+            gap_clip=float(self.cfg.rewards.tracking_gap_clip),
+        )
+        return terms["gap"] * self._method_task_gate()
+
+    def _reward_track_yaw_coarse(self):
+        error = self.commands[:, CMD_YAW] - self.base_ang_vel[:, 2]
+        terms = capped_tracking_terms(
+            error,
+            float(self.cfg.rewards.tracking_yaw_cap),
+            coarse_sigma=float(self.cfg.rewards.tracking_coarse_sigma),
+            fine_sigma=float(self.cfg.rewards.tracking_fine_sigma),
+            gap_delta=float(self.cfg.rewards.tracking_gap_delta),
+            gap_clip=float(self.cfg.rewards.tracking_gap_clip),
+        )
+        return terms["coarse"] * self._method_task_gate()
+
+    def _reward_track_yaw_fine(self):
+        error = self.commands[:, CMD_YAW] - self.base_ang_vel[:, 2]
+        terms = capped_tracking_terms(
+            error,
+            float(self.cfg.rewards.tracking_yaw_cap),
+            coarse_sigma=float(self.cfg.rewards.tracking_coarse_sigma),
+            fine_sigma=float(self.cfg.rewards.tracking_fine_sigma),
+            gap_delta=float(self.cfg.rewards.tracking_gap_delta),
+            gap_clip=float(self.cfg.rewards.tracking_gap_clip),
+        )
+        return terms["fine"] * self._method_task_gate()
+
+    def _reward_track_yaw_gap(self):
+        error = self.commands[:, CMD_YAW] - self.base_ang_vel[:, 2]
+        terms = capped_tracking_terms(
+            error,
+            float(self.cfg.rewards.tracking_yaw_cap),
+            coarse_sigma=float(self.cfg.rewards.tracking_coarse_sigma),
+            fine_sigma=float(self.cfg.rewards.tracking_fine_sigma),
+            gap_delta=float(self.cfg.rewards.tracking_gap_delta),
+            gap_clip=float(self.cfg.rewards.tracking_gap_clip),
+        )
+        return terms["gap"] * self._method_task_gate()
+
+    def _reward_height_cost(self):
+        return normalized_huber(
+            self.base_height - self.commands[:, CMD_HEIGHT],
+            float(self.cfg.rewards.height_gate_tolerance),
+            clip=1.0,
+        )
+
+    def _reward_lateral_velocity(self):
+        return normalized_huber(self.base_lin_vel[:, 1], 0.5, clip=1.0)
+
+    def _reward_wheel_slip(self):
+        return self._method_wheel_terms()["contact_slip"]
+
+    def _reward_airborne_wheel_spin(self):
+        return self._method_wheel_terms()["airborne_spin"]
+
+    def _reward_wheel_contact_loss(self):
+        return 1.0 - self.wheel_contact_history[:, 0].to(torch.float).mean(dim=1)
+
+    def _reward_forbidden_contact(self):
+        if self.termination_contact_indices.numel() == 0:
+            return torch.zeros(self.num_envs, device=self.device)
+        force = torch.norm(
+            self.contact_forces[:, self.termination_contact_indices, :], dim=-1
+        )
+        return (force > float(self.cfg.rewards.forbidden_contact_force_threshold)).any(dim=1).float()
+
+    def _reward_torque_cost(self):
+        normalized = torch.abs(self.torques) / torch.clamp(self.torque_limits, min=1.0)
+        return torch.clamp(torch.mean(torch.square(normalized), dim=1), max=1.0)
+
+    def _reward_power_cost(self):
+        torque_norm = torch.abs(self.torques) / torch.clamp(self.torque_limits, min=1.0)
+        velocity_norm = torch.abs(self.dof_vel) / torch.clamp(self.dof_vel_limits, min=1.0)
+        return torch.clamp(torch.mean(torque_norm * velocity_norm, dim=1), max=1.0)
+
+    def _reward_action_second_diff(self):
+        second = self.actions - 2.0 * self.last_actions[:, :, 0] + self.last_actions[:, :, 1]
+        return torch.clamp(torch.mean(torch.square(second), dim=1), max=1.0)
+
     def _reward_lin_vel_z(self):
         # Penalize z axis base linear velocity
+        if self._method_v1:
+            return normalized_huber(self.base_lin_vel[:, 2], 0.5, clip=1.0)
         return torch.square(self.base_lin_vel[:, 2])
 
     def _reward_ang_vel_xy(self):
         # Penalize xy axes base angular velocity
+        if self._method_v1:
+            return torch.clamp(torch.mean(torch.square(self.base_ang_vel[:, :2]), dim=1), max=1.0)
         return torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1)
 
     def _reward_orientation(self):
         # Penalize non flat base orientation
+        if self._method_v1:
+            return normalized_huber(
+                torch.norm(self.projected_gravity[:, :2], dim=1), 0.35, clip=1.0
+            )
         return torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
 
     def _reward_base_height(self):
@@ -2124,7 +2490,8 @@ class LeggedRobot(BaseTask):
 
     def _reward_action_rate(self):
         # Penalize changes in actions
-        return torch.sum(torch.square(self.last_actions[:, :, 0] - self.actions), dim=1)
+        value = torch.mean(torch.square(self.last_actions[:, :, 0] - self.actions), dim=1)
+        return torch.clamp(value, max=1.0) if self._method_v1 else value
 
     def _reward_action_smooth(self):
         # Penalize changes in actions
@@ -2259,11 +2626,20 @@ class LeggedRobot(BaseTask):
         penalty += self.cfg.rewards.zero_yaw_rate_weight * torch.abs(
             self.base_ang_vel[:, 2]
         )
+        if self._method_v1:
+            penalty = normalized_huber(penalty, 0.5, clip=1.0)
         return penalty * self._zero_command_mask()
 
     def _reward_zero_wheel_velocity(self):
         """Discourage the accepted policy's persistent zero-command wheel spin."""
-        wheel_speed = torch.mean(torch.abs(self.dof_vel[:, [2, 5]]), dim=1)
+        wheel_indices = getattr(
+            self, "wheel_dof_indices", torch.tensor([2, 5], device=self.device)
+        )
+        wheel_speed = torch.mean(torch.abs(self.dof_vel[:, wheel_indices]), dim=1)
+        if self._method_v1:
+            wheel_speed = normalized_huber(
+                wheel_speed * float(self.cfg.rewards.wheel_radius), 0.5, clip=1.0
+            )
         return wheel_speed * self._zero_command_mask()
 
     def _reward_low_speed_tracking(self):
@@ -2323,9 +2699,10 @@ class LeggedRobot(BaseTask):
 
     def _reward_stand_still(self):
         # Penalize motion at zero commands
-        return torch.sum(torch.abs(self.dof_pos - self.default_dof_pos), dim=1) * (
+        value = torch.sum(torch.abs(self.dof_pos - self.default_dof_pos), dim=1) * (
             torch.norm(self.commands[:, :2], dim=1) < 0.1
         )
+        return torch.clamp(value, max=1.0) if self._method_v1 else value
 
     def _reward_nominal_state(self):
         # return torch.square(self.theta0[:, 0] - self.theta0[:, 1])

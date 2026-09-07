@@ -39,6 +39,7 @@ import torch
 from pathlib import Path
 
 from wheel_legged_gym.envs.wheel_legged.policy_experiments import (
+    apply_training_profile,
     apply_policy_experiment,
     enforce_optimizer_overrides,
     write_experiment_manifest,
@@ -47,7 +48,21 @@ from wheel_legged_gym.envs.wheel_legged.policy_experiments import (
 
 def train(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
-    manifest = apply_policy_experiment(env_cfg, args.policy_experiment, train_cfg)
+    if str(args.policy_experiment or "").lower() in {"method_v1", "method"}:
+        if args.resume and getattr(args, "resume_mode", "full") == "full":
+            raise ValueError(
+                "method_v1 reward migration requires --resume_mode policy; "
+                "full resume is reserved for matching normalized_v1 checkpoints"
+            )
+        manifest = apply_training_profile(
+            env_cfg,
+            train_cfg,
+            profile="method_v1",
+            phase=args.phase,
+            level=args.command_level,
+        )
+    else:
+        manifest = apply_policy_experiment(env_cfg, args.policy_experiment, train_cfg)
     env, env_cfg = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
     ppo_runner, train_cfg = task_registry.make_alg_runner(
         env=env, name=args.task, args=args, train_cfg=train_cfg
