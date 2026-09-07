@@ -1,0 +1,14 @@
+# Generated training artifacts; keep them on disk, but do not version them.
+plane/logs/
+plane/outputs/
+
+# Python caches and local build metadata.
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+**/*.egg-info/
+
+# Local editor and OS files.
+.DS_Store
+.idea/
+.vscode/

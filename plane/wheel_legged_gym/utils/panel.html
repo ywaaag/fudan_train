@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wheel-Leg Live Control</title>
+  <style>
+    :root { color-scheme: dark; --bg:#111827; --card:#1f2937; --line:#374151; --text:#e5e7eb; --muted:#9ca3af; --accent:#38bdf8; --danger:#fb7185; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:linear-gradient(145deg,#0b1020,#111827 55%,#0f172a); color:var(--text); font:14px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { max-width:1400px; margin:0 auto; padding:22px; }
+    h1,h2 { margin:0 0 8px; } h1 { font-size:24px; } h2 { font-size:16px; }
+    .sub { color:var(--muted); margin-bottom:18px; }
+    .grid { display:grid; grid-template-columns:minmax(300px,360px) 1fr; gap:16px; align-items:start; }
+    .card { background:rgba(31,41,55,.9); border:1px solid var(--line); border-radius:12px; padding:16px; box-shadow:0 12px 30px rgba(0,0,0,.16); }
+    .controls { display:grid; gap:14px; }
+    .row { display:grid; grid-template-columns:90px 1fr 86px; align-items:center; gap:10px; }
+    label { color:#cbd5e1; } output { text-align:right; font-variant-numeric:tabular-nums; color:var(--accent); }
+    input[type=number] { width:86px; border:1px solid #475569; border-radius:6px; background:#0f172a; color:var(--text); padding:6px 7px; font-variant-numeric:tabular-nums; }
+    input[type=range] { width:100%; accent-color:var(--accent); }
+    button { border:1px solid #475569; background:#334155; color:var(--text); border-radius:8px; padding:8px 12px; cursor:pointer; }
+    button:hover { background:#475569; } button.danger { background:#7f1d1d; border-color:#991b1b; } button.active { background:#075985; border-color:#0ea5e9; }
+    .buttons { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+    .status { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+    .pill { border:1px solid var(--line); border-radius:999px; padding:4px 9px; color:var(--muted); }
+    .pill.ok { color:#86efac; border-color:#166534; } .pill.bad { color:#fda4af; border-color:#9f1239; }
+    .hint { color:var(--muted); font-size:12px; margin-top:8px; }
+    .gamepad { display:flex; align-items:center; gap:10px; margin-top:10px; }
+    .gamepad input { accent-color:var(--accent); }
+    .limit-grid { display:grid; grid-template-columns:90px 1fr 1fr; gap:8px; align-items:center; margin-top:6px; }
+    .limit-grid > span { color:var(--muted); font-size:12px; }
+    canvas { width:100%; height:220px; background:#0f172a; border:1px solid #253047; border-radius:8px; display:block; }
+    .charts { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .chart-wide { grid-column:1 / -1; }
+    .latest { margin-top:14px; color:var(--muted); font:12px ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; word-break:break-word; }
+    @media (max-width:900px) { .grid { grid-template-columns:1fr; } .charts { grid-template-columns:1fr; } .chart-wide { grid-column:auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Wheel-Leg Live Control</h1>
+  <div class="sub">本地实时控制面板 · 滑块、浏览器 WSAD、Gamepad API 与 Isaac Gym 状态曲线</div>
+  <div class="status">
+    <span id="connection" class="pill bad">连接中…</span>
+    <span id="runState" class="pill">仿真状态未知</span>
+    <span id="source" class="pill">source: —</span>
+    <span id="task" class="pill">task: —</span>
+  </div>
+
+  <div class="grid">
+    <section class="card controls">
+      <h2>手动命令</h2>
+      <div class="row"><label for="cmd_x">前后速度</label><input id="cmd_x" type="range" step="0.01"><input id="cmd_x_number" type="number" step="0.01"></div>
+      <div class="row"><label for="ang_vel">转向速度</label><input id="ang_vel" type="range" step="0.01"><input id="ang_vel_number" type="number" step="0.01"></div>
+      <div class="row"><label for="cmd_height">目标高度</label><input id="cmd_height" type="range" step="0.001"><input id="cmd_height_number" type="number" step="0.001"></div>
+      <div class="buttons">
+        <button id="stop" class="danger">停止运动</button>
+        <button id="center">命令归中</button>
+        <button id="csv">下载 CSV</button>
+      </div>
+      <div class="gamepad">
+        <input id="gamepadEnabled" type="checkbox"><label for="gamepadEnabled">启用浏览器手柄</label>
+        <span id="gamepadStatus" class="hint">未检测到手柄</span>
+      </div>
+      <h2 style="margin-top:12px">可编辑控制范围</h2>
+      <div class="limit-grid">
+        <span></span><span>最小值</span><span>最大值</span>
+        <label for="cmd_x_min">前后速度</label><input id="cmd_x_min" type="number" step="0.01"><input id="cmd_x_max" type="number" step="0.01">
+        <label for="ang_vel_min">转向速度</label><input id="ang_vel_min" type="number" step="0.01"><input id="ang_vel_max" type="number" step="0.01">
+        <label for="cmd_height_min">目标高度</label><input id="cmd_height_min" type="number" step="0.001"><input id="cmd_height_max" type="number" step="0.001">
+      </div>
+      <div class="buttons"><button id="applyLimits">应用控制范围</button></div>
+      <div class="hint">数值框可以直接输入目标值；范围设置会立即改变运行时 clamp。高度默认可调，但当前 checkpoint 主要在 0.40 m 高度上训练，过大改动可能失稳。</div>
+      <div class="hint">键盘：按住 W/S 前进/后退，A/D 左右转；松开后回到 0。滑块会直接覆盖当前命令。</div>
+      <div class="hint">手柄接口：左摇杆 Y → 前后，右摇杆 X → 转向，D-pad ↑/↓ → 高度。浏览器需要先聚焦本页并按一下手柄。</div>
+    </section>
+
+    <section class="card">
+      <h2>实时曲线</h2>
+      <div class="charts">
+        <div class="chart-wide"><canvas id="motionChart"></canvas></div>
+        <div><canvas id="heightChart"></canvas></div>
+        <div><canvas id="wheelChart"></canvas></div>
+      </div>
+      <div id="latest" class="latest">等待 Isaac Gym telemetry…</div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const axes = ['cmd_x', 'ang_vel', 'cmd_height'];
+const state = { command: {cmd_x:0, ang_vel:0, cmd_height:0}, limits:{}, telemetry:[], metadata:{} };
+let sendTimer = null;
+let lastSource = 'panel';
+let gamepadIndex = null;
+let slidersReady = false;
+
+function fmt(name, value) {
+  const digits = name === 'cmd_height' ? 3 : 2;
+  return Number(value || 0).toFixed(digits);
+}
+function setupSliders() {
+  for (const name of axes) {
+    const input = $(name), number = $(name + '_number'), limit = state.limits[name] || [-1,1];
+    input.min = limit[0]; input.max = limit[1];
+    number.min = limit[0]; number.max = limit[1];
+    if (!slidersReady || (document.activeElement !== input && document.activeElement !== number)) {
+      input.value = state.command[name] ?? 0;
+      number.value = state.command[name] ?? 0;
+    }
+    input.disabled = limit[0] === limit[1];
+    number.disabled = limit[0] === limit[1];
+    if (!slidersReady) {
+      input.oninput = () => { number.value = input.value; queueCommand(name, Number(input.value), 'slider'); };
+      number.onchange = () => {
+        const value = Number(number.value);
+        if (Number.isFinite(value)) { input.value = value; queueCommand(name, value, 'number'); }
+      };
+    }
+  }
+  setupLimitInputs();
+  slidersReady = true;
+}
+function updateSlider(name, value) {
+  const input = $(name), number = $(name + '_number');
+  if (!input || !number) return;
+  input.value = value; number.value = value;
+}
+function setupLimitInputs() {
+  for (const name of axes) {
+    const limit = state.limits[name] || [-1,1], min = $(name + '_min'), max = $(name + '_max');
+    if (!min || !max) continue;
+    if (document.activeElement !== min && document.activeElement !== max) {
+      min.value = limit[0]; max.value = limit[1];
+    }
+  }
+}
+async function applyLimits() {
+  const limits = {};
+  for (const name of axes) {
+    const lo = Number($(name + '_min').value), hi = Number($(name + '_max').value);
+    if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo > hi) {
+      alert(name + ' 的范围无效：需要 min <= max'); return;
+    }
+    limits[name] = [lo, hi];
+  }
+  try {
+    const response = await fetch('/api/limits', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({limits})});
+    const result = await response.json();
+    if (!result.ok) throw Error(result.error || 'range update failed');
+    state.limits = result.limits; setupSliders();
+  } catch (error) { alert('控制范围更新失败: ' + error.message); }
+}
+function queueCommand(name, value, source) {
+  state.command[name] = value; lastSource = source;
+  if (sendTimer) clearTimeout(sendTimer);
+  sendTimer = setTimeout(() => sendCommand({[name]: value, source}), 35);
+}
+async function sendCommand(payload) {
+  try {
+    const response = await fetch('/api/command', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    const result = await response.json();
+    if (result.ok && result.command) {
+      Object.assign(state.command, result.command);
+      for (const name of axes) updateSlider(name, state.command[name]);
+      $('source').textContent = 'source: ' + (result.command.source || lastSource);
+    }
+  } catch (error) { $('connection').textContent = '连接断开'; $('connection').className = 'pill bad'; }
+}
+function setAllCommand(values, source) {
+  const payload = Object.assign({}, values, {source});
+  Object.assign(state.command, values); for (const name of axes) updateSlider(name, state.command[name]);
+  sendCommand(payload);
+}
+function zeroCommand() { setAllCommand({cmd_x:0, ang_vel:0}, 'stop'); }
+function centeredCommand() {
+  const lo = state.limits.cmd_height || [0,0];
+  setAllCommand({cmd_x:0, ang_vel:0, cmd_height:(lo[0]+lo[1])/2}, 'center');
+}
+$('stop').onclick = zeroCommand; $('center').onclick = centeredCommand;
+$('applyLimits').onclick = applyLimits;
+$('csv').onclick = () => {
+  const rows = state.telemetry; if (!rows.length) return;
+  const columns = Object.keys(rows.reduce((all,row)=>Object.assign(all,row),{}));
+  const csv = [columns.join(','), ...rows.map(row=>columns.map(key=>row[key] ?? '').join(','))].join('\n');
+  const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'})); link.download = 'wheel_leg_telemetry.csv'; link.click();
+};
+
+function keyHandler(event, down) {
+  if (event.target && ['INPUT','TEXTAREA','BUTTON'].includes(event.target.tagName)) return;
+  const key = event.key.toLowerCase(); if (!['w','s','a','d','e'].includes(key)) return;
+  event.preventDefault(); if (down && event.repeat) return;
+  const limits = state.limits;
+  if (key === 'e' && down) return zeroCommand();
+  if (key === 'w') queueCommand('cmd_x', down ? limits.cmd_x[1] : 0, 'browser-keyboard');
+  if (key === 's') queueCommand('cmd_x', down ? limits.cmd_x[0] : 0, 'browser-keyboard');
+  if (key === 'a') queueCommand('ang_vel', down ? limits.ang_vel[1] : 0, 'browser-keyboard');
+  if (key === 'd') queueCommand('ang_vel', down ? limits.ang_vel[0] : 0, 'browser-keyboard');
+}
+window.addEventListener('keydown', e => keyHandler(e, true)); window.addEventListener('keyup', e => keyHandler(e, false));
+
+function deadzone(value, threshold=0.12) { return Math.abs(value) < threshold ? 0 : Math.sign(value) * (Math.abs(value)-threshold)/(1-threshold); }
+function pollGamepad() {
+  if (!$('gamepadEnabled').checked || gamepadIndex === null || !navigator.getGamepads) return;
+  const gp = navigator.getGamepads()[gamepadIndex]; if (!gp) return;
+  const limits = state.limits;
+  const ly = deadzone(gp.axes[1] || 0), rx = deadzone(gp.axes[2] ?? gp.axes[3] ?? 0);
+  const cmdX = -ly * Math.max(Math.abs(limits.cmd_x[0]), Math.abs(limits.cmd_x[1]));
+  const yaw = rx * Math.max(Math.abs(limits.ang_vel[0]), Math.abs(limits.ang_vel[1]));
+  const payload = {cmd_x:cmdX, ang_vel:yaw, source:'gamepad'};
+  if (gp.buttons[12]?.pressed) payload.cmd_height = limits.cmd_height[1];
+  if (gp.buttons[13]?.pressed) payload.cmd_height = limits.cmd_height[0];
+  Object.assign(state.command, payload); for (const name of axes) updateSlider(name, state.command[name]); sendCommand(payload);
+}
+window.addEventListener('gamepadconnected', e => { gamepadIndex=e.gamepad.index; $('gamepadStatus').textContent='已连接: '+e.gamepad.id; });
+window.addEventListener('gamepaddisconnected', e => { if (gamepadIndex===e.gamepad.index) gamepadIndex=null; $('gamepadStatus').textContent='手柄已断开'; });
+function detectGamepad() {
+  if (!navigator.getGamepads) return;
+  const pads = navigator.getGamepads();
+  const first = Array.from(pads).find(Boolean);
+  if (first) { gamepadIndex=first.index; $('gamepadStatus').textContent='已连接: '+first.id; }
+}
+document.addEventListener('visibilitychange', detectGamepad);
+$('gamepadEnabled').onchange = detectGamepad;
+setInterval(pollGamepad, 80);
+
+function drawChart(canvas, title, series, yLabel) {
+  const ctx = canvas.getContext('2d'), rect = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const width = Math.max(300, rect.width), height = Math.max(160, rect.height); canvas.width=width*dpr; canvas.height=height*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,width,height); ctx.fillStyle='#0f172a'; ctx.fillRect(0,0,width,height);
+  const pad={l:48,r:16,t:30,b:28}, w=width-pad.l-pad.r, h=height-pad.t-pad.b;
+  const rows=state.telemetry; ctx.strokeStyle='#263449'; ctx.lineWidth=1;
+  for(let i=0;i<5;i++){const y=pad.t+h*i/4;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+w,y);ctx.stroke();}
+  const values=[]; for(const item of rows) for(const itemSeries of series) if(Number.isFinite(Number(item[itemSeries.key]))) values.push(Number(item[itemSeries.key]));
+  let min=Math.min(...values), max=Math.max(...values); if(!values.length){min=-1;max=1;} if(min===max){const d=Math.max(1,Math.abs(min)*.1);min-=d;max+=d;} const scaleY=v=>pad.t+h-(v-min)/(max-min)*h;
+  ctx.font='12px system-ui'; ctx.fillStyle='#cbd5e1'; ctx.fillText(title, pad.l, 18); ctx.fillStyle='#94a3b8'; ctx.fillText(yLabel, 4, pad.t+10);
+  series.forEach((item,idx)=>{ctx.strokeStyle=item.color;ctx.lineWidth=1.8;ctx.beginPath();let started=false;rows.forEach((row,i)=>{const value=Number(row[item.key]);if(!Number.isFinite(value))return;const x=pad.l+(rows.length<=1?0:i/(rows.length-1))*w,y=scaleY(value);if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);});ctx.stroke();ctx.fillStyle=item.color;ctx.fillText(item.label,pad.l+idx*115, height-8);});
+  ctx.fillStyle='#94a3b8'; ctx.fillText(max.toFixed(2),4,pad.t+4);ctx.fillText(min.toFixed(2),4,pad.t+h);
+}
+function drawCharts() {
+  drawChart($('motionChart'),'速度跟踪',[{key:'cmd_x',label:'cmd vx',color:'#38bdf8'},{key:'vx',label:'real vx',color:'#fbbf24'},{key:'cmd_yaw',label:'cmd yaw',color:'#a78bfa'},{key:'real_yaw',label:'real yaw',color:'#fb7185'}],'value');
+  drawChart($('heightChart'),'高度 / 垂向速度',[{key:'cmd_height',label:'cmd h',color:'#38bdf8'},{key:'height',label:'real h',color:'#fbbf24'},{key:'vz',label:'vz',color:'#fb7185'}],'value');
+  drawChart($('wheelChart'),'轮速 / 轮端力矩',[{key:'wheel_vel_l',label:'vel L',color:'#38bdf8'},{key:'wheel_vel_r',label:'vel R',color:'#22d3ee'},{key:'wheel_tau_l',label:'tau L',color:'#fbbf24'},{key:'wheel_tau_r',label:'tau R',color:'#fb7185'}],'value');
+}
+async function refresh() {
+  try {
+    const response=await fetch('/api/state',{cache:'no-store'}); const payload=await response.json(); if(!payload.ok) throw Error(payload.error);
+    Object.assign(state,payload); $('connection').textContent='面板已连接'; $('connection').className='pill ok'; $('runState').textContent=payload.running?'仿真运行中':'仿真已停止'; $('runState').className='pill '+(payload.running?'ok':'bad'); $('task').textContent='task: '+(payload.metadata.task || 'wheel_legged');
+    setupSliders(); drawCharts(); const last=state.telemetry[state.telemetry.length-1]; $('latest').textContent=last ? JSON.stringify(last,null,2) : '等待 Isaac Gym telemetry…';
+  } catch(error) { $('connection').textContent='连接断开'; $('connection').className='pill bad'; }
+}
+setInterval(refresh,250); refresh(); window.addEventListener('resize',drawCharts);
+</script>
+</body>
+</html>

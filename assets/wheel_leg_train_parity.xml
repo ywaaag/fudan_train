@@ -1,0 +1,53 @@
+<mujoco model="wheel_leg_train_parity">
+  <compiler angle="radian"/>
+
+  <option timestep="0.001" integrator="implicitfast"/>
+
+  <worldbody>
+    <geom name="ground" size="100 100 0.1" type="plane" friction="1.1 0.05 0.01"/>
+    <body name="base_link">
+      <inertial pos="0.00542458 0.00509953 0.121354" quat="0.0323763 0.775594 0.0256037 0.629881" mass="16.6222" diaginertia="0.618778 0.402274 0.362672"/>
+      <joint name="robot_free" type="free"/>
+      <geom size="0.18 0.09 0.08" type="box"/>
+      <body name="left_leg_0_link" pos="1.4e-05 -0.1775 2.4e-05">
+        <inertial pos="-0.0454529 0.00108647 -0.0496913" quat="0.65667 0.293737 0.328022 0.612294" mass="0.580171" diaginertia="0.00356547 0.00291994 0.000734809"/>
+        <joint name="left_leg_0" pos="0 0 0" axis="0 1 0" range="-3.14 3.14" actuatorfrcrange="-40 40"/>
+        <geom size="0.03 0.03 0.105362" pos="-0.07692 -0.00875 -0.07147" quat="0.401045 0.103538 -0.910188 8.07906e-10" type="box"/>
+        <body name="left_leg_1_link" pos="-0.15384 -0.0175 -0.14294">
+          <inertial pos="0.0723517 0.000210686 -0.0899056" quat="0.670041 -0.223606 -0.220718 0.672554" mass="0.306543" diaginertia="0.00308479 0.00303814 5.44098e-05"/>
+          <joint name="left_leg_1" pos="0 0 0" axis="0 1 0" range="-3.14 3.14" actuatorfrcrange="-40 40"/>
+          <geom size="0.03 0.03 0.125622" pos="0.0769085 -0.0127445 -0.098507" quat="0.328518 0.154407 0.931791 -2.92912e-09" type="box"/>
+          <body name="left_wheel_link" pos="0.153817 -0.025489 -0.197014">
+            <inertial pos="2.46372e-05 -0.00123786 -4.48514e-05" quat="0.660025 -0.253709 -0.253701 0.660026" mass="0.412753" diaginertia="0.00066759 0.000350034 0.000350028"/>
+            <joint name="left_wheel" pos="0 0 0" axis="0 -1 0" range="-1000 1000" actuatorfrcrange="-47.2941 47.2941"/>
+            <geom size="0.06 0.02" quat="0.707107 0.707107 0 0" type="cylinder"/>
+          </body>
+        </body>
+      </body>
+      <body name="right_leg_0_link" pos="1.4e-05 0.1775 2.4e-05">
+        <inertial pos="-0.0454529 -0.00108626 -0.0496913" quat="0.612295 0.328022 0.293737 0.65667" mass="0.580171" diaginertia="0.00356545 0.00291992 0.000734809"/>
+        <joint name="right_leg_0" pos="0 0 0" axis="0 1 0" range="-3.14 3.14" actuatorfrcrange="-40 40"/>
+        <geom size="0.03 0.03 0.105362" pos="-0.07692 0.00875 -0.07147" quat="0.401045 -0.103538 -0.910188 -8.07906e-10" type="box"/>
+        <body name="right_leg_1_link" pos="-0.15384 0.0175 -0.14294">
+          <inertial pos="0.0723516 -0.000210484 -0.0899063" quat="0.672555 -0.220716 -0.223605 0.670041" mass="0.306545" diaginertia="0.00308485 0.00303819 5.44107e-05"/>
+          <joint name="right_leg_1" pos="0 0 0" axis="0 1 0" range="-3.14 3.14" actuatorfrcrange="-40 40"/>
+          <geom size="0.03 0.03 0.125641" pos="0.0768975 0.0127555 -0.0985385" quat="0.328418 -0.154564 0.9318 9.45756e-10" type="box"/>
+          <body name="right_wheel_link" pos="0.153795 0.025511 -0.197077">
+            <inertial pos="4.7208e-05 0.00121608 1.84836e-05" quat="0.624367 0.331904 0.331904 0.624377" mass="0.412753" diaginertia="0.00066759 0.000350033 0.000350028"/>
+            <joint name="right_wheel" pos="0 0 0" axis="0 -1 0" range="-1000 1000" actuatorfrcrange="-47.2941 47.2941"/>
+            <geom size="0.06 0.02" quat="0.707107 0.707107 0 0" type="cylinder"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <general name="left_leg_0_motor" joint="left_leg_0" ctrllimited="true" ctrlrange="-40 40" forcelimited="true" forcerange="-40 40"/>
+    <general name="left_leg_1_motor" joint="left_leg_1" ctrllimited="true" ctrlrange="-40 40" forcelimited="true" forcerange="-40 40"/>
+    <general name="left_wheel_motor" joint="left_wheel" ctrllimited="true" ctrlrange="-47.2941 47.2941" forcelimited="true" forcerange="-47.2941 47.2941"/>
+    <general name="right_leg_0_motor" joint="right_leg_0" ctrllimited="true" ctrlrange="-40 40" forcelimited="true" forcerange="-40 40"/>
+    <general name="right_leg_1_motor" joint="right_leg_1" ctrllimited="true" ctrlrange="-40 40" forcelimited="true" forcerange="-40 40"/>
+    <general name="right_wheel_motor" joint="right_wheel" ctrllimited="true" ctrlrange="-47.2941 47.2941" forcelimited="true" forcerange="-47.2941 47.2941"/>
+  </actuator>
+</mujoco>

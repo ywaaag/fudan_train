@@ -1,0 +1,76 @@
+{
+  "action_semantics": [
+    "position",
+    "position",
+    "velocity",
+    "position",
+    "position",
+    "velocity"
+  ],
+  "canonical_frame": {
+    "x": "forward",
+    "y": "left",
+    "z": "up"
+  },
+  "dof_names": [
+    "left_leg_0",
+    "left_leg_1",
+    "left_wheel",
+    "right_leg_0",
+    "right_leg_1",
+    "right_wheel"
+  ],
+  "notes": [
+    "Passive five-bar and guide-wheel bodies are fixed at the nominal MJCF pose.",
+    "Use the full closed-chain MJCF for sim2sim and actuator torque mapping."
+  ],
+  "schema_version": 1,
+  "serial_chain": {
+    "left": {
+      "link_lengths_m": [
+        0.2107245576576209,
+        0.2512446512982914
+      ],
+      "p0_m": [
+        1.4e-05,
+        -0.1775,
+        2.4e-05
+      ],
+      "p1_m": [
+        -0.15382600000000002,
+        -0.195,
+        -0.14291600000000002
+      ],
+      "p2_m": [
+        -9.000000000009e-06,
+        -0.22048900000000002,
+        -0.33993
+      ]
+    },
+    "right": {
+      "link_lengths_m": [
+        0.2107245576576209,
+        0.2512828228809124
+      ],
+      "p0_m": [
+        1.4e-05,
+        0.1775,
+        2.4e-05
+      ],
+      "p1_m": [
+        -0.15382600000000002,
+        0.195,
+        -0.14291600000000002
+      ],
+      "p2_m": [
+        -3.1000000000031e-05,
+        0.220511,
+        -0.339993
+      ]
+    }
+  },
+  "source_mjcf": "wheeled_infantry.xml",
+  "source_sha256": "663e121ef9aed4bfab09ff0d3d98321b7ce77d80b63584235e4da691bd3aebf3",
+  "total_mass_kg": 19.221139979665793,
+  "training_approximation": "six_dof_virtual_serial_chain_with_fixed_passive_attachments"
+}
