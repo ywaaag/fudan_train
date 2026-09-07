@@ -1657,9 +1657,6 @@ class LeggedRobot(BaseTask):
         self.wheel_contact_seen = torch.zeros(
             self.num_envs, dtype=torch.bool, device=self.device, requires_grad=False
         )
-        self.command_metric_preclip_torque_saturation_sum = torch.zeros(
-            self.num_envs, dtype=torch.float, device=self.device, requires_grad=False
-        )
         self.forbidden_contact_streak = torch.zeros(
             self.num_envs, dtype=torch.float, device=self.device, requires_grad=False
         )
