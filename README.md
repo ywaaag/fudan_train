@@ -3,6 +3,15 @@
 这个仓库是从已验证的 `/home/kellen/fudan_rl_wheel_leg/plane` 独立复制的
 第一阶段训练线。原 Fudan 目录保持不变，便于随时复现参考结果。
 
+## 当前交接状态
+
+当前主线已经从旧 H3/H7 经验调参切换到 `method_v1` 分阶段训练。详细的重构原因、训练时间线、已验证 checkpoint、当前风险和下一步命令见：
+
+[`HANDOFF_METHOD_V1.md`](HANDOFF_METHOD_V1.md)
+
+当前最新可用 checkpoint 为 `translate +/-2.0 m/s` 长训练的
+`plane/logs/wheel_legged/Sep07_16-10-41_method_v1_translate_20_long_v1/model_5000.pt`，下一目标是 `translate command_level=3`，即 `+/-3.0 m/s`。
+
   cd /home/kellen/fudan_train/plane
 
   source /home/kellen/anaconda3/etc/profile.d/conda.sh

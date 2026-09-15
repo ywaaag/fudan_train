@@ -117,7 +117,7 @@ find logs/wheel_legged -maxdepth 2 -name 'model_*.pt' -printf '%h/%f\n' | sort
 python wheel_legged_gym/scripts/play.py \
   --task=wheel_legged \
   --experiment_name=wheel_legged \
-  --load_run=H_finetune_v1 \
+  --load_run=Sep07_16-10-41_method_v1_translate_20_long_v1 \
   --checkpoint=5000
 ```
 
