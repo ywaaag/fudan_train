@@ -77,6 +77,20 @@ def train(args):
             matching_resume = True
     else:
         manifest = apply_policy_experiment(env_cfg, args.policy_experiment, train_cfg)
+    if str(args.policy_experiment).upper() == 'LOW_SPEED':
+        if not args.resume or args.resume_mode != 'full':
+            raise ValueError('LOW_SPEED requires explicit full-state warm start')
+        from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
+        from wheel_legged_gym.utils import get_load_path
+        root = Path(WHEEL_LEGGED_GYM_ROOT_DIR) / 'logs' / (args.experiment_name or train_cfg.runner.experiment_name)
+        checkpoint = Path(get_load_path(str(root), load_run=args.load_run, checkpoint=args.checkpoint))
+        previous = json.loads((checkpoint.parent/'policy_experiment.json').read_text())
+        if (previous.get('reward_pipeline') != 'normalized_v1'
+            or previous.get('name') not in {'STAND_SYMMETRIC', 'LOW_SPEED'}
+            or previous.get('randomization_level') != 1):
+            raise ValueError('LOW_SPEED requires compatible standing or low-speed source')
+        manifest['source_checkpoint'] = str(checkpoint)
+        manifest['source_reward_scales'] = previous['reward_scales']
     if str(args.policy_experiment).upper() in {'STAND_CONTROL', 'STAND_SYMMETRIC'}:
         if not args.resume or args.resume_mode != 'full':
             raise ValueError('Standing controlled fine-tune requires --resume --resume_mode=full')

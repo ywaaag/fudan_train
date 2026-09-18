@@ -436,6 +436,9 @@ runs and checkpoints remain untouched on disk.
 
 
 def apply_policy_experiment(env_cfg, name: str | None, train_cfg=None) -> dict:
+    if str(name).upper() == 'LOW_SPEED':
+        from .low_speed import apply_low_speed
+        return apply_low_speed(env_cfg, train_cfg)
     if str(name).upper() in {'STAND_CONTROL', 'STAND_SYMMETRIC'}:
         from .stand_balance import apply_stand_balance
         return apply_stand_balance(env_cfg, train_cfg, name)

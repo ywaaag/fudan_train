@@ -27,9 +27,10 @@ def main():
     parser.add_argument('--seconds', type=float, default=25)
     parser.add_argument('--warmup', type=float, default=5)
     parser.add_argument('--height', type=float, default=0.40)
+    parser.add_argument('--vx', type=float, default=0., help='Fixed forward velocity command for locomotion audit')
     parser.add_argument('--gui', action='store_true', help='Matched configuration visual audit; approximately real time')
     parser.add_argument('--push-delta-v', type=float, default=0., help='World horizontal velocity impulse magnitude (m/s), not force')
-    parser.add_argument('--profile', choices=['method_v1', 'FUDAN_STAND', 'STAND_CONTROL', 'STAND_SYMMETRIC'], default='method_v1')
+    parser.add_argument('--profile', choices=['method_v1', 'FUDAN_STAND', 'STAND_CONTROL', 'STAND_SYMMETRIC', 'LOW_SPEED'], default='method_v1')
     opts = parser.parse_args()
     if not 0 <= opts.warmup < opts.seconds:
         parser.error('require 0 <= warmup < seconds')
@@ -49,6 +50,11 @@ def main():
     cfg.terrain.mesh_type = 'plane'
     cfg.terrain.curriculum = False
     cfg.commands.ranges.height = [opts.height, opts.height]
+    if opts.profile == 'LOW_SPEED':
+        # Audit a fixed command, not the profile's episode mixture.
+        cfg.commands.sampling_strategy = 'uniform'
+        cfg.commands.ranges.lin_vel_x = [opts.vx, opts.vx]
+        cfg.commands.ranges.ang_vel_yaw = [0., 0.]
     args = _gym_args()
     if opts.gui:
         args.headless = False
@@ -82,6 +88,9 @@ def main():
     directions = ((1.,0.),(-1.,0.),(0.,1.),(0.,-1.),(1.,0.))
     for step in range(round(opts.seconds / env.dt)):
         step_started = time.monotonic()
+        if opts.profile == 'LOW_SPEED' and not torch.allclose(
+                env.commands[:, :3], env.commands.new_tensor([opts.vx, 0., opts.height]).expand(env.num_envs, -1)):
+            raise RuntimeError('Fixed-command audit was overwritten by a sampler')
         if opts.push_delta_v and step in [round(t/env.dt) for t in (10,20,30,40,50)]:
             if active_push is not None:
                 push_results.append(active_push)
@@ -150,6 +159,8 @@ def main():
                          'temporal_std': v.std(dim=0).mean().item()}
     payload = {'checkpoint': str(opts.checkpoint.resolve()), 'seed': opts.seed,
         'profile': opts.profile,
+        'command_vx': opts.vx,
+        'tracking_vx_mae': (data[:,:,0]-opts.vx).abs().mean().item(),
         'position_drift': {
             'measurement_seconds': (len(xy)-1)*env.dt,
             'final_displacement_mean_m': displacement[-1].mean().item(),
