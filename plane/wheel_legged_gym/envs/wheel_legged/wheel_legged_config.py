@@ -163,8 +163,11 @@ class WheelLeggedCfg(LeggedRobotCfg):
             power_cost = 0.0
             action_second_diff = 0.0
             method_termination = 0.0
+            stand_bilateral_geometry = 0.0
             
         dof_pos_target = 0.0  # 目标关节角度（0=-直腿）
+        bilateral_geometry_tolerance_m = 0.005
+        bilateral_geometry_scale_m = 0.05
         zero_command_threshold = 1.0e-2
         zero_yaw_rate_weight = 0.25
         low_speed_command_threshold = 0.1001  #这里改对称奖励的生效范围

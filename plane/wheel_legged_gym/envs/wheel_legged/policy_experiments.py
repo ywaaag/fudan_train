@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 
@@ -435,6 +436,12 @@ runs and checkpoints remain untouched on disk.
 
 
 def apply_policy_experiment(env_cfg, name: str | None, train_cfg=None) -> dict:
+    if str(name).upper() in {'STAND_CONTROL', 'STAND_SYMMETRIC'}:
+        from .stand_balance import apply_stand_balance
+        return apply_stand_balance(env_cfg, train_cfg, name)
+    if str(name).upper() == 'FUDAN_STAND':
+        from .fudan_stand import apply_fudan_stand
+        return apply_fudan_stand(env_cfg, train_cfg)
     if name is None:
         return {"name": "baseline", "description": "unmodified baseline"}
     if str(name).lower() in {"method_v1", "method"}:
@@ -620,6 +627,15 @@ def apply_training_profile(
     env_cfg.rewards.scales.track_yaw_fine = yaw_fine
     env_cfg.rewards.scales.track_yaw_gap = yaw_gap
     env_cfg.rewards.scales.stand_still = phase_cfg["stand_still_scale"]
+    if phase == "stand":
+        # Replace all-DOF pose cost, including accumulated wheel rotation,
+        # with bilateral leg geometry; keep velocity/contact costs active.
+        env_cfg.rewards.scales.stand_still = 0.0
+        env_cfg.rewards.scales.stand_bilateral_geometry = -0.3
+        # Standing is evaluated with deterministic actor means.  Give wheel
+        # speed a stronger zero-command penalty so the mean policy cannot
+        # rely on exploration noise to cancel residual wheel motion.
+        env_cfg.rewards.scales.zero_wheel_velocity = -3.0
     env_cfg.rewards.scales.tracking_lin_vel = 0.0
     env_cfg.rewards.scales.tracking_ang_vel = 0.0
     env_cfg.rewards.scales.high_speed_tracking = 0.0
@@ -634,13 +650,25 @@ def apply_training_profile(
     env_cfg.asset.penalize_contacts_on = ["base_link", "leg_0_link", "leg_1_link"]
     env_cfg.asset.terminate_after_contacts_on = ["base_link", "leg_0_link", "leg_1_link"]
     env_cfg.rewards.only_positive_rewards = False
-    env_cfg.domain_rand_level = int(phase_cfg["randomization_level"])
+    randomization_level = int(phase_cfg["randomization_level"])
+    if phase == "stand":
+        # Keep the validated deterministic baseline unchanged unless a new
+        # run explicitly opts into robustness training.
+        randomization_level = int(os.environ.get("FUDAN_STAND_RANDOMIZATION_LEVEL", randomization_level))
+        if not 0 <= randomization_level <= 3:
+            raise ValueError("FUDAN_STAND_RANDOMIZATION_LEVEL must be in [0, 3]")
+    env_cfg.domain_rand_level = randomization_level
     _apply_method_randomization(env_cfg, env_cfg.domain_rand_level)
 
     train_cfg.algorithm.learning_rate = 1.0e-4
     train_cfg.algorithm.extra_learning_rate = 1.0e-5
     train_cfg.algorithm.schedule = "adaptive"
-    train_cfg.algorithm.entropy_coef = 0.005
+    train_cfg.algorithm.entropy_coef = 0.001 if phase == "stand" else 0.005
+    # Apply mirror-equivariant policy regularization to the active method_v1
+    # line.  The transform in policy_symmetry.py swaps the parity-tree left /
+    # right channels and mirrors body-frame signs; it does not force raw live
+    # actions to be equal.
+    train_cfg.algorithm.symmetry_loss_coef = 0.01
     train_cfg.runner.save_interval = 100
     active_scales = {
         name: getattr(env_cfg.rewards.scales, name)
@@ -657,10 +685,10 @@ def apply_training_profile(
         "command_limits": (linear_limit, yaw_limit),
         "reward_scales": active_scales,
         "optimizer": {
-            "learning_rate": 1.0e-4,
+            "learning_rate": train_cfg.algorithm.learning_rate,
             "extra_learning_rate": 1.0e-5,
-            "schedule": "adaptive",
-            "entropy_coef": 0.005,
+            "schedule": train_cfg.algorithm.schedule,
+            "entropy_coef": train_cfg.algorithm.entropy_coef,
         },
     }
 
@@ -738,6 +766,7 @@ def write_experiment_manifest(path: Path, manifest: dict, env_cfg, train_cfg, ar
         "symmetry_loss_coef": float(
             getattr(train_cfg.algorithm, "symmetry_loss_coef", 0.0)
         ),
+        "init_noise_std": float(train_cfg.policy.init_noise_std),
         "save_interval": int(train_cfg.runner.save_interval),
     }
     path.write_text(

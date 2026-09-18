@@ -231,7 +231,7 @@ def get_args():
         {
             "name": "--policy_experiment",
             "type": str,
-            "help": "Named zero/reverse policy experiment: A, B, or C.",
+            "help": "Policy experiment: H3, H7, method_v1, or FUDAN_STAND (pure standing).",
         },
         {
             "name": "--phase",

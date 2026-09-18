@@ -24,6 +24,17 @@ from wheel_legged_gym.scripts.select_policy_checkpoint import score_grid
 
 
 class PolicyExperimentTest(unittest.TestCase):
+    def test_stand_entropy_survives_manifest_optimizer_overrides(self):
+        from types import SimpleNamespace
+        from wheel_legged_gym.envs.wheel_legged.policy_experiments import enforce_optimizer_overrides
+        cfg, train = WheelLeggedCfg(), WheelLeggedCfgPPO()
+        manifest = apply_training_profile(cfg, train, phase="stand", level=0)
+        alg = SimpleNamespace(entropy_coef=train.algorithm.entropy_coef,
+            optimizer=SimpleNamespace(param_groups=[{"lr": 1.0}]), extra_optimizer=None)
+        enforce_optimizer_overrides(SimpleNamespace(alg=alg), manifest)
+        self.assertEqual(alg.entropy_coef, 0.001)
+        self.assertEqual(manifest["optimizer"]["entropy_coef"], train.algorithm.entropy_coef)
+
     def test_mixture_has_requested_modes_signs_and_exact_zero(self) -> None:
         torch.manual_seed(7)
         count = 200_000

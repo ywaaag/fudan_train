@@ -20,6 +20,22 @@ CMD_YAW = 1
 CMD_HEIGHT = 2
 
 
+def bilateral_geometry_cost(points: Tensor, tolerance: float = 0.005,
+                            scale: float = 0.05) -> Tensor:
+    """Root-frame landmarks [left knee, right knee, left wheel, right wheel].
+
+    Allow small balancing asymmetry; use Huber tails without early saturation.
+    No world-frame height comparison, raw-action projection or joint sign guess.
+    """
+    if points.shape[-2:] != (4, 3) or tolerance < 0 or scale <= 0:
+        raise ValueError('require (...,4,3) points, tolerance >= 0, scale > 0')
+    left = points[..., (0, 2), :]
+    right = points[..., (1, 3), :] * points.new_tensor((1., -1., 1.))
+    distance = torch.linalg.vector_norm(left - right, dim=-1)
+    error = torch.clamp(distance - tolerance, min=0.) / scale
+    return _huber(error).mean(dim=-1)
+
+
 def _huber(error: Tensor, delta: float = 1.0) -> Tensor:
     """Element-wise smooth-L1 cost with a configurable transition point."""
 

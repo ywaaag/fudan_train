@@ -25,7 +25,7 @@ except ImportError:
 # --------------------
 cmd_x = 0.0
 ang_vel = 0.0
-cmd_height = 0.2
+cmd_height = 0.40
 running = True
 turn_left_pressed = False
 turn_right_pressed = False

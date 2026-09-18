@@ -62,6 +62,7 @@ from wheel_legged_gym.envs.base.reward_terms import (
     normalized_huber,
     smooth_gate,
     wheel_rolling_terms,
+    bilateral_geometry_cost,
 )
 from wheel_legged_gym.envs.base.command_curriculum import (
     evaluate_curriculum_window,
@@ -177,7 +178,10 @@ class LeggedRobot(BaseTask):
             contact_now = torch.norm(
                 self.contact_forces[:, self.feet_indices, :], dim=-1
             ) > float(self.cfg.rewards.contact_force_threshold)
-            self.wheel_contact_history[:, 1:] = self.wheel_contact_history[:, :-1]
+            # Clone the source because the slices overlap in storage.  CUDA
+            # often tolerates this for large batches, while the exact
+            # single-env playback path raises an aliasing error.
+            self.wheel_contact_history[:, 1:] = self.wheel_contact_history[:, :-1].clone()
             self.wheel_contact_history[:, 0] = contact_now
             self.wheel_contact_seen |= contact_now.any(dim=1)
 
@@ -2045,6 +2049,16 @@ class LeggedRobot(BaseTask):
                 device=self.device,
             )
             self.feet_indices = self.wheel_body_indices.clone()
+            landmarks = ('left_leg_1_link', 'right_leg_1_link',
+                         'left_wheel_link', 'right_wheel_link')
+            self.bilateral_body_indices = torch.tensor(
+                [body_names.index(name) for name in landmarks],
+                dtype=torch.long, device=self.device)
+
+        if getattr(self.cfg.commands, 'training_profile', '') == 'fudan_stand_v1':
+            self.fudan_leg_landmarks = torch.tensor([body_names.index(n) for n in
+                ('left_leg_0_link', 'right_leg_0_link', 'left_wheel_link', 'right_wheel_link')],
+                dtype=torch.long, device=self.device)
 
         self.penalised_contact_indices = torch.zeros(
             len(penalized_contact_names),
@@ -2701,7 +2715,26 @@ class LeggedRobot(BaseTask):
         )
         return torch.clamp(value, max=1.0) if self._method_v1 else value
 
+    def _reward_stand_bilateral_geometry(self):
+        relative = self.rigid_body_states[:, self.bilateral_body_indices, :3] - self.root_states[:, None, :3]
+        quat = self.base_quat[:, None, :].expand(-1, 4, -1)
+        points = quat_rotate_inverse(quat.reshape(-1, 4), relative.reshape(-1, 3)).reshape(-1, 4, 3)
+        cost = bilateral_geometry_cost(points,
+            tolerance=float(self.cfg.rewards.bilateral_geometry_tolerance_m),
+            scale=float(self.cfg.rewards.bilateral_geometry_scale_m))
+        stationary_command = torch.all(torch.abs(self.commands[:, :2]) < 0.01, dim=1)
+        return cost * stationary_command.float()
+
     def _reward_nominal_state(self):
+        if getattr(self.cfg.commands, 'training_profile', '') == 'fudan_stand_v1':
+            # Preserve reference squared virtual-leg angle difference, but use
+            # the actual tree geometry instead of the reference robot's signs.
+            p = self.rigid_body_states[:, self.fudan_leg_landmarks, :3]
+            direction = p[:, 2:] - p[:, :2]
+            q = self.base_quat[:, None, :].expand(-1, 2, -1)
+            d = quat_rotate_inverse(q.reshape(-1, 4), direction.reshape(-1, 3)).reshape(-1, 2, 3)
+            angles = torch.atan2(d[:, :, 0], -d[:, :, 2])
+            return torch.square(wrap_to_pi(angles[:, 0] - angles[:, 1]))
         # return torch.square(self.theta0[:, 0] - self.theta0[:, 1])
         if self.reward_scales["nominal_state"] < 0:
             return torch.square(self.theta0[:, 0] - self.theta0[:, 1])
