@@ -77,7 +77,21 @@ def train(args):
             matching_resume = True
     else:
         manifest = apply_policy_experiment(env_cfg, args.policy_experiment, train_cfg)
-    if str(args.policy_experiment).upper() == 'LOW_SPEED':
+    if str(args.policy_experiment).upper() in {'H3_SPEED1', 'ENCODER_FROZEN', 'ENCODER_UPDATING'}:
+        from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
+        from wheel_legged_gym.utils import get_load_path
+        from wheel_legged_gym.envs.wheel_legged.h3_speed1 import validate_source
+        root = Path(WHEEL_LEGGED_GYM_ROOT_DIR) / 'logs' / (args.experiment_name or train_cfg.runner.experiment_name)
+        checkpoint = Path(get_load_path(str(root), load_run=args.load_run, checkpoint=args.checkpoint))
+        manifest.update(validate_source(checkpoint, args.resume, args.resume_mode, manifest))
+    if str(args.policy_experiment).upper() == 'H3_LOW_SPEED':
+        from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
+        from wheel_legged_gym.utils import get_load_path
+        from wheel_legged_gym.envs.wheel_legged.h3_low_speed import validate_source
+        root = Path(WHEEL_LEGGED_GYM_ROOT_DIR) / 'logs' / (args.experiment_name or train_cfg.runner.experiment_name)
+        checkpoint = Path(get_load_path(str(root), load_run=args.load_run, checkpoint=args.checkpoint))
+        manifest.update(validate_source(checkpoint, args.resume, args.resume_mode))
+    if str(args.policy_experiment).upper() in {'LOW_SPEED', 'LOW_SPEED_TRACKING'}:
         if not args.resume or args.resume_mode != 'full':
             raise ValueError('LOW_SPEED requires explicit full-state warm start')
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
@@ -86,7 +100,7 @@ def train(args):
         checkpoint = Path(get_load_path(str(root), load_run=args.load_run, checkpoint=args.checkpoint))
         previous = json.loads((checkpoint.parent/'policy_experiment.json').read_text())
         if (previous.get('reward_pipeline') != 'normalized_v1'
-            or previous.get('name') not in {'STAND_SYMMETRIC', 'LOW_SPEED'}
+            or previous.get('name') not in {'STAND_SYMMETRIC', 'LOW_SPEED', 'LOW_SPEED_TRACKING'}
             or previous.get('randomization_level') != 1):
             raise ValueError('LOW_SPEED requires compatible standing or low-speed source')
         manifest['source_checkpoint'] = str(checkpoint)
@@ -117,7 +131,18 @@ def train(args):
         ppo_runner.alg.learning_rate = ppo_runner.alg.optimizer.param_groups[0]['lr']
     else:
         enforce_optimizer_overrides(ppo_runner, manifest)
+    if str(args.policy_experiment).upper() == 'H3_LOW_SPEED':
+        from wheel_legged_gym.envs.wheel_legged.h3_low_speed import verify_and_restore_std
+        manifest['migration_verification'] = verify_and_restore_std(ppo_runner, checkpoint)
     task_registry.save_cfgs(name=args.task)
+    if str(args.policy_experiment).upper() in {'H3_SPEED1', 'ENCODER_FROZEN', 'ENCODER_UPDATING'}:
+        from wheel_legged_gym.envs.wheel_legged.h3_speed1 import verify_full_resume
+        manifest['resume_verification'] = verify_full_resume(ppo_runner, checkpoint)
+    if manifest.get('command_diagnostics'):
+        from wheel_legged_gym.utils.command_diagnostics import CommandDiagnostics
+        ppo_runner.command_diagnostics = CommandDiagnostics(env, task_registry.log_dir)
+        ppo_runner.alg.freeze_encoder_updates = manifest['freeze_encoder_updates']
+        ppo_runner.alg.encoder_ablation_diagnostics = True
     write_experiment_manifest(
         Path(task_registry.log_dir) / "policy_experiment.json",
         manifest,

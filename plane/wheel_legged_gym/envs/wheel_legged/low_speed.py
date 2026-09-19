@@ -2,7 +2,7 @@
 from .policy_experiments import apply_training_profile, _apply_method_randomization
 
 
-def apply_low_speed(env_cfg, train_cfg):
+def apply_low_speed(env_cfg, train_cfg, name='LOW_SPEED'):
     manifest = apply_training_profile(env_cfg, train_cfg, phase='translate', level=0)
     env_cfg.commands.training_profile = 'low_speed_v1'
     env_cfg.domain_rand_level = 1
@@ -20,4 +20,11 @@ def apply_low_speed(env_cfg, train_cfg):
     manifest['optimizer'].update(learning_rate=1e-5, extra_learning_rate=1e-5,
                                  schedule='fixed', entropy_coef=.001)
     manifest['reward_scales'] = {k:getattr(env_cfg.rewards.scales,k) for k in manifest['reward_scales']}
+    if name == 'LOW_SPEED_TRACKING':
+        # One-variable ablation: normalize tracking errors to this stage's
+        # endpoint instead of the old 1 m/s scale. No command compensation.
+        env_cfg.rewards.tracking_linear_cap = .5
+        manifest.update(name=name, profile='low_speed_tracking_v1')
+        env_cfg.commands.training_profile = 'low_speed_tracking_v1'
+    manifest['reward_parameters'] = {'tracking_linear_cap':env_cfg.rewards.tracking_linear_cap}
     return manifest

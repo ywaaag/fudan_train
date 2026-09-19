@@ -436,9 +436,23 @@ runs and checkpoints remain untouched on disk.
 
 
 def apply_policy_experiment(env_cfg, name: str | None, train_cfg=None) -> dict:
-    if str(name).upper() == 'LOW_SPEED':
+    if str(name).upper() in {'ENCODER_FROZEN', 'ENCODER_UPDATING'}:
+        from .h3_speed1 import apply_h3_speed1
+        manifest = apply_h3_speed1(env_cfg, train_cfg)
+        manifest.update(name=str(name).upper(), profile='encoder_ablation_v1',
+            freeze_encoder_updates=str(name).upper() == 'ENCODER_FROZEN',
+            command_diagnostics=True,
+            ablation_variable='encoder optimizer.step enabled/disabled; all gradient calculation and RNG/batch iteration retained')
+        return manifest
+    if str(name).upper() == 'H3_SPEED1':
+        from .h3_speed1 import apply_h3_speed1
+        return apply_h3_speed1(env_cfg, train_cfg)
+    if str(name).upper() == 'H3_LOW_SPEED':
+        from .h3_low_speed import apply_h3_low_speed
+        return apply_h3_low_speed(env_cfg, train_cfg)
+    if str(name).upper() in {'LOW_SPEED', 'LOW_SPEED_TRACKING'}:
         from .low_speed import apply_low_speed
-        return apply_low_speed(env_cfg, train_cfg)
+        return apply_low_speed(env_cfg, train_cfg, str(name).upper())
     if str(name).upper() in {'STAND_CONTROL', 'STAND_SYMMETRIC'}:
         from .stand_balance import apply_stand_balance
         return apply_stand_balance(env_cfg, train_cfg, name)

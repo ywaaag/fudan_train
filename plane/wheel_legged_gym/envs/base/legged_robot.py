@@ -925,6 +925,7 @@ class LeggedRobot(BaseTask):
                     getattr(self.cfg.commands, "mixture_small_yaw_limit", 0.10)
                 ),
                 slot_ids=self.method_v1_segment_counter[env_ids],
+                translation_anchors=getattr(self.cfg.commands, 'translation_retention_anchors', None),
             )
             self.commands[env_ids, 0] = linear
             self.commands[env_ids, 1] = yaw

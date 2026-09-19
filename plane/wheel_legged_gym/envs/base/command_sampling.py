@@ -26,6 +26,7 @@ def sample_method_v1(
     small_linear_limit: float = 0.10,
     small_yaw_limit: float = 0.10,
     slot_ids: torch.Tensor | None = None,
+    translation_anchors: tuple[float, ...] | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Sample the staged method_v1 command modes.
 
@@ -75,6 +76,15 @@ def sample_method_v1(
         )
         linear[reverse] = torch.minimum(linear_ranges[reverse, 1], -lin_limit[reverse])
         linear[forward] = torch.maximum(linear_ranges[forward, 0], lin_limit[forward])
+        if translation_anchors is not None:
+            anchors = linear.new_tensor(translation_anchors)
+            if anchors.ndim != 1 or not anchors.numel() or not torch.isfinite(anchors).all() or not (anchors > 0).all():
+                raise ValueError('translation anchors must be finite positive magnitudes')
+            magnitude = anchors[(slot_ids // 10) % anchors.numel()]
+            linear[reverse] = torch.clamp(-magnitude[reverse],
+                min=linear_ranges[reverse, 0], max=linear_ranges[reverse, 1])
+            linear[forward] = torch.clamp(magnitude[forward],
+                min=linear_ranges[forward, 0], max=linear_ranges[forward, 1])
         mode[small] = MODE_SMALL
         mode[reverse] = MODE_REVERSE
         mode[forward] = MODE_FORWARD

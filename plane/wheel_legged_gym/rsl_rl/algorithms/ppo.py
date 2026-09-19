@@ -275,6 +275,12 @@ class PPO:
             num_updates += 1
 
         num_updates_extra = 0
+        probe_enabled = getattr(self, 'encoder_ablation_diagnostics', False)
+        if probe_enabled:
+            with torch.no_grad():
+                probe_obs, probe_history = obs_batch[:256], obs_history_batch[:256]
+                probe_before = self.actor_critic.actor(torch.cat((probe_obs,
+                    self.actor_critic.encode(probe_history)), dim=-1)).clone()
         mean_extra_loss = 0
         mean_encoder_grad_norm = 0.0
         mean_encoder_parameter_delta = 0.0
@@ -327,7 +333,8 @@ class PPO:
                 grad_norm = nn.utils.clip_grad_norm_(
                     self.actor_critic.encoder.parameters(), 0.1
                 )
-                self.extra_optimizer.step()
+                if not getattr(self, 'freeze_encoder_updates', False):
+                    self.extra_optimizer.step()
 
                 parameter_delta = torch.sqrt(
                     sum(
@@ -353,6 +360,17 @@ class PPO:
             mean_encoder_parameter_delta /= num_updates_extra
         self.last_encoder_grad_norm = mean_encoder_grad_norm
         self.last_encoder_parameter_delta = mean_encoder_parameter_delta
+        if probe_enabled:
+            with torch.no_grad():
+                probe_after = self.actor_critic.actor(torch.cat((probe_obs,
+                    self.actor_critic.encode(probe_history)), dim=-1))
+                delta = probe_after-probe_before
+                std = self.actor_critic.std.detach().clamp(min=1e-8)
+                self.last_encoder_action_shift = {
+                    'mean_abs_by_channel':delta.abs().mean(dim=0).cpu().tolist(),
+                    'max_abs':delta.abs().max().item(),
+                    'implied_mean_policy_kl':(.5*(delta/std).square().sum(dim=1)).mean().item(),
+                    'probe_size':len(probe_obs)}
         self.storage.clear()
 
         return (

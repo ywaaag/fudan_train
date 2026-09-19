@@ -30,7 +30,7 @@ def main():
     parser.add_argument('--vx', type=float, default=0., help='Fixed forward velocity command for locomotion audit')
     parser.add_argument('--gui', action='store_true', help='Matched configuration visual audit; approximately real time')
     parser.add_argument('--push-delta-v', type=float, default=0., help='World horizontal velocity impulse magnitude (m/s), not force')
-    parser.add_argument('--profile', choices=['method_v1', 'FUDAN_STAND', 'STAND_CONTROL', 'STAND_SYMMETRIC', 'LOW_SPEED'], default='method_v1')
+    parser.add_argument('--profile', choices=['method_v1', 'FUDAN_STAND', 'STAND_CONTROL', 'STAND_SYMMETRIC', 'LOW_SPEED', 'LOW_SPEED_TRACKING'], default='method_v1')
     opts = parser.parse_args()
     if not 0 <= opts.warmup < opts.seconds:
         parser.error('require 0 <= warmup < seconds')
@@ -50,7 +50,7 @@ def main():
     cfg.terrain.mesh_type = 'plane'
     cfg.terrain.curriculum = False
     cfg.commands.ranges.height = [opts.height, opts.height]
-    if opts.profile == 'LOW_SPEED':
+    if opts.profile in {'LOW_SPEED', 'LOW_SPEED_TRACKING'}:
         # Audit a fixed command, not the profile's episode mixture.
         cfg.commands.sampling_strategy = 'uniform'
         cfg.commands.ranges.lin_vel_x = [opts.vx, opts.vx]
@@ -82,13 +82,14 @@ def main():
     samples = []
     geometry = []
     poses = []
+    encoder_samples = []
     xy_samples = []
     push_results = []
     active_push = None
     directions = ((1.,0.),(-1.,0.),(0.,1.),(0.,-1.),(1.,0.))
     for step in range(round(opts.seconds / env.dt)):
         step_started = time.monotonic()
-        if opts.profile == 'LOW_SPEED' and not torch.allclose(
+        if opts.profile in {'LOW_SPEED', 'LOW_SPEED_TRACKING'} and not torch.allclose(
                 env.commands[:, :3], env.commands.new_tensor([opts.vx, 0., opts.height]).expand(env.num_envs, -1)):
             raise RuntimeError('Fixed-command audit was overwritten by a sampler')
         if opts.push_delta_v and step in [round(t/env.dt) for t in (10,20,30,40,50)]:
@@ -103,7 +104,8 @@ def main():
             streak = torch.zeros(opts.num_envs, device=env.device)
             invalid = torch.zeros(opts.num_envs, dtype=torch.bool, device=env.device)
         with torch.inference_mode():
-            action, _ = policy.act_inference(obs, history)
+            action, latent = policy.act_inference(obs, history)
+            velocity_pair = torch.stack((env.base_lin_vel[:,0], latent[:,0]/env.obs_scales.lin_vel), dim=-1)
         obs, _, _, dones, info, history = env.step(action)
         timeout = info.get('time_outs', torch.zeros_like(dones)).bool()
         failures += (dones.bool() & ~timeout).float()
@@ -132,6 +134,7 @@ def main():
             env.dof_pos[:, 0]-env.dof_pos[:, 3], env.dof_pos[:, 1]-env.dof_pos[:, 4],
             (env.contact_forces[:, nonwheel_ids].norm(dim=-1) > 1.).any(dim=-1).float()), dim=-1)
         samples.append(values.detach().cpu())
+        encoder_samples.append(velocity_pair.detach().cpu())
         xy_samples.append(env.root_states[:, :2].detach().cpu().clone())
         positions = env.rigid_body_states[:, body_ids, :3] - env.root_states[:, None, :3]
         root_positions = quat_rotate_inverse(env.base_quat[:, None, :].expand(-1, 4, -1).reshape(-1, 4),
@@ -144,6 +147,7 @@ def main():
         if opts.gui:
             time.sleep(max(0., env.dt-(time.monotonic()-step_started)))
     data = torch.stack(samples)
+    encoder_data = torch.stack(encoder_samples)
     xy = torch.stack(xy_samples)
     displacement = (xy - xy[0]).norm(dim=-1)
     if active_push is not None:
@@ -159,6 +163,9 @@ def main():
                          'temporal_std': v.std(dim=0).mean().item()}
     payload = {'checkpoint': str(opts.checkpoint.resolve()), 'seed': opts.seed,
         'profile': opts.profile,
+        'encoder_vx': {'true_mean':encoder_data[:,:,0].mean().item(),
+                       'estimate_mean':encoder_data[:,:,1].mean().item(),
+                       'mae':(encoder_data[:,:,0]-encoder_data[:,:,1]).abs().mean().item()},
         'command_vx': opts.vx,
         'tracking_vx_mae': (data[:,:,0]-opts.vx).abs().mean().item(),
         'position_drift': {

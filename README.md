@@ -5,10 +5,23 @@
 
 ## 当前交接状态
 
-2026-09-19 已完成 8 个候选的统一验收（48 组、240 项）。推荐下一轮运动迁移起点为
+**最新 encoder 配对消融已完成：** 同源冻结/更新各500 iteration。冻结组末尾失稳，
+更新组更稳定但仍未通过完整±1验收；保留原model100低速候选。新增逐命令加权统计，
+诊断未改变更新组训练结果。见 [encoder对照结论](docs/encoder_ablation.md)。
+
+**最新 ±1 m/s 续训已完成但未通过。** H3_SPEED1追加500 iteration并检查全部保存点；
+model200保留低速、改善+1，但-1不足；model600停车和+0.5退化。
+仍保留下面的model100低速候选，训练已暂停，见 [±1课程结果](docs/h3_speed1.md)。
+
+**2026-09-19 最新：H3 低速迁移短训完成。**
+`Sep19_09-17-38_h3_low_speed_20260919_091730/model_100.pt` 已通过三种子
+`0、±0.5 m/s` 验收（9/9），选为当前低速候选；ONNX 数值一致性通过。
+±1 m/s 尚未通过，未自动升速。见 [本轮记录](docs/h3_low_speed_migration.md)。
+
+此前完成 8 个候选的统一验收（48 组、240 项）。当时推荐的运动迁移起点为
 `Sep05_17-41-43_H3_from_H2_best_v1/model_15800.pt`；站立参考仍保留
 `Sep18_21-21-37_stand_validated_20260918_212129/model_3100.pt`。
-**所有候选均未通过完整初始门槛，暂不升速，不继续盲目延长两条失败的 LOW_SPEED run。**
+这批旧候选均未通过完整初始门槛；两条失败的 LOW_SPEED run 不继续盲目延长。
 
 - [当前验收结论与复现方法](docs/policy_version_comparison.md)
 - [模型分支、继承关系和全量 checkpoint 清单](docs/model_branches.md)
@@ -35,6 +48,7 @@
     --policy_experiment=H7 \
     --max_iterations=3000 \
     --run_name=H7_fixed_3ms_v1
+
 
 
 

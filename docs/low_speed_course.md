@@ -49,3 +49,29 @@ Logs and status are under plane/outputs/low_speed_05_<timestamp>.
 
 Validation: config/sampler test, 64-env one-iteration resume smoke, fixed-command
 evaluation smoke. Training and audit outcomes must be inspected separately.
+
+## Response ablation: LOW_SPEED_TRACKING
+
+First 500-iteration LOW_SPEED run failed all directional tracking gates.
+Additional seed19 diagnostics (8 envs, 15 s / 5 warmup) measured encoder vx
+MAE 0.0155 m/s in reverse and 0.0196 m/s forward. These errors are much
+smaller than task tracking errors; they do not establish encoder error as
+the dominant cause. Actual commands are asserted each evaluation step.
+
+LOW_SPEED_TRACKING changes only tracking_linear_cap from 1.0 to 0.5 m/s,
+matching the first stage's velocity endpoints. This changes coarse/fine/gap
+normalization together, sharpening the reward distinction between stationary
+and correctly moving behavior. It does not compensate or offset commands.
+Sampling, optimizer settings and physical parameters remain the same.
+It starts again from the same model_3100 with seed23 for a matched 500-iteration
+comparison, preserving the original failed run for reference.
+
+```bash
+/home/kellen/anaconda3/envs/fudan_leg/bin/python tools/run_low_speed.py \
+ --profile LOW_SPEED_TRACKING
+```
+
+Two config/reward tests and a one-iteration 64-env resume smoke passed.
+The new reward normalization is recorded in manifest reward_parameters.
+Nine independent audits run automatically after training, with unchanged gates.
+No stage advancement or performance claim until these tests finish.

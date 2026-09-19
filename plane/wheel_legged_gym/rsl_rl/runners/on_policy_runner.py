@@ -123,6 +123,9 @@ class OnPolicyRunner:
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):    ###############这里
                     actions = self.alg.act(obs, obs_history, critic_obs)
+                    diagnostics = getattr(self, 'command_diagnostics', None)
+                    if diagnostics is not None:
+                        diagnostics.before_step(self.alg.actor_critic.get_latent())
                     obs, privileged_obs, rewards, dones, infos, obs_history = (
                         self.env.step(actions)
                     )
@@ -176,6 +179,9 @@ class OnPolicyRunner:
             )
             stop = time.time()
             learn_time = stop - start
+            if getattr(self, 'command_diagnostics', None) is not None:
+                self.command_diagnostics.flush(it, self.writer,
+                    getattr(self.alg, 'last_encoder_action_shift', None))
             if self.log_dir is not None:
                 self.log(locals())
             self.current_learning_iteration = it + 1

@@ -1,5 +1,6 @@
 """One 500-iteration low-speed relay, followed by signed fixed-command audits."""
 import json
+import argparse
 import os
 from pathlib import Path
 import subprocess
@@ -7,12 +8,16 @@ import sys
 from datetime import datetime
 
 root=Path(__file__).resolve().parents[1]
+parser=argparse.ArgumentParser(__doc__)
+parser.add_argument('--profile',choices=['LOW_SPEED','LOW_SPEED_TRACKING'],default='LOW_SPEED')
+args=parser.parse_args()
 plane=root/'plane'
 job=plane/'outputs'/('low_speed_05_'+datetime.now().strftime('%Y%m%d_%H%M%S'))
 job.mkdir()
 env=dict(os.environ,CUDA_VISIBLE_DEVICES='0',PYTHONPATH=str(plane),
  LD_LIBRARY_PATH=str(Path(sys.executable).parent.parent/'lib')+':'+os.environ.get('LD_LIBRARY_PATH',''))
 state={'status':'training','additional_iterations':500,'completed_audits':[],
+ 'profile':args.profile,
  'source_checkpoint':'Sep18_21-21-37_stand_validated_20260918_212129/model_3100.pt','supervisor_pid':os.getpid()}
 def save():
  t=job/'status.tmp';t.write_text(json.dumps(state,indent=2));t.replace(job/'status.json')
@@ -24,7 +29,7 @@ def run(cmd,tag):
 try:
  run([str(plane/'wheel_legged_gym/scripts/train.py'),'--task=wheel_legged','--headless','--num_envs=4096',
   '--resume','--resume_mode=full','--load_run=Sep18_21-21-37_stand_validated_20260918_212129',
-  '--checkpoint=3100','--policy_experiment=LOW_SPEED','--max_iterations=500','--seed=23','--run_name='+job.name],'train')
+  '--checkpoint=3100','--policy_experiment='+args.profile,'--max_iterations=500','--seed=23','--run_name='+job.name],'train')
  runs=list((plane/'logs/wheel_legged').glob('*_'+job.name))
  if len(runs)!=1:raise RuntimeError('Ambiguous run')
  model=runs[0]/'model_3600.pt'
@@ -34,7 +39,7 @@ try:
   for vx in [-.5,0.,.5]:
    tag=f'audit_{seed}_{vx:+.1f}'
    out=job/(tag+'.json')
-   run([str(plane/'wheel_legged_gym/scripts/evaluate_standing.py'),'--profile=LOW_SPEED',
+   run([str(plane/'wheel_legged_gym/scripts/evaluate_standing.py'),'--profile='+args.profile,
     '--checkpoint='+str(model),'--randomization-level=1','--num-envs=16','--seconds=25',
     '--warmup=5','--seed='+str(seed),'--vx='+str(vx),'--out='+str(out)],tag)
    state['completed_audits'].append(str(out));save()
