@@ -5,12 +5,16 @@
 
 ## 当前交接状态
 
-当前主线已经从旧 H3/H7 经验调参切换到 `method_v1` 分阶段训练。详细的重构原因、训练时间线、已验证 checkpoint、当前风险和下一步命令见：
+2026-09-19 已完成 8 个候选的统一验收（48 组、240 项）。推荐下一轮运动迁移起点为
+`Sep05_17-41-43_H3_from_H2_best_v1/model_15800.pt`；站立参考仍保留
+`Sep18_21-21-37_stand_validated_20260918_212129/model_3100.pt`。
+**所有候选均未通过完整初始门槛，暂不升速，不继续盲目延长两条失败的 LOW_SPEED run。**
 
-[`HANDOFF_METHOD_V1.md`](HANDOFF_METHOD_V1.md)
+- [当前验收结论与复现方法](docs/policy_version_comparison.md)
+- [模型分支、继承关系和全量 checkpoint 清单](docs/model_branches.md)
 
-当前最新可用 checkpoint 为 `translate +/-2.0 m/s` 长训练的
-`plane/logs/wheel_legged/Sep07_16-10-41_method_v1_translate_20_long_v1/model_5000.pt`，下一目标是 `translate command_level=3`，即 `+/-3.0 m/s`。
+重构历史见 [`HANDOFF_METHOD_V1.md`](HANDOFF_METHOD_V1.md)。其中早期 ±2/±3 课程进度
+不是当前验收结论；下面保留的旧启动示例也不作为本次推荐训练命令。
 
   cd /home/kellen/fudan_train/plane
 
