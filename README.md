@@ -9,6 +9,10 @@
 更新组更稳定但仍未通过完整±1验收；保留原model100低速候选。新增逐命令加权统计，
 诊断未改变更新组训练结果。见 [encoder对照结论](docs/encoder_ablation.md)。
 
+由于本项目移植自 `fudan_rl_wheel_leg`，已完成原项目与当前实现的契约审计；两者的
+asset、初始状态、wheel PD、reward、command 和 PPO 配置并不等价。见
+[移植契约对照](docs/source_contract_migration.md)。
+
 **最新 ±1 m/s 续训已完成但未通过。** H3_SPEED1追加500 iteration并检查全部保存点；
 model200保留低速、改善+1，但-1不足；model600停车和+0.5退化。
 仍保留下面的model100低速候选，训练已暂停，见 [±1课程结果](docs/h3_speed1.md)。
