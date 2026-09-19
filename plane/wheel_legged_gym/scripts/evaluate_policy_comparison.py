@@ -19,6 +19,7 @@ from wheel_legged_gym.utils.helpers import class_to_dict
 from wheel_legged_gym.envs.wheel_legged.policy_experiments import (
     apply_training_profile, _apply_method_randomization,
 )
+from wheel_legged_gym.envs.wheel_legged.policy_experiments import apply_policy_experiment
 from wheel_legged_gym.scripts.isaac_parity_trace import _gym_args, _disable_randomization
 from wheel_legged_gym.scripts.isaac_command_grid import load_policy, _set_fixed_ranges
 
@@ -37,13 +38,17 @@ def main():
     p.add_argument('--randomization-level', type=int, choices=[0, 1], default=1)
     p.add_argument('--seconds', type=float, default=25)
     p.add_argument('--warmup', type=float, default=5)
+    p.add_argument('--profile', choices=['method_v1','LEGACY_URDF'], default='method_v1')
     a = p.parse_args()
     if not 0 <= a.warmup < a.seconds or a.envs_per_command < 1:
         p.error('require seconds > warmup >= 0 and positive environment count')
     if a.out.exists():
         raise FileExistsError(a.out)
     cfg, train = task_registry.get_cfgs(name='wheel_legged')
-    apply_training_profile(cfg, train, phase='translate', level=0)
+    if a.profile == 'LEGACY_URDF':
+        apply_policy_experiment(cfg, 'LEGACY_URDF', train)
+    else:
+        apply_training_profile(cfg, train, phase='translate', level=0)
     _disable_randomization(cfg)
     _apply_method_randomization(cfg, a.randomization_level)
     cfg.domain_rand_level = a.randomization_level
@@ -120,10 +125,14 @@ def main():
                                         positions.reshape(-1, 3)).reshape(-1, 4, 3)
             mirror = local.new_tensor([1, -1, 1])
             vx, yaw = env.base_lin_vel[:, 0], env.base_ang_vel[:, 2]
+            if getattr(env, '_method_v1', False):
+                slip_metric = env._method_wheel_terms()['residual_rms']
+            else:
+                slip_metric = torch.abs(vx.unsqueeze(1) + .06 * env.dof_vel[:, [2, 5]]).mean(dim=1)
             values = torch.stack([vx, (vx-target[:, 0]).abs(), vx.abs(), yaw, yaw.abs(),
                 env.base_height, (env.base_height-.4).abs(), roll.abs(), pitch.abs(),
                 contact[:, 0], contact[:, 1], body_contact,
-                env._method_wheel_terms()['residual_rms'], sat,
+                slip_metric, sat,
                 (local[:, 0]-local[:, 1]*mirror).norm(dim=-1),
                 (local[:, 2]-local[:, 3]*mirror).norm(dim=-1), encoder_error,
                 (action.abs() > env.cfg.normalization.clip_actions).float().mean(dim=-1)], dim=-1)

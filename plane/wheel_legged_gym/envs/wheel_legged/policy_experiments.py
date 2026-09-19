@@ -436,6 +436,9 @@ runs and checkpoints remain untouched on disk.
 
 
 def apply_policy_experiment(env_cfg, name: str | None, train_cfg=None) -> dict:
+    if str(name).upper() == 'LEGACY_URDF':
+        from .legacy_urdf import apply_legacy_urdf
+        return apply_legacy_urdf(env_cfg, train_cfg)
     if str(name).upper() in {'ENCODER_FROZEN', 'ENCODER_UPDATING'}:
         from .h3_speed1 import apply_h3_speed1
         manifest = apply_h3_speed1(env_cfg, train_cfg)

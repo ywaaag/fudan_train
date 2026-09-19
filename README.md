@@ -13,6 +13,9 @@
 asset、初始状态、wheel PD、reward、command 和 PPO 配置并不等价。见
 [移植契约对照](docs/source_contract_migration.md)。
 
+已完成 `LEGACY_URDF` 配置对照：原始 reward/PPO 在当前 URDF 上改善了前进，但 zero/reverse
+仍失败，不能直接替代当前主线。见 [对照结果](docs/legacy_urdf_ablation.md)。
+
 **最新 ±1 m/s 续训已完成但未通过。** H3_SPEED1追加500 iteration并检查全部保存点；
 model200保留低速、改善+1，但-1不足；model600停车和+0.5退化。
 仍保留下面的model100低速候选，训练已暂停，见 [±1课程结果](docs/h3_speed1.md)。
