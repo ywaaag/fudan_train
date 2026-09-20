@@ -16,6 +16,17 @@ def test_all_stages_retain_previous_commands_and_reach_targets():
     assert {(-4,0),(4,0),(0,-4),(0,4)} <= previous
 
 
+def test_turn_curriculum_retains_motion_and_progresses_both_directions():
+    previous=set(stage_bank('yaw4'))
+    for i in range(1,5):
+        current=set(stage_bank('turn'+str(i)))
+        assert previous<=current
+        assert {(s*float(i),t*.5) for s in (-1,1) for t in (-1,1)}<=current
+        assert {(0,0),(-4,0),(4,0),(0,-4),(0,4)}<=current
+        previous=current
+    assert {(-4,-.25),(-4,.25),(4,-.25),(4,.25)}<=previous
+
+
 def test_unsafe_policy_cannot_be_promoted_even_with_zero_error():
     row=dict(command=[0,.5,.4],failure_count=1,timeout_count=0,
              nonwheel_contact_full_fraction=0,

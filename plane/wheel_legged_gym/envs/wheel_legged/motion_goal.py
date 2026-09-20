@@ -9,6 +9,14 @@ STAGES = ('yaw05', 'turn05', 'yaw1', 'speed3', 'yaw2', 'speed4', 'yaw3', 'yaw4',
 
 
 def stage_bank(stage):
+    if stage in ('turn1','turn2','turn3','turn4'):
+        level=int(stage[-1])
+        bank=stage_bank('yaw4')
+        pairs=[(1.,.5),(1.,1.)]
+        if level>=2:pairs += [(2.,.5),(2.,1.)]
+        if level>=3:pairs += [(3.,.25),(3.,.5)]
+        if level>=4:pairs += [(4.,.25),(4.,.5)]
+        return bank+[(s*v,t*w) for v,w in pairs for s in (-1,1) for t in (-1,1)]
     index = STAGES.index(stage)
     speeds = [.5, 1., 1.5, 2.]
     if index >= 3: speeds += [2.5, 3.]

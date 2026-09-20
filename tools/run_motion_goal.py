@@ -47,14 +47,19 @@ def main():
     parser=argparse.ArgumentParser(__doc__)
     parser.add_argument('--max-rounds',type=int,default=40)
     parser.add_argument('--max-stagnant',type=int,default=3)
+    parser.add_argument('--turn-curriculum',action='store_true',help='Resume accepted6900, expand combined turns gradually at fixed .40m')
     opts=parser.parse_args()
+    stages=('turn1','turn2','turn3','turn4') if opts.turn_curriculum else STAGES
+    initial_source=(PLANE/'logs/wheel_legged/Sep20_03-42-29_motion_goal_20260920_002043_r24_yaw4/model_6900.pt'
+                    if opts.turn_curriculum else SOURCE)
+    initial_accepted=initial_source if opts.turn_curriculum else ACCEPTED
     if opts.max_rounds<1 or opts.max_stagnant<1:parser.error('positive limits required')
     lock=(PLANE/'outputs/h3_low_speed_training.lock').open('a')
     fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
     job=PLANE/'outputs'/('motion_goal_'+datetime.now().strftime('%Y%m%d_%H%M%S'))
     job.mkdir()
-    state={'status':'starting','supervisor_pid':os.getpid(),'job':str(job),'stage':'yaw05',
-           'source':str(SOURCE),'accepted':str(ACCEPTED),'round':0,'history':[],
+    state={'status':'starting','supervisor_pid':os.getpid(),'job':str(job),'stage':stages[0],
+           'source':str(initial_source),'accepted':str(initial_accepted),'round':0,'history':[],
            'goal_complete':False,'limits':vars(opts),'child_pid':None}
     env=dict(os.environ,CUDA_VISIBLE_DEVICES='0',PYTHONPATH=str(PLANE),
              LD_LIBRARY_PATH=str(Path(sys.executable).parent.parent/'lib')+':'+os.environ.get('LD_LIBRARY_PATH',''))
@@ -122,12 +127,12 @@ def main():
              '--out='+str(onnx)],tag+'_export')
         run([PLANE/'export_onnx/verify_onnx.py','--checkpoint='+str(checkpoint),'--onnx='+str(onnx),'--batch=256'],tag+'_onnx_check')
     print(job,flush=True);save()
-    source=SOURCE;stage_index=0;stagnant=0;focus=[]
+    source=initial_source;stage_index=0;stagnant=0;focus=[]
     try:
-        baseline=evaluate(source,STAGES[0],[19,37,53],'initial')
+        baseline=evaluate(source,stages[0],[19,37,53],'initial')
         if not baseline['safe']:raise RuntimeError('Initial source fails safety gate')
         for round_id in range(1,opts.max_rounds+1):
-            stage=STAGES[stage_index]
+            stage=stages[stage_index]
             state.update(status='training',stage=stage,round=round_id,source=str(source));save()
             iteration=int(source.stem.split('_')[-1])
             spec={'stage':stage,'focus':focus,'source_checkpoint':str(source),
@@ -169,9 +174,10 @@ def main():
                     state['history'].append({'round':round_id,'stage':stage,'decision':'stage accepted',
                                              'checkpoint':str(candidate),'result':result})
                     source=candidate;stage_index+=1;focus=[];stagnant=0
-                    if stage_index==len(STAGES):
-                        state['status']='simulation_curriculum_passed_pending_sim2sim_and_smoothness_review';save();return
-                    baseline=evaluate(source,STAGES[stage_index],[19,37,53],f'enter_{STAGES[stage_index]}')
+                    if stage_index==len(stages):
+                        state['status']=('turn_grid_passed_pending_transitions_and_sim2sim' if opts.turn_curriculum
+                            else 'simulation_curriculum_passed_pending_sim2sim_and_smoothness_review');save();return
+                    baseline=evaluate(source,stages[stage_index],[19,37,53],f'enter_{stages[stage_index]}')
                 else:
                     state['history'].append({'round':round_id,'stage':stage,'decision':'improved candidate' if improved else 'rollback retained source',
                                              'checkpoint':str(candidate),'result':result})
