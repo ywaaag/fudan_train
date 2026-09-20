@@ -14,13 +14,24 @@ MODE_NAMES = ("zero", "small", "reverse", "forward")
 
 def sample_fixed_bank(linear_ranges, yaw_ranges, slot_ids, bank):
     """Explicit weighted (vx, yaw) slots; reject clipping that hides lost anchors."""
-    table = linear_ranges.new_tensor(bank)
+    table = torch.as_tensor(bank,device=linear_ranges.device,dtype=linear_ranges.dtype)
     if table.ndim != 2 or table.shape[1] != 2 or not table.shape[0] or not torch.isfinite(table).all():
         raise ValueError('command bank must be finite nonempty (N,2)')
     selected = table[slot_ids % table.shape[0]]
     for col, ranges in enumerate((linear_ranges, yaw_ranges)):
         if ((selected[:, col] < ranges[:, 0]) | (selected[:, col] > ranges[:, 1])).any():
             raise ValueError('command bank exceeds configured ranges')
+    return selected
+
+
+def sample_height_bank(linear_ranges, yaw_ranges, height_ranges, slot_ids, bank):
+    table = linear_ranges.new_tensor(bank)
+    if table.ndim != 2 or table.shape[1] != 3 or not table.shape[0] or not torch.isfinite(table).all():
+        raise ValueError('height bank must be finite nonempty (N,3)')
+    sample_fixed_bank(linear_ranges, yaw_ranges, slot_ids, table[:, :2])
+    selected = table[slot_ids % table.shape[0]]
+    if ((selected[:, 2] < height_ranges[:, 0]) | (selected[:, 2] > height_ranges[:, 1])).any():
+        raise ValueError('height bank exceeds configured height range')
     return selected
 
 

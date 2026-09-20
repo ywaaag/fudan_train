@@ -436,6 +436,9 @@ runs and checkpoints remain untouched on disk.
 
 
 def apply_policy_experiment(env_cfg, name: str | None, train_cfg=None) -> dict:
+    if str(name).upper() == 'HEIGHT_COURSE':
+        from .height_course import apply_height_course
+        return apply_height_course(env_cfg, train_cfg)
     if str(name).upper() == 'MOTION_GOAL':
         from .motion_goal import apply_motion_goal
         return apply_motion_goal(env_cfg, train_cfg)

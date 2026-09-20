@@ -34,6 +34,8 @@ def main():
     p.add_argument('--out', type=Path, required=True)
     p.add_argument('--commands', type=float, nargs='+', default=[0, -.5, .5, -1, 1])
     p.add_argument('--yaw-commands', type=float, nargs='+', help='Yaw paired with each vx; defaults to zero')
+    p.add_argument('--height-commands', type=float, nargs='+', help='Base root height in metres, paired with vx; defaults to .4')
+    p.add_argument('--initial-height-commands', type=float, nargs='+')
     p.add_argument('--initial-commands', type=float, nargs='+', help='Optional vx before one timed switch; no reset at switch')
     p.add_argument('--initial-yaw-commands', type=float, nargs='+')
     p.add_argument('--switch-at', type=float, default=5.)
@@ -44,16 +46,26 @@ def main():
     p.add_argument('--warmup', type=float, default=5)
     p.add_argument('--profile', choices=['method_v1','LEGACY_URDF'], default='method_v1')
     a = p.parse_args()
+    if a.height_commands is None:
+        a.height_commands = [.4] * len(a.commands)
+    if (len(a.height_commands) != len(a.commands) or not np.isfinite(a.height_commands).all()
+            or not all(.30 <= h <= .45 for h in a.height_commands)):
+        p.error('height commands must match vx count and lie in [.30,.45] metres')
     if a.yaw_commands is None:
         a.yaw_commands = [0.] * len(a.commands)
     if len(a.yaw_commands) != len(a.commands) or not np.isfinite(a.commands + a.yaw_commands).all():
         p.error('vx/yaw lists must have equal length and finite values')
     transition = a.initial_commands is not None
-    if a.initial_yaw_commands is not None and not transition:
+    if (a.initial_yaw_commands is not None or a.initial_height_commands is not None) and not transition:
         p.error('initial yaw requires initial commands')
     if transition:
         if a.initial_yaw_commands is None:
             a.initial_yaw_commands = [0.] * len(a.commands)
+        if a.initial_height_commands is None:
+            a.initial_height_commands = a.height_commands
+        if (len(a.initial_height_commands) != len(a.commands) or
+                not all(.30 <= h <= .45 for h in a.initial_height_commands)):
+            p.error('initial heights must match vx count and lie in [.30,.45]')
         if (len(a.initial_commands) != len(a.commands) or len(a.initial_yaw_commands) != len(a.commands)
                 or not np.isfinite(a.initial_commands + a.initial_yaw_commands).all()
                 or not 0 < a.switch_at < a.warmup):
@@ -83,10 +95,10 @@ def main():
     args.num_envs, args.seed = cfg.env.num_envs, a.seed
     env, _ = task_registry.make_env(name='wheel_legged', args=args, env_cfg=cfg)
     try:
-        commands = np.repeat(np.array([[v, w, .4] for v, w in zip(a.commands, a.yaw_commands)]),
+        commands = np.repeat(np.array(list(zip(a.commands, a.yaw_commands, a.height_commands))),
                              a.envs_per_command, axis=0)
-        initial_commands = (np.repeat(np.array([[v, w, .4] for v, w in
-            zip(a.initial_commands, a.initial_yaw_commands)]), a.envs_per_command, axis=0)
+        initial_commands = (np.repeat(np.array(list(zip(a.initial_commands, a.initial_yaw_commands,
+            a.initial_height_commands))), a.envs_per_command, axis=0)
             if transition else commands)
         _set_fixed_ranges(env, initial_commands)
         env.reset()
@@ -114,6 +126,10 @@ def main():
         sums = torch.zeros(env.num_envs, len(names), device=env.device)
         maxima = torch.zeros_like(sums)
         count = 0
+        joint_sums = torch.zeros(env.num_envs,6,device=env.device)
+        joint_min = torch.full_like(joint_sums,float('inf'))
+        joint_max = torch.full_like(joint_sums,-float('inf'))
+        torque_max = torch.zeros_like(joint_sums)
         response_trace = []
         for step in range(round(a.seconds / env.dt)):
             if transition and step == round(a.switch_at / env.dt):
@@ -142,6 +158,7 @@ def main():
             nonwheel_full += body_contact
             if transition and step % 10 == 0:
                 response_trace.append({'time': (step+1)*env.dt,
+                    'height': env.base_height.detach().cpu().tolist(),
                     'vx': env.base_lin_vel[:, 0].detach().cpu().tolist(),
                     'yaw': env.base_ang_vel[:, 2].detach().cpu().tolist()})
             # Counters reset with episodes; post-reset samples are not valid
@@ -164,7 +181,7 @@ def main():
             else:
                 slip_metric = torch.abs(vx.unsqueeze(1) + .06 * env.dof_vel[:, [2, 5]]).mean(dim=1)
             values = torch.stack([vx, (vx-target[:, 0]).abs(), vx.abs(), yaw, yaw.abs(),
-                env.base_height, (env.base_height-.4).abs(), roll.abs(), pitch.abs(),
+                env.base_height, (env.base_height-target[:, 2]).abs(), roll.abs(), pitch.abs(),
                 contact[:, 0], contact[:, 1], body_contact,
                 slip_metric, sat,
                 (local[:, 0]-local[:, 1]*mirror).norm(dim=-1),
@@ -174,6 +191,10 @@ def main():
             if not torch.isfinite(values).all():
                 raise RuntimeError('Nonfinite physics metrics')
             sums += values
+            joint_sums += env.dof_pos
+            joint_min = torch.minimum(joint_min,env.dof_pos)
+            joint_max = torch.maximum(joint_max,env.dof_pos)
+            torque_max = torch.maximum(torque_max,env.torques.abs())
             maxima = torch.maximum(maxima, values.abs())
             count += 1
         means = (sums / count).cpu()
@@ -181,7 +202,13 @@ def main():
         for i, vx in enumerate(a.commands):
             sl = slice(i*a.envs_per_command, (i+1)*a.envs_per_command)
             metrics = {n: means[sl, j].mean().item() for j, n in enumerate(names)}
-            results.append({'command': [vx, a.yaw_commands[i], .4], 'metrics': metrics,
+            results.append({'command': [vx, a.yaw_commands[i], a.height_commands[i]], 'metrics': metrics,
+                'joint_diagnostics':{'names':list(env.dof_names),
+                    'mean_positions_rad':(joint_sums[sl]/count).mean(0).cpu().tolist(),
+                    'min_positions_rad':joint_min[sl].min(0).values.cpu().tolist(),
+                    'max_positions_rad':joint_max[sl].max(0).values.cpu().tolist(),
+                    'max_applied_torque_nm':torque_max[sl].max(0).values.cpu().tolist(),
+                    'scope':'Post-warmup positions; torque snapshots at policy steps, not all physics substeps. Wheel position is accumulated angle.'},
                 'failure_count': failures[sl].sum().item(), 'timeout_count': timeouts[sl].sum().item(),
                 'survival_fraction': (failures[sl] == 0).float().mean().item(),
                 'nonwheel_contact_full_fraction': (nonwheel_full[sl]/round(a.seconds/env.dt)).mean().item(),
@@ -202,7 +229,7 @@ def main():
         if transition:
             payload.update(schema='matched_policy_transition_v1',
                 switch_at=round(a.switch_at/env.dt)*env.dt,
-                initial_commands=[[v,w,.4] for v,w in zip(a.initial_commands,a.initial_yaw_commands)],
+                initial_commands=list(map(list,zip(a.initial_commands,a.initial_yaw_commands,a.initial_height_commands))),
                 response_trace=response_trace,
                 transition_note='No reset at switch; 10 Hz per-environment response trace. Metrics and gate cover post-warmup steady state, not transient smoothness.')
         a.out.parent.mkdir(parents=True, exist_ok=True)

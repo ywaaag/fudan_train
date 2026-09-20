@@ -77,10 +77,12 @@ def train(args):
             matching_resume = True
     else:
         manifest = apply_policy_experiment(env_cfg, args.policy_experiment, train_cfg)
-    if str(args.policy_experiment).upper() == 'MOTION_GOAL':
+    if str(args.policy_experiment).upper() in {'MOTION_GOAL','HEIGHT_COURSE'}:
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
         from wheel_legged_gym.utils import get_load_path
         from wheel_legged_gym.envs.wheel_legged.motion_goal import validate_source
+        if str(args.policy_experiment).upper() == 'HEIGHT_COURSE':
+            from wheel_legged_gym.envs.wheel_legged.height_course import validate_source
         root=Path(WHEEL_LEGGED_GYM_ROOT_DIR)/'logs'/(args.experiment_name or train_cfg.runner.experiment_name)
         checkpoint=Path(get_load_path(str(root),load_run=args.load_run,checkpoint=args.checkpoint))
         manifest.update(validate_source(checkpoint,args.resume,args.resume_mode,env_cfg))
@@ -164,10 +166,10 @@ def train(args):
         from wheel_legged_gym.envs.wheel_legged.h3_low_speed import verify_and_restore_std
         manifest['migration_verification'] = verify_and_restore_std(ppo_runner, checkpoint)
     task_registry.save_cfgs(name=args.task)
-    if str(args.policy_experiment).upper() == 'MOTION_GOAL':
+    if str(args.policy_experiment).upper() in {'MOTION_GOAL','HEIGHT_COURSE'}:
         from wheel_legged_gym.envs.wheel_legged.h3_speed1 import verify_full_resume
         manifest['resume_verification']=verify_full_resume(ppo_runner,checkpoint,
-            expected_iteration=manifest['motion_goal_spec']['source_iteration'])
+            expected_iteration=manifest.get('height_spec',manifest.get('motion_goal_spec'))['source_iteration'])
         manifest['effective_start_learning_rate']=ppo_runner.alg.learning_rate
     if str(args.policy_experiment).upper() in {'LEGACY_ANCHORS','LEGACY_SPEED2','LEGACY_SPEED2_STOP','LEGACY_YAW'}:
         from wheel_legged_gym.envs.wheel_legged.h3_speed1 import verify_full_resume

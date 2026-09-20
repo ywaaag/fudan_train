@@ -869,6 +869,10 @@ class LeggedRobot(BaseTask):
         )
         if not getattr(self.cfg.commands, "hold_command_until_reset", False):
             self._resample_commands(env_ids)
+        if getattr(self.cfg.commands,'height_switch_interval',0.)>0:
+            from .height_commands import alternate_height
+            alternate_height(self.commands,self.episode_length_buf,self.dt,
+                self.cfg.commands.height_switch_interval,*self.cfg.commands.ranges.height)
         if self.cfg.commands.heading_command:
             forward = quat_apply(self.base_quat, self.forward_vec)
             heading = torch.atan2(forward[:, 1], forward[:, 0])
@@ -913,7 +917,15 @@ class LeggedRobot(BaseTask):
             env_ids (List[int]): Environments ids for which new commands are needed
         """
         strategy = getattr(self.cfg.commands, "sampling_strategy", "uniform")
-        if strategy == "fixed_bank":
+        if strategy == "height_bank":
+            from .command_sampling import sample_height_bank
+            height_selected = sample_height_bank(self.command_ranges['lin_vel_x'][env_ids],
+                self.command_ranges['ang_vel_yaw'][env_ids], self.command_ranges['height'][env_ids],
+                self.method_v1_segment_counter[env_ids], self.cfg.commands.height_bank)
+            self.commands[env_ids, :2] = height_selected[:, :2]
+            self.command_sample_mode[env_ids] = -1
+            self.method_v1_segment_counter[env_ids] += 1
+        elif strategy == "fixed_bank":
             from .command_sampling import sample_fixed_bank
             selected = sample_fixed_bank(self.command_ranges['lin_vel_x'][env_ids],
                 self.command_ranges['ang_vel_yaw'][env_ids],
@@ -986,6 +998,8 @@ class LeggedRobot(BaseTask):
         ]
 
         # # 清空 jump_height
+        if strategy == 'height_bank':
+            self.commands[env_ids, 2] = height_selected[:, 2]
         # self.commands[env_ids, self.jump_cmd_idx] = 0.0
 
         # # 采样 jump_height（像 diablo 一样：先采样，再用 mask 置 0）

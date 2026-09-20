@@ -33,9 +33,11 @@ def summarize(data):
     rows = []
     for i, (initial, result) in enumerate(zip(data['initial_commands'], data['results'])):
         axes = {}
-        for col, name in enumerate(('vx','yaw')):
+        names = ('vx','yaw','height') if 'height' in traces[0] else ('vx','yaw')
+        for col, name in enumerate(names):
             target = result['command'][col]
             tolerance = (.05 if target == 0 else .10) if name == 'vx' else .10
+            if name == 'height': tolerance = .015
             outcomes = [response_metrics(times,[t[name][e] for t in traces],target,initial[col],
                         data['switch_at'],tolerance) for e in range(i*count,(i+1)*count)]
             settled = [r['settling_time_s'] for r in outcomes if r['settling_time_s'] is not None]
