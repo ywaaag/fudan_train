@@ -5,6 +5,16 @@
 
 ## 当前交接状态
 
+**2026-09-20 夜间结果：** 30轮短训后，model6900通过前后±4m/s、原地±4rad/s及
+低速组合转弯的固定命令三种子验收（93/93），ONNX一致性通过。高速后退转弯仍未达标，
+连续三轮改善不足已自动暂停；动态切换和sim2sim未完成。
+模型路径、进步原因、此前实现错误和证据边界见 [夜间训练复盘](docs/overnight_motion_goal.md)。
+
+**2026-09-20：LEGACY_SPEED2_STOP v2 model1400 已通过0/±0.5/±1/±1.5/±2m/s三seed全部27项稳态验收。**
+路径：`plane/logs/wheel_legged/Sep19_23-08-55_legacy_speed2_stop_20260919_230848/model_1400.pt`。
+ONNX一致性通过。−1m/s误差接近门槛；尚未通过yaw、转弯、反向切换或sim2sim。
+旧model700保留。见 [最新平移阶段结果及上一轮实现错误](docs/legacy_speed2_stop.md)。下文为历史实验记录。
+
 **最新 encoder 配对消融已完成：** 同源冻结/更新各500 iteration。冻结组末尾失稳，
 更新组更稳定但仍未通过完整±1验收；保留原model100低速候选。新增逐命令加权统计，
 诊断未改变更新组训练结果。见 [encoder对照结论](docs/encoder_ablation.md)。

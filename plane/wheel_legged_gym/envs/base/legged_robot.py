@@ -913,7 +913,15 @@ class LeggedRobot(BaseTask):
             env_ids (List[int]): Environments ids for which new commands are needed
         """
         strategy = getattr(self.cfg.commands, "sampling_strategy", "uniform")
-        if strategy == "method_v1":
+        if strategy == "fixed_bank":
+            from .command_sampling import sample_fixed_bank
+            selected = sample_fixed_bank(self.command_ranges['lin_vel_x'][env_ids],
+                self.command_ranges['ang_vel_yaw'][env_ids],
+                self.method_v1_segment_counter[env_ids], self.cfg.commands.fixed_bank)
+            self.commands[env_ids, :2] = selected
+            self.command_sample_mode[env_ids] = -1
+            self.method_v1_segment_counter[env_ids] += 1
+        elif strategy == "method_v1":
             linear, yaw, mode = sample_method_v1(
                 self.command_ranges["lin_vel_x"][env_ids],
                 self.command_ranges["ang_vel_yaw"][env_ids],
@@ -926,6 +934,7 @@ class LeggedRobot(BaseTask):
                 ),
                 slot_ids=self.method_v1_segment_counter[env_ids],
                 translation_anchors=getattr(self.cfg.commands, 'translation_retention_anchors', None),
+                zero_retention=getattr(self.cfg.commands, 'zero_retention', False),
             )
             self.commands[env_ids, 0] = linear
             self.commands[env_ids, 1] = yaw

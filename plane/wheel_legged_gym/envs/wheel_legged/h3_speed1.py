@@ -35,7 +35,7 @@ def validate_source(checkpoint, resume, mode, manifest):
     return {'source_checkpoint':str(checkpoint.resolve()),'source_checkpoint_sha256':evidence['checkpoint_sha256']['100']}
 
 
-def verify_full_resume(runner, checkpoint):
+def verify_full_resume(runner, checkpoint, expected_iteration=100):
     import torch
     source=torch.load(checkpoint,map_location=runner.device)
     for k,v in runner.alg.actor_critic.state_dict().items():
@@ -50,6 +50,6 @@ def verify_full_resume(runner, checkpoint):
         raise ValueError('Adam state was not retained')
     if not equal(runner.alg.extra_optimizer.state_dict(),source['extra_optimizer_state_dict']):
         raise ValueError('Encoder Adam state was not retained')
-    if runner.current_learning_iteration!=100:raise ValueError('Unexpected resume iteration')
-    return {'all_model_tensors_exact':True,'both_optimizer_states_exact':True,'initial_iteration':100,
+    if runner.current_learning_iteration!=expected_iteration:raise ValueError('Unexpected resume iteration')
+    return {'all_model_tensors_exact':True,'both_optimizer_states_exact':True,'initial_iteration':expected_iteration,
             'initial_action_std':runner.alg.actor_critic.std.detach().cpu().tolist()}

@@ -12,6 +12,18 @@ MODE_FORWARD = 3
 MODE_NAMES = ("zero", "small", "reverse", "forward")
 
 
+def sample_fixed_bank(linear_ranges, yaw_ranges, slot_ids, bank):
+    """Explicit weighted (vx, yaw) slots; reject clipping that hides lost anchors."""
+    table = linear_ranges.new_tensor(bank)
+    if table.ndim != 2 or table.shape[1] != 2 or not table.shape[0] or not torch.isfinite(table).all():
+        raise ValueError('command bank must be finite nonempty (N,2)')
+    selected = table[slot_ids % table.shape[0]]
+    for col, ranges in enumerate((linear_ranges, yaw_ranges)):
+        if ((selected[:, col] < ranges[:, 0]) | (selected[:, col] > ranges[:, 1])).any():
+            raise ValueError('command bank exceeds configured ranges')
+    return selected
+
+
 def _signed_endpoint(limit: torch.Tensor, sign: torch.Tensor) -> torch.Tensor:
     """Return an endpoint command with deterministic sign coverage."""
 
@@ -27,6 +39,7 @@ def sample_method_v1(
     small_yaw_limit: float = 0.10,
     slot_ids: torch.Tensor | None = None,
     translation_anchors: tuple[float, ...] | None = None,
+    zero_retention: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Sample the staged method_v1 command modes.
 
@@ -64,6 +77,29 @@ def sample_method_v1(
     )
 
     if phase == "translate":
+        if zero_retention:
+            if translation_anchors is not None and len(translation_anchors) > 2:
+                anchors = linear.new_tensor(translation_anchors)
+                if not torch.isfinite(anchors).all() or not (anchors > 0).all():
+                    raise ValueError('translation anchors must be finite positive magnitudes')
+                bucket = slot_ids % 10
+                reverse, forward = (bucket >= 4) & (bucket < 7), bucket >= 7
+                magnitude = anchors[(slot_ids // 10) % anchors.numel()]
+                for mask, sign_value, label in [(reverse,-1.,MODE_REVERSE),(forward,1.,MODE_FORWARD)]:
+                    linear[mask] = torch.clamp(sign_value*magnitude[mask],
+                        min=linear_ranges[mask,0],max=linear_ranges[mask,1])
+                    mode[mask] = label
+                return linear,yaw,mode
+            # Same +/-0.5 and +/-1 endpoint exposure (15% each), reallocating
+            # the old +/-0.1 slots to exact zero (40%). No command offset.
+            bucket = slot_ids % 20
+            for lower, upper, value, label in [(8,11,-.5,MODE_REVERSE),
+                    (11,14,.5,MODE_FORWARD),(14,17,-1.,MODE_REVERSE),(17,20,1.,MODE_FORWARD)]:
+                mask=(bucket>=lower)&(bucket<upper)
+                linear[mask]=torch.clamp(torch.full_like(linear[mask],value),
+                    min=linear_ranges[mask,0],max=linear_ranges[mask,1])
+                mode[mask]=label
+            return linear,yaw,mode
         # 20% exact zero, 20% small anchors, then balanced reverse/forward.
         bucket = slot_ids % 10
         small = (bucket >= 2) & (bucket < 4)

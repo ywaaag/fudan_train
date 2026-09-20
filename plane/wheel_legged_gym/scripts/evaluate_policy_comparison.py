@@ -33,6 +33,10 @@ def main():
     p.add_argument('--checkpoint', type=Path, required=True)
     p.add_argument('--out', type=Path, required=True)
     p.add_argument('--commands', type=float, nargs='+', default=[0, -.5, .5, -1, 1])
+    p.add_argument('--yaw-commands', type=float, nargs='+', help='Yaw paired with each vx; defaults to zero')
+    p.add_argument('--initial-commands', type=float, nargs='+', help='Optional vx before one timed switch; no reset at switch')
+    p.add_argument('--initial-yaw-commands', type=float, nargs='+')
+    p.add_argument('--switch-at', type=float, default=5.)
     p.add_argument('--envs-per-command', type=int, default=16)
     p.add_argument('--seed', type=int, default=19)
     p.add_argument('--randomization-level', type=int, choices=[0, 1], default=1)
@@ -40,6 +44,20 @@ def main():
     p.add_argument('--warmup', type=float, default=5)
     p.add_argument('--profile', choices=['method_v1','LEGACY_URDF'], default='method_v1')
     a = p.parse_args()
+    if a.yaw_commands is None:
+        a.yaw_commands = [0.] * len(a.commands)
+    if len(a.yaw_commands) != len(a.commands) or not np.isfinite(a.commands + a.yaw_commands).all():
+        p.error('vx/yaw lists must have equal length and finite values')
+    transition = a.initial_commands is not None
+    if a.initial_yaw_commands is not None and not transition:
+        p.error('initial yaw requires initial commands')
+    if transition:
+        if a.initial_yaw_commands is None:
+            a.initial_yaw_commands = [0.] * len(a.commands)
+        if (len(a.initial_commands) != len(a.commands) or len(a.initial_yaw_commands) != len(a.commands)
+                or not np.isfinite(a.initial_commands + a.initial_yaw_commands).all()
+                or not 0 < a.switch_at < a.warmup):
+            p.error('initial lists must match target lists; require 0 < switch-at < warmup')
     if not 0 <= a.warmup < a.seconds or a.envs_per_command < 1:
         p.error('require seconds > warmup >= 0 and positive environment count')
     if a.out.exists():
@@ -65,12 +83,15 @@ def main():
     args.num_envs, args.seed = cfg.env.num_envs, a.seed
     env, _ = task_registry.make_env(name='wheel_legged', args=args, env_cfg=cfg)
     try:
-        commands = np.repeat(np.array([[v, 0., .4] for v in a.commands]),
+        commands = np.repeat(np.array([[v, w, .4] for v, w in zip(a.commands, a.yaw_commands)]),
                              a.envs_per_command, axis=0)
-        _set_fixed_ranges(env, commands)
+        initial_commands = (np.repeat(np.array([[v, w, .4] for v, w in
+            zip(a.initial_commands, a.initial_yaw_commands)]), a.envs_per_command, axis=0)
+            if transition else commands)
+        _set_fixed_ranges(env, initial_commands)
         env.reset()
         obs, history = env.get_observations()
-        target = torch.tensor(commands, device=env.device, dtype=torch.float)
+        target = torch.tensor(initial_commands, device=env.device, dtype=torch.float)
         policy = load_policy(a.checkpoint, env.device)
         expected_dofs = ['left_leg_0', 'left_leg_1', 'left_wheel',
                          'right_leg_0', 'right_leg_1', 'right_wheel']
@@ -89,11 +110,20 @@ def main():
         names = ['vx', 'vx_mae', 'abs_vx', 'yaw', 'abs_yaw', 'height', 'height_mae',
                  'abs_roll', 'abs_pitch', 'left_contact', 'right_contact',
                  'nonwheel_contact', 'slip_rms', 'torque_saturation',
-                 'knee_mirror_m', 'wheel_mirror_m', 'encoder_vx_mae', 'action_clip']
+                 'knee_mirror_m', 'wheel_mirror_m', 'encoder_vx_mae', 'action_clip', 'yaw_mae']
         sums = torch.zeros(env.num_envs, len(names), device=env.device)
         maxima = torch.zeros_like(sums)
         count = 0
+        response_trace = []
         for step in range(round(a.seconds / env.dt)):
+            if transition and step == round(a.switch_at / env.dt):
+                _set_fixed_ranges(env, commands)
+                target = torch.tensor(commands, device=env.device, dtype=torch.float)
+                env.commands[:, :3] = target
+                # Replace only current command channels, preserving the four past frames.
+                # Recomputing observations here would append an extra history frame.
+                obs[:, 6:9] = target * env.commands_scale
+                history[:, -25+6:-25+9] = obs[:, 6:9]
             if not torch.allclose(env.commands[:, :3], target):
                 raise RuntimeError('Actual command changed during fixed-command evaluation')
             if not torch.allclose(obs[:, 6:9], target * env.commands_scale):
@@ -110,6 +140,10 @@ def main():
             timeouts += (dones.bool() & timeout).float()
             body_contact = (env.contact_forces[:, nonwheel].norm(dim=-1) > 1).any(dim=-1).float()
             nonwheel_full += body_contact
+            if transition and step % 10 == 0:
+                response_trace.append({'time': (step+1)*env.dt,
+                    'vx': env.base_lin_vel[:, 0].detach().cpu().tolist(),
+                    'yaw': env.base_ang_vel[:, 2].detach().cpu().tolist()})
             # Counters reset with episodes; post-reset samples are not valid
             # torque observations. Any reset independently fails acceptance.
             sat = (env.command_metric_preclip_torque_saturation_sum - before_saturation).clamp(min=0)
@@ -135,7 +169,8 @@ def main():
                 slip_metric, sat,
                 (local[:, 0]-local[:, 1]*mirror).norm(dim=-1),
                 (local[:, 2]-local[:, 3]*mirror).norm(dim=-1), encoder_error,
-                (action.abs() > env.cfg.normalization.clip_actions).float().mean(dim=-1)], dim=-1)
+                (action.abs() > env.cfg.normalization.clip_actions).float().mean(dim=-1),
+                (yaw-target[:, 1]).abs()], dim=-1)
             if not torch.isfinite(values).all():
                 raise RuntimeError('Nonfinite physics metrics')
             sums += values
@@ -146,7 +181,7 @@ def main():
         for i, vx in enumerate(a.commands):
             sl = slice(i*a.envs_per_command, (i+1)*a.envs_per_command)
             metrics = {n: means[sl, j].mean().item() for j, n in enumerate(names)}
-            results.append({'command': [vx, 0., .4], 'metrics': metrics,
+            results.append({'command': [vx, a.yaw_commands[i], .4], 'metrics': metrics,
                 'failure_count': failures[sl].sum().item(), 'timeout_count': timeouts[sl].sum().item(),
                 'survival_fraction': (failures[sl] == 0).float().mean().item(),
                 'nonwheel_contact_full_fraction': (nonwheel_full[sl]/round(a.seconds/env.dt)).mean().item(),
@@ -164,6 +199,12 @@ def main():
             'torque_limits': env.torque_limits.cpu().tolist(), 'configuration': configuration,
             'initial_root_states': initial_root, 'initial_observations': initial_obs,
             'results': results, 'note': 'Reset counts cover warmup too; metrics after warmup include reset trajectories. Any reset fails the gate.'}
+        if transition:
+            payload.update(schema='matched_policy_transition_v1',
+                switch_at=round(a.switch_at/env.dt)*env.dt,
+                initial_commands=[[v,w,.4] for v,w in zip(a.initial_commands,a.initial_yaw_commands)],
+                response_trace=response_trace,
+                transition_note='No reset at switch; 10 Hz per-environment response trace. Metrics and gate cover post-warmup steady state, not transient smoothness.')
         a.out.parent.mkdir(parents=True, exist_ok=True)
         a.out.write_text(json.dumps(payload, indent=2)+'\n')
         print(json.dumps({'out': str(a.out), 'results': [{k:v for k,v in r.items()

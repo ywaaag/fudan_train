@@ -436,6 +436,27 @@ runs and checkpoints remain untouched on disk.
 
 
 def apply_policy_experiment(env_cfg, name: str | None, train_cfg=None) -> dict:
+    if str(name).upper() == 'MOTION_GOAL':
+        from .motion_goal import apply_motion_goal
+        return apply_motion_goal(env_cfg, train_cfg)
+    if str(name).upper() == 'LEGACY_YAW':
+        from .legacy_yaw import apply_legacy_yaw
+        return apply_legacy_yaw(env_cfg, train_cfg)
+    if str(name).upper() == 'LEGACY_SPEED2_STOP':
+        from .legacy_speed2_stop import apply_legacy_speed2_stop
+        return apply_legacy_speed2_stop(env_cfg, train_cfg)
+    if str(name).upper() == 'LEGACY_SPEED2':
+        from .legacy_speed2 import apply_legacy_speed2
+        return apply_legacy_speed2(env_cfg, train_cfg)
+    if str(name).upper() == 'LEGACY_ANCHORS':
+        from .legacy_anchors import apply_legacy_anchors
+        return apply_legacy_anchors(env_cfg, train_cfg)
+    if str(name).upper() == 'EXPLORE_CLEAN_OBS':
+        from .clean_observation import apply_clean_observation
+        return apply_clean_observation(env_cfg, train_cfg)
+    if str(name).upper() == 'EXPLORE_STOP_RETENTION':
+        from .stop_retention import apply_stop_retention
+        return apply_stop_retention(env_cfg, train_cfg)
     if str(name).upper() == 'LEGACY_URDF':
         from .legacy_urdf import apply_legacy_urdf
         return apply_legacy_urdf(env_cfg, train_cfg)
@@ -446,6 +467,18 @@ def apply_policy_experiment(env_cfg, name: str | None, train_cfg=None) -> dict:
             freeze_encoder_updates=str(name).upper() == 'ENCODER_FROZEN',
             command_diagnostics=True,
             ablation_variable='encoder optimizer.step enabled/disabled; all gradient calculation and RNG/batch iteration retained')
+        return manifest
+    if str(name).upper() in {'ENCODER_ANCHORED', 'ANCHORED_WHEEL_EXPLORE'}:
+        from .h3_speed1 import apply_h3_speed1
+        manifest = apply_h3_speed1(env_cfg, train_cfg)
+        manifest.update(name='ENCODER_ANCHORED', profile='encoder_ablation_v3',
+            encoder_action_anchor_coef=1.0, freeze_encoder_updates=False,
+            command_diagnostics=True,
+            ablation_variable='encoder action-anchor penalty only; encoder remains trainable')
+        if str(name).upper() == 'ANCHORED_WHEEL_EXPLORE':
+            manifest.update(name='ANCHORED_WHEEL_EXPLORE',profile='anchored_wheel_explore_v1',
+                wheel_exploration_initialization='left wheel std initialized to source right wheel std; all other model/Adam values retained',
+                ablation_variable='initial left wheel std only, against encoder_ablation_v3')
         return manifest
     if str(name).upper() == 'H3_SPEED1':
         from .h3_speed1 import apply_h3_speed1

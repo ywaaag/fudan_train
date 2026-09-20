@@ -237,13 +237,14 @@ class RolloutStorage:
                     None,
                 ), None
 
-    def encoder_mini_batch_generator(self, num_mini_batches, num_epochs=8):
+    def encoder_mini_batch_generator(self, num_mini_batches, num_epochs=8, include_current_obs=False):
         batch_size = self.num_envs * self.num_transitions_per_env
         mini_batch_size = batch_size // num_mini_batches
         indices = torch.randperm(
             num_mini_batches * mini_batch_size, requires_grad=False, device=self.device
         )
 
+        observations = self.observations.flatten(0, 1)
         next_observations = self.next_observations.flatten(0, 1)
         if self.privileged_observations is not None:
             critic_observations = self.privileged_observations.flatten(0, 1)
@@ -260,7 +261,10 @@ class RolloutStorage:
                 next_obs_batch = next_observations[batch_idx]
                 critic_observations_batch = critic_observations[batch_idx]
                 obs_history_batch = obs_history[batch_idx]
-                yield next_obs_batch, critic_observations_batch, obs_history_batch
+                if include_current_obs:
+                    yield next_obs_batch, critic_observations_batch, obs_history_batch, observations[batch_idx]
+                else:
+                    yield next_obs_batch, critic_observations_batch, obs_history_batch
 
     # for RNNs only
     def reccurent_mini_batch_generator(self, num_mini_batches, num_epochs=8):

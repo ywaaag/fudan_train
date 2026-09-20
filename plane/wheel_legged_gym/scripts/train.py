@@ -77,7 +77,36 @@ def train(args):
             matching_resume = True
     else:
         manifest = apply_policy_experiment(env_cfg, args.policy_experiment, train_cfg)
-    if str(args.policy_experiment).upper() in {'H3_SPEED1', 'ENCODER_FROZEN', 'ENCODER_UPDATING'}:
+    if str(args.policy_experiment).upper() == 'MOTION_GOAL':
+        from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
+        from wheel_legged_gym.utils import get_load_path
+        from wheel_legged_gym.envs.wheel_legged.motion_goal import validate_source
+        root=Path(WHEEL_LEGGED_GYM_ROOT_DIR)/'logs'/(args.experiment_name or train_cfg.runner.experiment_name)
+        checkpoint=Path(get_load_path(str(root),load_run=args.load_run,checkpoint=args.checkpoint))
+        manifest.update(validate_source(checkpoint,args.resume,args.resume_mode,env_cfg))
+        matching_resume=True
+    if str(args.policy_experiment).upper() in {'LEGACY_ANCHORS','LEGACY_SPEED2','LEGACY_SPEED2_STOP','LEGACY_YAW'}:
+        from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
+        from wheel_legged_gym.utils import get_load_path
+        from wheel_legged_gym.envs.wheel_legged.legacy_anchors import validate_source
+        if str(args.policy_experiment).upper() == 'LEGACY_SPEED2':
+            from wheel_legged_gym.envs.wheel_legged.legacy_speed2 import validate_source
+        if str(args.policy_experiment).upper() == 'LEGACY_SPEED2_STOP':
+            from wheel_legged_gym.envs.wheel_legged.legacy_speed2_stop import validate_source
+        if str(args.policy_experiment).upper() == 'LEGACY_YAW':
+            from wheel_legged_gym.envs.wheel_legged.legacy_yaw import validate_source
+        root=Path(WHEEL_LEGGED_GYM_ROOT_DIR)/'logs'/(args.experiment_name or train_cfg.runner.experiment_name)
+        checkpoint=Path(get_load_path(str(root),load_run=args.load_run,checkpoint=args.checkpoint))
+        manifest.update(validate_source(checkpoint,args.resume,args.resume_mode,env_cfg))
+        matching_resume=True
+    if str(args.policy_experiment).upper() in {'EXPLORE_STOP_RETENTION','EXPLORE_CLEAN_OBS'}:
+        from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
+        from wheel_legged_gym.utils import get_load_path
+        from wheel_legged_gym.envs.wheel_legged.stop_retention import validate_source
+        root = Path(WHEEL_LEGGED_GYM_ROOT_DIR) / 'logs' / (args.experiment_name or train_cfg.runner.experiment_name)
+        checkpoint = Path(get_load_path(str(root), load_run=args.load_run, checkpoint=args.checkpoint))
+        manifest.update(validate_source(checkpoint,args.resume,args.resume_mode,manifest))
+    if str(args.policy_experiment).upper() in {'H3_SPEED1', 'ENCODER_FROZEN', 'ENCODER_UPDATING', 'ENCODER_ANCHORED', 'ANCHORED_WHEEL_EXPLORE'}:
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
         from wheel_legged_gym.utils import get_load_path
         from wheel_legged_gym.envs.wheel_legged.h3_speed1 import validate_source
@@ -135,13 +164,33 @@ def train(args):
         from wheel_legged_gym.envs.wheel_legged.h3_low_speed import verify_and_restore_std
         manifest['migration_verification'] = verify_and_restore_std(ppo_runner, checkpoint)
     task_registry.save_cfgs(name=args.task)
-    if str(args.policy_experiment).upper() in {'H3_SPEED1', 'ENCODER_FROZEN', 'ENCODER_UPDATING'}:
+    if str(args.policy_experiment).upper() == 'MOTION_GOAL':
+        from wheel_legged_gym.envs.wheel_legged.h3_speed1 import verify_full_resume
+        manifest['resume_verification']=verify_full_resume(ppo_runner,checkpoint,
+            expected_iteration=manifest['motion_goal_spec']['source_iteration'])
+        manifest['effective_start_learning_rate']=ppo_runner.alg.learning_rate
+    if str(args.policy_experiment).upper() in {'LEGACY_ANCHORS','LEGACY_SPEED2','LEGACY_SPEED2_STOP','LEGACY_YAW'}:
+        from wheel_legged_gym.envs.wheel_legged.h3_speed1 import verify_full_resume
+        manifest['resume_verification']=verify_full_resume(ppo_runner,checkpoint,
+            expected_iteration={'LEGACY_ANCHORS':500,'LEGACY_SPEED2':700,'LEGACY_SPEED2_STOP':900,'LEGACY_YAW':1400}[str(args.policy_experiment).upper()])
+        manifest['effective_start_learning_rate']=ppo_runner.alg.learning_rate
+    if str(args.policy_experiment).upper() in {'EXPLORE_STOP_RETENTION','EXPLORE_CLEAN_OBS'}:
+        from wheel_legged_gym.envs.wheel_legged.h3_speed1 import verify_full_resume
+        manifest['resume_verification']=verify_full_resume(ppo_runner,checkpoint,expected_iteration=500)
+    if str(args.policy_experiment).upper() in {'H3_SPEED1', 'ENCODER_FROZEN', 'ENCODER_UPDATING', 'ENCODER_ANCHORED', 'ANCHORED_WHEEL_EXPLORE'}:
         from wheel_legged_gym.envs.wheel_legged.h3_speed1 import verify_full_resume
         manifest['resume_verification'] = verify_full_resume(ppo_runner, checkpoint)
+    if str(args.policy_experiment).upper() == 'ANCHORED_WHEEL_EXPLORE':
+        model = ppo_runner.alg.actor_critic
+        manifest['std_before_override'] = model.std.detach().cpu().tolist()
+        with torch.no_grad():
+            model.std[2].copy_(model.std[5])
+        manifest['std_after_override'] = model.std.detach().cpu().tolist()
     if manifest.get('command_diagnostics'):
         from wheel_legged_gym.utils.command_diagnostics import CommandDiagnostics
         ppo_runner.command_diagnostics = CommandDiagnostics(env, task_registry.log_dir)
         ppo_runner.alg.freeze_encoder_updates = manifest['freeze_encoder_updates']
+        ppo_runner.alg.encoder_action_anchor_coef = manifest.get('encoder_action_anchor_coef', 0.0)
         ppo_runner.alg.encoder_ablation_diagnostics = True
     write_experiment_manifest(
         Path(task_registry.log_dir) / "policy_experiment.json",

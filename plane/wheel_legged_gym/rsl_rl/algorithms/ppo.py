@@ -6,6 +6,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import copy
 
 from wheel_legged_gym.rsl_rl.modules import ActorCritic
 from wheel_legged_gym.rsl_rl.modules.policy_symmetry import (
@@ -38,6 +39,7 @@ class PPO:
         desired_kl=0.01,
         kl_decay=0,
         symmetry_loss_coef=0.0,
+        encoder_action_anchor_coef=0.0,
         device="cpu",
     ):
         self.device = device
@@ -80,6 +82,7 @@ class PPO:
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
         self.symmetry_loss_coef = float(symmetry_loss_coef)
+        self.encoder_action_anchor_coef = float(encoder_action_anchor_coef)
         self.last_encoder_grad_norm = 0.0
         self.last_encoder_parameter_delta = 0.0
 
@@ -285,10 +288,18 @@ class PPO:
         mean_encoder_grad_norm = 0.0
         mean_encoder_parameter_delta = 0.0
         if self.extra_optimizer is not None:
+            anchor_encoder = None
+            if self.encoder_action_anchor_coef > 0.0:
+                anchor_encoder = copy.deepcopy(self.actor_critic.encoder).to(self.device).eval()
+                for parameter in anchor_encoder.parameters():
+                    parameter.requires_grad_(False)
             generator = self.storage.encoder_mini_batch_generator(
-                self.num_mini_batches, self.num_learning_epochs
+                self.num_mini_batches, self.num_learning_epochs,
+                include_current_obs=self.encoder_action_anchor_coef > 0.0,
             )
-            for next_obs_batch, critic_obs_batch, obs_history_batch in generator:
+            for encoder_batch in generator:
+                next_obs_batch, critic_obs_batch, obs_history_batch = encoder_batch[:3]
+                anchor_obs = encoder_batch[3] if self.encoder_action_anchor_coef > 0.0 else None
                 if self.actor_critic.is_sequence:
                     latent_batch = self.actor_critic.encode(obs_history_batch)
                     vel_est_loss = (
@@ -306,6 +317,19 @@ class PPO:
                         extra_loss = vel_est_loss + obs_denoise_loss
                     else:
                         extra_loss = vel_est_loss
+
+                    if self.encoder_action_anchor_coef > 0.0:
+                        with torch.no_grad():
+                            anchor_latent = anchor_encoder(obs_history_batch).detach()
+                            anchor_mean = self.actor_critic.actor(
+                                torch.cat((anchor_obs, anchor_latent), dim=-1)
+                            ).detach()
+                        candidate_mean = self.actor_critic.actor(
+                            torch.cat((anchor_obs, latent_batch), dim=-1)
+                        )
+                        extra_loss = extra_loss + self.encoder_action_anchor_coef * torch.mean(
+                            torch.square(candidate_mean - anchor_mean)
+                        )
 
                     if self.symmetry_loss_coef > 0.0:
                         mirrored_latent = self.actor_critic.encode(

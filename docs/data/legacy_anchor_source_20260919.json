@@ -1,0 +1,5 @@
+{
+  "checkpoint": "plane/logs/wheel_legged/Sep19_11-22-46_legacy_urdf_20260919/model_500.pt",
+  "sha256": "2af5e75fec0ed773203ddf0692c202febaee497cc0c766f25984e4c004ea0897",
+  "status": "experimental source only; legacy500 zero/reverse failed, no promotion"
+}

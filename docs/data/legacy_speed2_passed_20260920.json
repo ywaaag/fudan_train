@@ -1,0 +1,945 @@
+{
+  "checkpoint": "plane/logs/wheel_legged/Sep19_23-08-55_legacy_speed2_stop_20260919_230848/model_1400.pt",
+  "sha256": "48757710c67bcca15a27a74c4c50152ad116d12f9dbfba5d8378dd8469eb13f4",
+  "profile": "LEGACY_SPEED2_STOP",
+  "version": "legacy_speed2_stop_v2",
+  "acceptance": "plane/outputs/legacy_speed2_stop_20260919_230848/acceptance.json",
+  "passed": 27,
+  "total": 27,
+  "protocol": {
+    "seeds": [
+      19,
+      37,
+      53
+    ],
+    "envs_per_command": 16,
+    "seconds": 25,
+    "warmup": 5,
+    "randomization_level": 1,
+    "deterministic": true
+  },
+  "onnx": "plane/outputs/legacy_speed2_stop_20260919_230848/model_1400.onnx",
+  "onnx_sha256": "067f56fe9bc890a1f553dd0a0866ecd01f3ef1cce36270eb35a5765130ba77e6",
+  "onnx_verification": "plane/outputs/legacy_speed2_stop_20260919_230848/onnx_verification.log",
+  "records": [
+    {
+      "seed": 19,
+      "command": [
+        0.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -0.03881731629371643,
+        "vx_mae": 0.03881731629371643,
+        "abs_vx": 0.03881731629371643,
+        "yaw": 0.004969351924955845,
+        "abs_yaw": 0.005228215828537941,
+        "height": 0.3996862769126892,
+        "height_mae": 0.0003193149750586599,
+        "abs_roll": 0.0007255193195305765,
+        "abs_pitch": 0.008338091894984245,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.001291389693506062,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.11930174380540848,
+        "wheel_mirror_m": 0.1966010183095932,
+        "encoder_vx_mae": 0.031871676445007324,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 19,
+      "command": [
+        -0.5,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -0.5642536878585815,
+        "vx_mae": 0.0642535462975502,
+        "abs_vx": 0.5642536878585815,
+        "yaw": -0.00789347942918539,
+        "abs_yaw": 0.007894390262663364,
+        "height": 0.39971354603767395,
+        "height_mae": 0.00034144902019761503,
+        "abs_roll": 0.0005559506244026124,
+        "abs_pitch": 0.010741602629423141,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.000701378972735256,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.07700556516647339,
+        "wheel_mirror_m": 0.12524016201496124,
+        "encoder_vx_mae": 0.048694830387830734,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 19,
+      "command": [
+        0.5,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": 0.4671969413757324,
+        "vx_mae": 0.032803140580654144,
+        "abs_vx": 0.4671969413757324,
+        "yaw": 0.005944926757365465,
+        "abs_yaw": 0.006283679977059364,
+        "height": 0.39980244636535645,
+        "height_mae": 0.00031357459374703467,
+        "abs_roll": 0.0011381892254576087,
+        "abs_pitch": 0.0035938278306275606,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.002431626198813319,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.14414557814598083,
+        "wheel_mirror_m": 0.24222177267074585,
+        "encoder_vx_mae": 0.02697639912366867,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 19,
+      "command": [
+        -1.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -1.097229242324829,
+        "vx_mae": 0.09722928702831268,
+        "abs_vx": 1.097229242324829,
+        "yaw": -0.012250900268554688,
+        "abs_yaw": 0.012250900268554688,
+        "height": 0.40036678314208984,
+        "height_mae": 0.0003755158104468137,
+        "abs_roll": 0.000824157556053251,
+        "abs_pitch": 0.006639454048126936,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.00033412850461900234,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.024773092940449715,
+        "wheel_mirror_m": 0.03970274329185486,
+        "encoder_vx_mae": 0.06690362095832825,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 19,
+      "command": [
+        1.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": 0.9538220167160034,
+        "vx_mae": 0.04617790877819061,
+        "abs_vx": 0.9538220167160034,
+        "yaw": 0.00497130211442709,
+        "abs_yaw": 0.004981838632375002,
+        "height": 0.40015673637390137,
+        "height_mae": 0.00027773287729360163,
+        "abs_roll": 0.0013846630463376641,
+        "abs_pitch": 0.003168822731822729,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.003214543219655752,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.15952131152153015,
+        "wheel_mirror_m": 0.2710058093070984,
+        "encoder_vx_mae": 0.030838601291179657,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 19,
+      "command": [
+        -1.5,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -1.5896832942962646,
+        "vx_mae": 0.08968371152877808,
+        "abs_vx": 1.5896832942962646,
+        "yaw": 0.011657397262752056,
+        "abs_yaw": 0.011657397262752056,
+        "height": 0.4005529582500458,
+        "height_mae": 0.0005514277727343142,
+        "abs_roll": 0.0013812489341944456,
+        "abs_pitch": 0.004485082812607288,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.000411268207244575,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.021786510944366455,
+        "wheel_mirror_m": 0.036493558436632156,
+        "encoder_vx_mae": 0.05806931480765343,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 19,
+      "command": [
+        1.5,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": 1.4410896301269531,
+        "vx_mae": 0.05890959873795509,
+        "abs_vx": 1.4410896301269531,
+        "yaw": 0.007270215079188347,
+        "abs_yaw": 0.007272230926901102,
+        "height": 0.401367723941803,
+        "height_mae": 0.0013693036744371057,
+        "abs_roll": 0.000992238288745284,
+        "abs_pitch": 0.00794869102537632,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.003731297329068184,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.16943314671516418,
+        "wheel_mirror_m": 0.28974398970603943,
+        "encoder_vx_mae": 0.040406905114650726,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 19,
+      "command": [
+        -2.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -2.0460147857666016,
+        "vx_mae": 0.04601331055164337,
+        "abs_vx": 2.0460147857666016,
+        "yaw": 0.007056329399347305,
+        "abs_yaw": 0.007057582959532738,
+        "height": 0.39987853169441223,
+        "height_mae": 0.0003204271197319031,
+        "abs_roll": 0.0012993859127163887,
+        "abs_pitch": 0.003841649042442441,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0005431533209048212,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.052912693470716476,
+        "wheel_mirror_m": 0.08800849318504333,
+        "encoder_vx_mae": 0.03944772481918335,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 19,
+      "command": [
+        2.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": 1.9384821653366089,
+        "vx_mae": 0.061517879366874695,
+        "abs_vx": 1.9384821653366089,
+        "yaw": 0.008397487923502922,
+        "abs_yaw": 0.008399409241974354,
+        "height": 0.4024876654148102,
+        "height_mae": 0.0024876210372895002,
+        "abs_roll": 0.0003911683161277324,
+        "abs_pitch": 0.01305469311773777,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.004034330137073994,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.18100237846374512,
+        "wheel_mirror_m": 0.30726808309555054,
+        "encoder_vx_mae": 0.05250345170497894,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 37,
+      "command": [
+        0.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -0.038881368935108185,
+        "vx_mae": 0.038881368935108185,
+        "abs_vx": 0.038881368935108185,
+        "yaw": 0.004982983693480492,
+        "abs_yaw": 0.005310002714395523,
+        "height": 0.39967501163482666,
+        "height_mae": 0.00033437812817282975,
+        "abs_roll": 0.0008285039220936596,
+        "abs_pitch": 0.008374130353331566,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0013058537151664495,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.11931058764457703,
+        "wheel_mirror_m": 0.19656924903392792,
+        "encoder_vx_mae": 0.03190930560231209,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 37,
+      "command": [
+        -0.5,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -0.5643690228462219,
+        "vx_mae": 0.06436894834041595,
+        "abs_vx": 0.5643690228462219,
+        "yaw": -0.008093481883406639,
+        "abs_yaw": 0.00809457153081894,
+        "height": 0.3996204733848572,
+        "height_mae": 0.00039604114135727286,
+        "abs_roll": 0.0005663525080308318,
+        "abs_pitch": 0.010511169210076332,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0007144491537474096,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.07692693918943405,
+        "wheel_mirror_m": 0.12495847791433334,
+        "encoder_vx_mae": 0.04867140203714371,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 37,
+      "command": [
+        0.5,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": 0.4715244174003601,
+        "vx_mae": 0.028475765138864517,
+        "abs_vx": 0.4715244174003601,
+        "yaw": 0.005913546308875084,
+        "abs_yaw": 0.006530424579977989,
+        "height": 0.39976930618286133,
+        "height_mae": 0.000315646844683215,
+        "abs_roll": 0.0011825714027509093,
+        "abs_pitch": 0.003912598825991154,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0024677368346601725,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.1444275975227356,
+        "wheel_mirror_m": 0.24194404482841492,
+        "encoder_vx_mae": 0.024752404540777206,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 37,
+      "command": [
+        -1.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -1.0959502458572388,
+        "vx_mae": 0.09595054388046265,
+        "abs_vx": 1.0959502458572388,
+        "yaw": -0.012122118845582008,
+        "abs_yaw": 0.012122118845582008,
+        "height": 0.40025201439857483,
+        "height_mae": 0.00030225786031223834,
+        "abs_roll": 0.0007606245344504714,
+        "abs_pitch": 0.006632296368479729,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0003344869473949075,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.024580786004662514,
+        "wheel_mirror_m": 0.03943983092904091,
+        "encoder_vx_mae": 0.06569076329469681,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 37,
+      "command": [
+        1.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": 0.9549510478973389,
+        "vx_mae": 0.045049041509628296,
+        "abs_vx": 0.9549510478973389,
+        "yaw": 0.005164415575563908,
+        "abs_yaw": 0.005181262269616127,
+        "height": 0.40001073479652405,
+        "height_mae": 0.0001958199281943962,
+        "abs_roll": 0.0014269071398302913,
+        "abs_pitch": 0.004184070974588394,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.003245982574298978,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.15887466073036194,
+        "wheel_mirror_m": 0.2720728814601898,
+        "encoder_vx_mae": 0.029429521411657333,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 37,
+      "command": [
+        -1.5,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -1.5897302627563477,
+        "vx_mae": 0.08973003178834915,
+        "abs_vx": 1.5897302627563477,
+        "yaw": 0.011653739959001541,
+        "abs_yaw": 0.011653739959001541,
+        "height": 0.40049275755882263,
+        "height_mae": 0.0005043470300734043,
+        "abs_roll": 0.0014996891841292381,
+        "abs_pitch": 0.004436240531504154,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0004067065310664475,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.021782206371426582,
+        "wheel_mirror_m": 0.036571815609931946,
+        "encoder_vx_mae": 0.0577629879117012,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 37,
+      "command": [
+        1.5,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": 1.437268614768982,
+        "vx_mae": 0.06273161619901657,
+        "abs_vx": 1.437268614768982,
+        "yaw": 0.007414890453219414,
+        "abs_yaw": 0.007416847161948681,
+        "height": 0.4012351334095001,
+        "height_mae": 0.0012371159391477704,
+        "abs_roll": 0.0009371883352287114,
+        "abs_pitch": 0.008036418817937374,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0037177158519625664,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.16904182732105255,
+        "wheel_mirror_m": 0.2906707525253296,
+        "encoder_vx_mae": 0.04212401807308197,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 37,
+      "command": [
+        -2.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -2.044663429260254,
+        "vx_mae": 0.044664252549409866,
+        "abs_vx": 2.044663429260254,
+        "yaw": 0.007772674784064293,
+        "abs_yaw": 0.007772679906338453,
+        "height": 0.39973485469818115,
+        "height_mae": 0.0003718691295944154,
+        "abs_roll": 0.0015032764058560133,
+        "abs_pitch": 0.0041313134133815765,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0005401838570833206,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.05286846309900284,
+        "wheel_mirror_m": 0.08825626969337463,
+        "encoder_vx_mae": 0.03732378035783768,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 37,
+      "command": [
+        2.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": 1.9358564615249634,
+        "vx_mae": 0.0641433596611023,
+        "abs_vx": 1.9358564615249634,
+        "yaw": 0.008392967283725739,
+        "abs_yaw": 0.00839361920952797,
+        "height": 0.40250301361083984,
+        "height_mae": 0.002502412535250187,
+        "abs_roll": 0.00033381819957867265,
+        "abs_pitch": 0.012555759400129318,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.004074982367455959,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.18113233149051666,
+        "wheel_mirror_m": 0.30710822343826294,
+        "encoder_vx_mae": 0.05409778282046318,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 53,
+      "command": [
+        0.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -0.04003019630908966,
+        "vx_mae": 0.04003019630908966,
+        "abs_vx": 0.04003019630908966,
+        "yaw": 0.004962123464792967,
+        "abs_yaw": 0.005291256122291088,
+        "height": 0.3995963931083679,
+        "height_mae": 0.00040604680543765426,
+        "abs_roll": 0.0007251915521919727,
+        "abs_pitch": 0.008219284005463123,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0013080192729830742,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.11929915845394135,
+        "wheel_mirror_m": 0.1964106559753418,
+        "encoder_vx_mae": 0.03243834897875786,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 53,
+      "command": [
+        -0.5,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -0.5628756284713745,
+        "vx_mae": 0.0628756582736969,
+        "abs_vx": 0.5628756284713745,
+        "yaw": -0.008025424554944038,
+        "abs_yaw": 0.008026596158742905,
+        "height": 0.3995405435562134,
+        "height_mae": 0.00048176341806538403,
+        "abs_roll": 0.0005440226523205638,
+        "abs_pitch": 0.010466923005878925,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0006865650648251176,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.07656610757112503,
+        "wheel_mirror_m": 0.12402774393558502,
+        "encoder_vx_mae": 0.04766891151666641,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 53,
+      "command": [
+        0.5,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": 0.46978554129600525,
+        "vx_mae": 0.030214570462703705,
+        "abs_vx": 0.46978554129600525,
+        "yaw": 0.007755824364721775,
+        "abs_yaw": 0.008253193460404873,
+        "height": 0.39974504709243774,
+        "height_mae": 0.0003002155863214284,
+        "abs_roll": 0.0012404313310980797,
+        "abs_pitch": 0.004226642195135355,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0028631051536649466,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.1438954919576645,
+        "wheel_mirror_m": 0.2422284483909607,
+        "encoder_vx_mae": 0.02543039433658123,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 53,
+      "command": [
+        -1.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -1.096377968788147,
+        "vx_mae": 0.0963774099946022,
+        "abs_vx": 1.096377968788147,
+        "yaw": -0.012430289760231972,
+        "abs_yaw": 0.012430289760231972,
+        "height": 0.400310754776001,
+        "height_mae": 0.00036828051088377833,
+        "abs_roll": 0.0007833241252228618,
+        "abs_pitch": 0.006698321085423231,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.00033740774961188436,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.0248149074614048,
+        "wheel_mirror_m": 0.0398920476436615,
+        "encoder_vx_mae": 0.06586657464504242,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 53,
+      "command": [
+        1.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": 0.9550323486328125,
+        "vx_mae": 0.04496774449944496,
+        "abs_vx": 0.9550323486328125,
+        "yaw": 0.005147048272192478,
+        "abs_yaw": 0.005160804372280836,
+        "height": 0.40017351508140564,
+        "height_mae": 0.00026914183399640024,
+        "abs_roll": 0.0013302621664479375,
+        "abs_pitch": 0.004122708924114704,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0032265204936265945,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.1587853878736496,
+        "wheel_mirror_m": 0.2720300257205963,
+        "encoder_vx_mae": 0.02966718189418316,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 53,
+      "command": [
+        -1.5,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -1.5894935131072998,
+        "vx_mae": 0.0894932895898819,
+        "abs_vx": 1.5894935131072998,
+        "yaw": 0.01210880558937788,
+        "abs_yaw": 0.01210880558937788,
+        "height": 0.40045836567878723,
+        "height_mae": 0.0005538895493373275,
+        "abs_roll": 0.0014158191625028849,
+        "abs_pitch": 0.004234182648360729,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0004146650608163327,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.02220446616411209,
+        "wheel_mirror_m": 0.037055738270282745,
+        "encoder_vx_mae": 0.05825703591108322,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 53,
+      "command": [
+        1.5,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": 1.4384069442749023,
+        "vx_mae": 0.061593204736709595,
+        "abs_vx": 1.4384069442749023,
+        "yaw": 0.00740097975358367,
+        "abs_yaw": 0.007402999792248011,
+        "height": 0.40128427743911743,
+        "height_mae": 0.001284201629459858,
+        "abs_roll": 0.0010352639947086573,
+        "abs_pitch": 0.008197912015020847,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0037289969623088837,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.16906246542930603,
+        "wheel_mirror_m": 0.2907015085220337,
+        "encoder_vx_mae": 0.041587069630622864,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 53,
+      "command": [
+        -2.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": -2.0447916984558105,
+        "vx_mae": 0.04479135572910309,
+        "abs_vx": 2.0447916984558105,
+        "yaw": 0.007466547191143036,
+        "abs_yaw": 0.007466866634786129,
+        "height": 0.3998536467552185,
+        "height_mae": 0.00033727759728208184,
+        "abs_roll": 0.0014139687409624457,
+        "abs_pitch": 0.0038384441286325455,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.0005387998535297811,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.05306491255760193,
+        "wheel_mirror_m": 0.08817106485366821,
+        "encoder_vx_mae": 0.03895842283964157,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    },
+    {
+      "seed": 53,
+      "command": [
+        2.0,
+        0.0,
+        0.4
+      ],
+      "metrics": {
+        "vx": 1.9358779191970825,
+        "vx_mae": 0.06412161141633987,
+        "abs_vx": 1.9358779191970825,
+        "yaw": 0.008528171107172966,
+        "abs_yaw": 0.00852874107658863,
+        "height": 0.4022940397262573,
+        "height_mae": 0.0022935986053198576,
+        "abs_roll": 0.0003667917335405946,
+        "abs_pitch": 0.012529350817203522,
+        "left_contact": 1.0,
+        "right_contact": 1.0,
+        "nonwheel_contact": 0.0,
+        "slip_rms": 0.004102879669517279,
+        "torque_saturation": 0.0,
+        "knee_mirror_m": 0.1811780333518982,
+        "wheel_mirror_m": 0.30809536576271057,
+        "encoder_vx_mae": 0.05387213081121445,
+        "action_clip": 0.0
+      },
+      "failure_count": 0.0,
+      "timeout_count": 0.0,
+      "gate": {
+        "passed": true,
+        "failed_checks": []
+      }
+    }
+  ],
+  "limits": "Fixed-command steady translation only; reverse1 MAE near threshold; no yaw, turns, transitions or sim2sim acceptance."
+}

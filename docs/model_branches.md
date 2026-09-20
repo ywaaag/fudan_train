@@ -6,6 +6,17 @@
 
 ## 当前采用的结论
 
+**2026-09-20 最新运动候选：** `Sep20_03-42-29_motion_goal_20260920_002043_r24_yaw4/model_6900.pt`。
+同一策略31命令×3验收seed共93/93通过，覆盖±4m/s、±4rad/s和低速转弯，ONNX通过。
+夜间30轮后停在高速组合turns阶段；8100仅为诊断来源，最后8200为123/129，均未全过。
+完整继承决策、SHA和边界见[夜间复盘](overnight_motion_goal.md)。下文为早期阶段记录。
+
+**2026-09-20 最新已验收平移基线：** `Sep19_23-08-55_legacy_speed2_stop_20260919_230848/model_1400.pt`，
+0/±.5/±1/±1.5/±2三seed27/27通过，ONNX数值一致性通过。继承链为
+LEGACY_URDF 500 → LEGACY_ANCHORS 700 → LEGACY_SPEED2 900 → LEGACY_SPEED2_STOP v2 1400。
+900仅运动24/27通过，停车失败；1400的−1误差接近门槛。v1停车实验存在采样与验收遗漏，
+不作为有效±2对照。所有历史模型保留；详见[本轮记录](legacy_speed2_stop.md)。
+
 **最新配对分支：** 从同一低速model100完整续训，`ENCODER_FROZEN` / `ENCODER_UPDATING`，
 分别为 `Sep19_10-09-43_encoder_ablation_20260919_100936_frozen` 和
 `Sep19_10-20-22_encoder_ablation_20260919_100936_updating`，各保存200/300/400/500/600。

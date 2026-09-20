@@ -1,5 +1,13 @@
 # 原项目训练配置在当前 URDF 上的对照（2026-09-19）
 
+> 后续源码复核补充：这轮不是严格的原项目配置复现。run manifest仍包含
+> `zero_base_velocity=-1`、`zero_wheel_velocity=-1`（原项目没有）；当前legacy
+> action_rate按mean计算，原项目按sum计算；PPO encoder梯度裁剪范围也不同。
+> 评估器的legacy分支没有累加preclip torque计数，因此其0值不能证明无饱和；
+> slip指标使用平均绝对残差，与method_v1逐轮RMS口径不同。
+> 这些限制不否定速度读数，但不能据这次对照归因于“原始配置本身偏向前进”。
+> 之后若复用此实验，必须先明确隔离这些残留差异，不能仅凭profile名称称其等价。
+
 目的：验证当前 `method_v1`/H3 系列的 reward、command、PPO 和 termination 改动是否是
 速度跟踪不佳的唯一原因。该 profile 使用原项目训练语义，但继续使用当前
 `assets/wheel_leg_train.urdf`，因此是 **training-config ablation**，不是原项目物理复现。
