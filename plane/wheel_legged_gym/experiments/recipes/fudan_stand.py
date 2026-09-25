@@ -1,17 +1,16 @@
 """Fudan reference reward/PPO reproduction for the custom tree standing task."""
+from types import MappingProxyType
 
-FUDAN_SCALES = {
-    'tracking_lin_vel': 1., 'tracking_lin_vel_enhance': 1.,
-    'tracking_ang_vel': 1., 'tracking_ang_vel_enhance': 1.,
-    'base_height': 1., 'nominal_state': -1., 'lin_vel_z': -1.,
-    'ang_vel_xy': -.20, 'orientation': -100., 'dof_vel': -5e-5,
+# Final adapted reference values, in the historical insertion order.
+FUDAN_SCALES = MappingProxyType({
+    'tracking_lin_vel': 1., 'tracking_lin_vel_enhance': 0.,
+    'tracking_ang_vel': 1., 'tracking_ang_vel_enhance': 0.,
+    'base_height': 2., 'nominal_state': -1., 'lin_vel_z': -1.,
+    'ang_vel_xy': -.20, 'orientation': -500., 'dof_vel': -.01,
     'dof_acc': -2.5e-7, 'torques': -.0001, 'action_rate': -.01,
     'action_smooth': -.01, 'collision': -1., 'dof_pos_limits': -1.,
-}
-# Overrides from wheel_leg_mjrl-lqr/fudan_train: the user's adapted reference.
-FUDAN_SCALES.update(orientation=-500., base_height=2., dof_vel=-.01,
-                    tracking_lin_vel_enhance=0., tracking_ang_vel_enhance=0.,
-                    zero_base_velocity=-1., zero_wheel_velocity=-1.)
+    'zero_base_velocity': -1., 'zero_wheel_velocity': -1.,
+})
 
 
 def apply_fudan_stand(env_cfg, train_cfg):

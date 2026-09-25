@@ -130,6 +130,8 @@ tools、export_onnx与wheel_legged_gym.scripts作为可执行入口，禁止被�
 4. 实验目录不再读取环境变量或来源文件；环境输入归app/experiment_inputs，来源校验和checkpoint迁移归artifacts。legacy_sources保留历史证据路径与原门槛，新配方应采用显式spec。
 5. mapping audit、closed probe、tree probe均改为公开MuJoCo进程接口；tree/closed测量使用冻结快照回调，已移除这些入口的monkey patch。MuJoCo库直接使用，不修改物理引擎；后续仅在验证接口确有缺口时修改外部runner，不继续全面拆分sim2sim内部。
 6. 自有代码静态循环目前为零；包内允许层级及禁止反向导入tools/scripts/export规则已生效。仍须复核动态导入、进程接口和旧监督器内部职责；静态允许边不代表接口粒度已经充分清晰。
+7. 全仓库扫描仍发现scripts/play.py的GUI模块级命令状态和export_encoder_jit.py导入即执行，
+   均属于真实待处理项。FUDAN_SCALES奖励表及TERMINAL状态集合已冻结，原值与顺序不变。
 
 这些是过渡任务，不是永久例外。架构 goal 不因本阶段测试通过就完成。
 

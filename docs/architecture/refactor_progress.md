@@ -1,5 +1,16 @@
 # 架构重构证据与交接
 
+## 2026-09-24 阶段94：共享常量冻结与GUI全局状态缺口确认
+
+- AST扫描包内模块顶层可变集合/调用，发现FUDAN_SCALES和TERMINAL仍可跨调用修改。
+  修改experiments/recipes/fudan_stand.py为最终值的MappingProxyType，保持原字典插入顺序；
+  workflows/completion.py的TERMINAL改frozenset。无奖励数值或完成状态集合内容变更。
+- 新增plane/tests/test_readonly_runtime_constants.py，验证全部奖励键/值/顺序、manifest副本
+  隔离与状态集合不可变；全套652 passed、2 warnings，244模块1027边四类违规为空。
+- 同次扫描确认scripts/play.py仍有GUI全局命令/lock/runtime_limits，export_encoder_jit.py
+  仍顶层加载模型并导出。更新ARCHITECTURE及completion_audit明确缺口，不以核心训练已分层
+  推断整个仓库无全局状态。更新依赖JSON与本记录；未训练/修改物理/通知。
+
 ## 2026-09-24 阶段93：批量明确剩余监督器应用所有权
 
 - 清单剩余13个tools流程入口改为薄CLI，实现迁至plane/wheel_legged_gym/app同名main(root)。

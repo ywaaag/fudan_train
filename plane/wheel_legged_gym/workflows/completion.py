@@ -3,12 +3,12 @@ import json,time
 from pathlib import Path
 from wheel_legged_gym.ports.notifications import NotificationSink
 
-TERMINAL = {'finished_pending_review', 'paused_on_regression', 'error', 'stopped',
+TERMINAL = frozenset({'finished_pending_review', 'paused_on_regression', 'error', 'stopped',
     'paused_round_budget_review', 'paused_no_improvement_needs_diagnosis',
     'paused_duplicate_experiment_prevented', 'dynamic_source_passed_pending_closed_validation',
     'motion_and_geometry_passed_pending_dynamic_validation',
     'turn_grid_passed_pending_transitions_and_sim2sim',
-    'simulation_curriculum_passed_pending_sim2sim_and_smoothness_review'}
+    'simulation_curriculum_passed_pending_sim2sim_and_smoothness_review'})
 
 
 def write_report(job,state,notify: NotificationSink):
