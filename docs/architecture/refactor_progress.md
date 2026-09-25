@@ -1,5 +1,18 @@
 # 架构重构证据与交接
 
+## 2026-09-24 阶段97：全仓库静态与测试收口复核
+
+- 两仓库当前工作区除`.deep-copilot/`外无未提交源码改动；训练最新提交b3eb4ab/36147a4/
+  221910e/c1a2f40，sim2sim最新提交ee84200，原dirty源码归档分支独立保存。
+- 训练依赖审计：243模块、1027边，cycles/layer_violations/simulator_import_violations/
+  missing_local_imports均为空；sim2sim：39模块、78边，cycles/layer_violations为空。
+  生产源码扫描没有eval/exec/__import__动态执行（PyTorch `.eval()`调用除外）；tools与
+  scripts没有互相导入旧监督器入口，测试/应用导入均指向责任模块。
+- 最终全套测试：训练654 passed、2 warnings；sim2sim 24 passed。两套测试均在对应旧
+  Python环境运行，未启动长训练、GUI、MuJoCo长验收或通知。本轮仅更新completion_audit与本记录。
+- 已关闭静态循环、入口迁移和测试收口项；仍需完成supervisor_inventory中应用内部
+  STOP/artifact/恢复协议的代表性复核，以及最终smoke/验收汇总和最后Git提交，goal保持active。
+
 ## 2026-09-24 阶段96：GUI播放命令状态实例化
 
 - 修改 `plane/wheel_legged_gym/scripts/play.py`：新增PlayCommandState，每次play会话独立
