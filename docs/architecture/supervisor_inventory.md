@@ -1,8 +1,8 @@
 # 监督器剩余范围清单
 
-2026-09-24现场AST扫描tools下run/train/validate/screen入口，发现以下16个文件仍直接调用
-subprocess.Popen。存在子进程调用不自动意味着设计错误；每个文件需要按职责判断，不能
-把移到app目录本身当作完成。以下为待核对清单，不是允许循环/向上依赖的例外。
+2026-09-24首次扫描发现16个tools入口直接管理子进程；阶段90/93已全部迁至app同名
+main(root)，tools只引导路径。下表旧文件名现在对应app模块名，进程调用不再留在tools。
+存在子进程调用不自动意味着设计错误；以下内部职责仍须逐项核对，不能把迁目录当作完成。
 
 | 分组 | tools文件 | 需要核对的边界 |
 |---|---|---|
@@ -25,3 +25,14 @@ app.candidate_closed_review；run_fixed_height_diagnosis→app.fixed_height_diag
 micro高度误差上限.005，其余.015，严格大于才拒绝；非轮接触大于0追加full_contact。
 原地替换row.gate、保留failed_checks顺序，seed补充由调用方负责。
 test_height_acceptance覆盖36种stage/阈值边界/接触/基础门槛组合；其余高度流程未宣称完成。
+
+阶段93的13个app入口：run_closed_sequences、run_closed_stop_comparison、run_dynamic_boundary、
+run_encoder_ablation、run_h3_low_speed、run_sim2sim_adaptation_pair、run_stand_ablation、
+run_stop_ramp_diagnostic、train_stand_long、validate_adaptation_candidates、validate_basic_dynamics、
+validate_closed_ramp、validate_closed_speed。root及依赖root的PLANE/CP等路径为调用局部变量，
+不再在模块导入时按__file__推算仓库位置；SOURCE等实验配置保持原值。
+
+test_remaining_supervisor_entries用冻结旧源码检查main与辅助函数AST完全一致，
+只排除root注入和路径常量归入main；禁止导入时解析参数、读写任务文件或Popen。
+无argparse入口不执行--help。有argparse的8个入口在robot环境--help通过。
+公开辅助函数audit_grid归app.run_h3_low_speed，旧测试调用方已迁移，不保留tools导出别名。

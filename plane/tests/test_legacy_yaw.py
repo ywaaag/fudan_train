@@ -1,15 +1,12 @@
 import isaacgym
-import sys
-from pathlib import Path
 import torch
 import pytest
 from wheel_legged_gym.domain.commands.command_sampling import sample_fixed_bank
 from wheel_legged_gym.contracts.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
 from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tools'))
-from run_h3_low_speed import audit_grid
-from compare_policy_versions import gate
+from wheel_legged_gym.app.run_h3_low_speed import audit_grid
+from wheel_legged_gym.evaluation.gates import gate
 
 
 def test_yaw_bank_preserves_zero_and_all_motion_anchors():

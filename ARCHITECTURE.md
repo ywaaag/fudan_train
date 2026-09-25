@@ -125,6 +125,8 @@ tools、export_onnx与wheel_legged_gym.scripts作为可执行入口，禁止被�
 1. `envs/base/legged_robot.py` 已将独立计算、控制初始化和原点布局交给domain，资产/actor/索引/随机化/共享张量与物理reset交给Isaac适配器。生命周期与buffer所有权指南已核对；最终仍需代表性运行验收，不能只用静态图宣称等价。
 2. `utils/helpers.py`、`utils/task_registry.py`、`utils/terrain.py`转发已删除：配置转换归contracts，CLI/种子/registry归app，仿真/地形归Isaac适配器，checkpoint/JIT归artifacts；只从责任模块导入。
 3. 完成hook、验收指标、命令序列、并行调度已迁入正式模块；motion CLI已薄化，参数/状态/进程、训练计划及候选轮次推进边界已拆分。启动恢复与其他tools监督器仍待核对和整理。
+   清单中的16个监督器入口已全部归app，tools保留薄CLI；内部进程/artifact协议的核对
+   与必要职责提取仍按监督器清单执行，不以入口迁移替代完整验收。
 4. 实验目录不再读取环境变量或来源文件；环境输入归app/experiment_inputs，来源校验和checkpoint迁移归artifacts。legacy_sources保留历史证据路径与原门槛，新配方应采用显式spec。
 5. mapping audit、closed probe、tree probe均改为公开MuJoCo进程接口；tree/closed测量使用冻结快照回调，已移除这些入口的monkey patch。MuJoCo库直接使用，不修改物理引擎；后续仅在验证接口确有缺口时修改外部runner，不继续全面拆分sim2sim内部。
 6. 自有代码静态循环目前为零；包内允许层级及禁止反向导入tools/scripts/export规则已生效。仍须复核动态导入、进程接口和旧监督器内部职责；静态允许边不代表接口粒度已经充分清晰。

@@ -1,5 +1,18 @@
 # 架构重构证据与交接
 
+## 2026-09-24 阶段93：批量明确剩余监督器应用所有权
+
+- 清单剩余13个tools流程入口改为薄CLI，实现迁至plane/wheel_legged_gym/app同名main(root)。
+  完整名称见supervisor_inventory.md；保留main/辅助函数体，root及派生路径由调用参数构建，
+  移除工具重复路径引导。没有批量改写实验、门槛、停止协议或日志格式。
+- 新增plane/tests/test_remaining_supervisor_entries.py及fixtures/supervisor_entry_sources.json，
+  26项检查冻结源码AST一致与导入无任务I/O。迁移test_legacy_yaw.py的audit_grid与gate导入，
+  删除该测试的tools路径注入，不添加旧名兼容包装。
+- 全套650 passed、2 warnings；8个有argparse入口在robot环境--help通过；无argparse入口未执行。
+  静态244模块1027边四类违规为空。未训练/仿真/通知。
+- 更新ARCHITECTURE、supervisor_inventory、completion_audit、依赖JSON及本记录。
+  入口所有权完成不等于内部职责全部完成，剩余进程/artifact核对仍在台账中，goal保持active。
+
 ## 2026-09-24 阶段92：双姿态切换验收与应用解耦
 
 - 修改plane/wheel_legged_gym/evaluation/height_acceptance.py增加assess_height_transitions，

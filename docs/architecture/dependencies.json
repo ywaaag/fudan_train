@@ -102,14 +102,27 @@
     "wheel_legged_gym.app.motion_supervisor": "plane/wheel_legged_gym/app/motion_supervisor.py",
     "wheel_legged_gym.app.optimizer_overrides": "plane/wheel_legged_gym/app/optimizer_overrides.py",
     "wheel_legged_gym.app.random_seed": "plane/wheel_legged_gym/app/random_seed.py",
+    "wheel_legged_gym.app.run_closed_sequences": "plane/wheel_legged_gym/app/run_closed_sequences.py",
+    "wheel_legged_gym.app.run_closed_stop_comparison": "plane/wheel_legged_gym/app/run_closed_stop_comparison.py",
     "wheel_legged_gym.app.run_dual_height": "plane/wheel_legged_gym/app/run_dual_height.py",
+    "wheel_legged_gym.app.run_dynamic_boundary": "plane/wheel_legged_gym/app/run_dynamic_boundary.py",
+    "wheel_legged_gym.app.run_encoder_ablation": "plane/wheel_legged_gym/app/run_encoder_ablation.py",
+    "wheel_legged_gym.app.run_h3_low_speed": "plane/wheel_legged_gym/app/run_h3_low_speed.py",
     "wheel_legged_gym.app.run_height_course": "plane/wheel_legged_gym/app/run_height_course.py",
     "wheel_legged_gym.app.run_low_speed": "plane/wheel_legged_gym/app/run_low_speed.py",
+    "wheel_legged_gym.app.run_sim2sim_adaptation_pair": "plane/wheel_legged_gym/app/run_sim2sim_adaptation_pair.py",
+    "wheel_legged_gym.app.run_stand_ablation": "plane/wheel_legged_gym/app/run_stand_ablation.py",
+    "wheel_legged_gym.app.run_stop_ramp_diagnostic": "plane/wheel_legged_gym/app/run_stop_ramp_diagnostic.py",
     "wheel_legged_gym.app.screen_height_checkpoints": "plane/wheel_legged_gym/app/screen_height_checkpoints.py",
     "wheel_legged_gym.app.stand_long_guard": "plane/wheel_legged_gym/app/stand_long_guard.py",
     "wheel_legged_gym.app.task_registry": "plane/wheel_legged_gym/app/task_registry.py",
     "wheel_legged_gym.app.torch_runtime": "plane/wheel_legged_gym/app/torch_runtime.py",
+    "wheel_legged_gym.app.train_stand_long": "plane/wheel_legged_gym/app/train_stand_long.py",
     "wheel_legged_gym.app.training_summary": "plane/wheel_legged_gym/app/training_summary.py",
+    "wheel_legged_gym.app.validate_adaptation_candidates": "plane/wheel_legged_gym/app/validate_adaptation_candidates.py",
+    "wheel_legged_gym.app.validate_basic_dynamics": "plane/wheel_legged_gym/app/validate_basic_dynamics.py",
+    "wheel_legged_gym.app.validate_closed_ramp": "plane/wheel_legged_gym/app/validate_closed_ramp.py",
+    "wheel_legged_gym.app.validate_closed_speed": "plane/wheel_legged_gym/app/validate_closed_speed.py",
     "wheel_legged_gym.contracts": "plane/wheel_legged_gym/contracts/__init__.py",
     "wheel_legged_gym.contracts.base_config": "plane/wheel_legged_gym/contracts/base_config.py",
     "wheel_legged_gym.contracts.config_serialization": "plane/wheel_legged_gym/contracts/config_serialization.py",
@@ -722,97 +735,37 @@
     {
       "source": "tools.run_closed_sequences",
       "target": "wheel_legged_gym",
-      "line": 11,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_closed_sequences",
-      "target": "wheel_legged_gym",
-      "line": 12,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_closed_sequences",
-      "target": "wheel_legged_gym",
-      "line": 13,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_closed_sequences",
       "target": "wheel_legged_gym.app",
-      "line": 13,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_closed_sequences",
-      "target": "wheel_legged_gym.app.completion",
-      "line": 13,
-      "kind": "import"
-    },
-    {
-      "source": "tools.run_closed_sequences",
-      "target": "wheel_legged_gym.domain",
-      "line": 11,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_closed_sequences",
-      "target": "wheel_legged_gym.domain.commands",
-      "line": 11,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_closed_sequences",
-      "target": "wheel_legged_gym.domain.commands.sequence",
-      "line": 11,
-      "kind": "import"
-    },
-    {
-      "source": "tools.run_closed_sequences",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 12,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_closed_sequences",
-      "target": "wheel_legged_gym.evaluation.sequences",
-      "line": 12,
+      "target": "wheel_legged_gym.app.run_closed_sequences",
+      "line": 10,
       "kind": "import"
     },
     {
       "source": "tools.run_closed_stop_comparison",
       "target": "wheel_legged_gym",
-      "line": 11,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_closed_stop_comparison",
-      "target": "wheel_legged_gym",
-      "line": 12,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_closed_stop_comparison",
       "target": "wheel_legged_gym.app",
-      "line": 12,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_closed_stop_comparison",
-      "target": "wheel_legged_gym.app.completion",
-      "line": 12,
-      "kind": "import"
-    },
-    {
-      "source": "tools.run_closed_stop_comparison",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 11,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_closed_stop_comparison",
-      "target": "wheel_legged_gym.evaluation.sequences",
-      "line": 11,
+      "target": "wheel_legged_gym.app.run_closed_stop_comparison",
+      "line": 10,
       "kind": "import"
     },
     {
@@ -836,37 +789,37 @@
     {
       "source": "tools.run_dynamic_boundary",
       "target": "wheel_legged_gym",
-      "line": 11,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_dynamic_boundary",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 11,
+      "target": "wheel_legged_gym.app",
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_dynamic_boundary",
-      "target": "wheel_legged_gym.evaluation.sequences",
-      "line": 11,
+      "target": "wheel_legged_gym.app.run_dynamic_boundary",
+      "line": 10,
       "kind": "import"
     },
     {
       "source": "tools.run_encoder_ablation",
       "target": "wheel_legged_gym",
-      "line": 15,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_encoder_ablation",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 15,
+      "target": "wheel_legged_gym.app",
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_encoder_ablation",
-      "target": "wheel_legged_gym.evaluation.gates",
-      "line": 15,
+      "target": "wheel_legged_gym.app.run_encoder_ablation",
+      "line": 10,
       "kind": "import"
     },
     {
@@ -890,19 +843,19 @@
     {
       "source": "tools.run_h3_low_speed",
       "target": "wheel_legged_gym",
-      "line": 16,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_h3_low_speed",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 16,
+      "target": "wheel_legged_gym.app",
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_h3_low_speed",
-      "target": "wheel_legged_gym.evaluation.gates",
-      "line": 16,
+      "target": "wheel_legged_gym.app.run_h3_low_speed",
+      "line": 10,
       "kind": "import"
     },
     {
@@ -978,57 +931,57 @@
       "kind": "import"
     },
     {
-      "source": "tools.run_stop_ramp_diagnostic",
+      "source": "tools.run_sim2sim_adaptation_pair",
       "target": "wheel_legged_gym",
-      "line": 11,
+      "line": 10,
       "kind": "package_init"
+    },
+    {
+      "source": "tools.run_sim2sim_adaptation_pair",
+      "target": "wheel_legged_gym.app",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.run_sim2sim_adaptation_pair",
+      "target": "wheel_legged_gym.app.run_sim2sim_adaptation_pair",
+      "line": 10,
+      "kind": "import"
+    },
+    {
+      "source": "tools.run_stand_ablation",
+      "target": "wheel_legged_gym",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.run_stand_ablation",
+      "target": "wheel_legged_gym.app",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.run_stand_ablation",
+      "target": "wheel_legged_gym.app.run_stand_ablation",
+      "line": 10,
+      "kind": "import"
     },
     {
       "source": "tools.run_stop_ramp_diagnostic",
       "target": "wheel_legged_gym",
-      "line": 12,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_stop_ramp_diagnostic",
-      "target": "wheel_legged_gym",
-      "line": 13,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_stop_ramp_diagnostic",
       "target": "wheel_legged_gym.app",
-      "line": 13,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_stop_ramp_diagnostic",
-      "target": "wheel_legged_gym.app.completion",
-      "line": 13,
-      "kind": "import"
-    },
-    {
-      "source": "tools.run_stop_ramp_diagnostic",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 11,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_stop_ramp_diagnostic",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 12,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_stop_ramp_diagnostic",
-      "target": "wheel_legged_gym.evaluation.gates",
-      "line": 12,
-      "kind": "import"
-    },
-    {
-      "source": "tools.run_stop_ramp_diagnostic",
-      "target": "wheel_legged_gym.evaluation.transitions",
-      "line": 11,
+      "target": "wheel_legged_gym.app.run_stop_ramp_diagnostic",
+      "line": 10,
       "kind": "import"
     },
     {
@@ -1140,6 +1093,24 @@
       "kind": "import"
     },
     {
+      "source": "tools.train_stand_long",
+      "target": "wheel_legged_gym",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.train_stand_long",
+      "target": "wheel_legged_gym.app",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.train_stand_long",
+      "target": "wheel_legged_gym.app.train_stand_long",
+      "line": 10,
+      "kind": "import"
+    },
+    {
       "source": "tools.training_completion_hook",
       "target": "wheel_legged_gym",
       "line": 7,
@@ -1158,57 +1129,75 @@
       "kind": "import"
     },
     {
-      "source": "tools.validate_basic_dynamics",
+      "source": "tools.validate_adaptation_candidates",
       "target": "wheel_legged_gym",
-      "line": 11,
+      "line": 10,
       "kind": "package_init"
     },
     {
-      "source": "tools.validate_basic_dynamics",
-      "target": "wheel_legged_gym",
-      "line": 12,
+      "source": "tools.validate_adaptation_candidates",
+      "target": "wheel_legged_gym.app",
+      "line": 10,
       "kind": "package_init"
     },
     {
-      "source": "tools.validate_basic_dynamics",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 11,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.validate_basic_dynamics",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 12,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.validate_basic_dynamics",
-      "target": "wheel_legged_gym.evaluation.gates",
-      "line": 12,
+      "source": "tools.validate_adaptation_candidates",
+      "target": "wheel_legged_gym.app.validate_adaptation_candidates",
+      "line": 10,
       "kind": "import"
     },
     {
       "source": "tools.validate_basic_dynamics",
-      "target": "wheel_legged_gym.evaluation.transitions",
-      "line": 11,
+      "target": "wheel_legged_gym",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.validate_basic_dynamics",
+      "target": "wheel_legged_gym.app",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.validate_basic_dynamics",
+      "target": "wheel_legged_gym.app.validate_basic_dynamics",
+      "line": 10,
       "kind": "import"
     },
     {
       "source": "tools.validate_closed_ramp",
       "target": "wheel_legged_gym",
-      "line": 9,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.validate_closed_ramp",
-      "target": "wheel_legged_gym.workflows",
-      "line": 9,
+      "target": "wheel_legged_gym.app",
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.validate_closed_ramp",
-      "target": "wheel_legged_gym.workflows.validation_schedule",
-      "line": 9,
+      "target": "wheel_legged_gym.app.validate_closed_ramp",
+      "line": 10,
+      "kind": "import"
+    },
+    {
+      "source": "tools.validate_closed_speed",
+      "target": "wheel_legged_gym",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.validate_closed_speed",
+      "target": "wheel_legged_gym.app",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.validate_closed_speed",
+      "target": "wheel_legged_gym.app.validate_closed_speed",
+      "line": 10,
       "kind": "import"
     },
     {
@@ -1902,6 +1891,102 @@
       "kind": "import"
     },
     {
+      "source": "wheel_legged_gym.app.run_closed_sequences",
+      "target": "wheel_legged_gym",
+      "line": 6,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_sequences",
+      "target": "wheel_legged_gym",
+      "line": 7,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_sequences",
+      "target": "wheel_legged_gym",
+      "line": 8,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_sequences",
+      "target": "wheel_legged_gym.app",
+      "line": 8,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_sequences",
+      "target": "wheel_legged_gym.app.completion",
+      "line": 8,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_sequences",
+      "target": "wheel_legged_gym.domain",
+      "line": 6,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_sequences",
+      "target": "wheel_legged_gym.domain.commands",
+      "line": 6,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_sequences",
+      "target": "wheel_legged_gym.domain.commands.sequence",
+      "line": 6,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_sequences",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 7,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_sequences",
+      "target": "wheel_legged_gym.evaluation.sequences",
+      "line": 7,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_stop_comparison",
+      "target": "wheel_legged_gym",
+      "line": 6,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_stop_comparison",
+      "target": "wheel_legged_gym",
+      "line": 7,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_stop_comparison",
+      "target": "wheel_legged_gym.app",
+      "line": 7,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_stop_comparison",
+      "target": "wheel_legged_gym.app.completion",
+      "line": 7,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_stop_comparison",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 6,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_closed_stop_comparison",
+      "target": "wheel_legged_gym.evaluation.sequences",
+      "line": 6,
+      "kind": "import"
+    },
+    {
       "source": "wheel_legged_gym.app.run_dual_height",
       "target": "wheel_legged_gym",
       "line": 10,
@@ -1935,6 +2020,60 @@
       "source": "wheel_legged_gym.app.run_dual_height",
       "target": "wheel_legged_gym.evaluation.transitions",
       "line": 11,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_dynamic_boundary",
+      "target": "wheel_legged_gym",
+      "line": 6,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_dynamic_boundary",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 6,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_dynamic_boundary",
+      "target": "wheel_legged_gym.evaluation.sequences",
+      "line": 6,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_encoder_ablation",
+      "target": "wheel_legged_gym",
+      "line": 9,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_encoder_ablation",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 9,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_encoder_ablation",
+      "target": "wheel_legged_gym.evaluation.gates",
+      "line": 9,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_h3_low_speed",
+      "target": "wheel_legged_gym",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_h3_low_speed",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_h3_low_speed",
+      "target": "wheel_legged_gym.evaluation.gates",
+      "line": 10,
       "kind": "import"
     },
     {
@@ -2019,6 +2158,60 @@
       "source": "wheel_legged_gym.app.run_low_speed",
       "target": "wheel_legged_gym.evaluation.low_speed_relay",
       "line": 3,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_stop_ramp_diagnostic",
+      "target": "wheel_legged_gym",
+      "line": 6,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_stop_ramp_diagnostic",
+      "target": "wheel_legged_gym",
+      "line": 7,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_stop_ramp_diagnostic",
+      "target": "wheel_legged_gym",
+      "line": 8,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_stop_ramp_diagnostic",
+      "target": "wheel_legged_gym.app",
+      "line": 8,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_stop_ramp_diagnostic",
+      "target": "wheel_legged_gym.app.completion",
+      "line": 8,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_stop_ramp_diagnostic",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 6,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_stop_ramp_diagnostic",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 7,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_stop_ramp_diagnostic",
+      "target": "wheel_legged_gym.evaluation.gates",
+      "line": 7,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_stop_ramp_diagnostic",
+      "target": "wheel_legged_gym.evaluation.transitions",
+      "line": 6,
       "kind": "import"
     },
     {
@@ -2355,6 +2548,60 @@
       "source": "wheel_legged_gym.app.training_summary",
       "target": "wheel_legged_gym.evaluation.training_summary",
       "line": 7,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.validate_basic_dynamics",
+      "target": "wheel_legged_gym",
+      "line": 6,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.validate_basic_dynamics",
+      "target": "wheel_legged_gym",
+      "line": 7,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.validate_basic_dynamics",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 6,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.validate_basic_dynamics",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 7,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.validate_basic_dynamics",
+      "target": "wheel_legged_gym.evaluation.gates",
+      "line": 7,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.validate_basic_dynamics",
+      "target": "wheel_legged_gym.evaluation.transitions",
+      "line": 6,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.validate_closed_ramp",
+      "target": "wheel_legged_gym",
+      "line": 5,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.validate_closed_ramp",
+      "target": "wheel_legged_gym.workflows",
+      "line": 5,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.validate_closed_ramp",
+      "target": "wheel_legged_gym.workflows.validation_schedule",
+      "line": 5,
       "kind": "import"
     },
     {
