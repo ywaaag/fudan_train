@@ -5,12 +5,10 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(root)
-JOB = ROOT/'plane/outputs/policy_comparison_20260919_004138'
-OUT = ROOT/'docs/data'
-
-
 def main(root):
+    ROOT = Path(root)
+    JOB = ROOT/'plane/outputs/policy_comparison_20260919_004138'
+    OUT = ROOT/'docs/data'
     manifest = json.loads((JOB/'manifest.json').read_text())
     status = json.loads((JOB/'status.json').read_text())
     assert status['status'] == 'completed' and len(status['completed']) == 48
@@ -59,5 +57,4 @@ def main(root):
         source_hashes=json.loads((JOB/'source_snapshot_sha256.json').read_text()))
     (OUT/'policy_comparison_20260919.json').write_text(json.dumps(evidence,indent=2)+'\n')
     print(json.dumps({'runs':len(runs),'checkpoints':payload['checkpoint_count'],'comparison_rows':len(rows)}))
-
 
