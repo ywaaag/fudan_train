@@ -12,7 +12,8 @@
 | 闭链序列 | run_closed_sequences.py、run_closed_stop_comparison.py、run_dynamic_boundary.py | 命令序列与指标已有domain/evaluation；核对线程调度、STOP、hash校验与摘要落盘 |
 | 诊断与适配 | run_sim2sim_adaptation_pair.py、run_stop_ramp_diagnostic.py、validate_adaptation_candidates.py、validate_basic_dynamics.py | 子job发现/恢复、动态门槛与任务状态隔离，不能隐式提升模型 |
 | 闭链网格 | validate_closed_ramp.py、validate_closed_speed.py | ramp已有validation_schedule；核对剩余进程、逐方向停止和skipped统计 |
-| 历史只读/完成hook（待收口） | compare_policy_versions.py、continue_height_course.py、audit_observation_noise.py、wait_for_completion.py、summarize_policy_comparison.py、export_model_registry.py | 旧job/diagnostic协议；迁移前先保留真实命令和报告格式，不能只删掉入口 |
+| 历史只读/完成hook（待收口） | continue_height_course.py、audit_observation_noise.py、wait_for_completion.py、summarize_policy_comparison.py、export_model_registry.py | 旧job/diagnostic协议；迁移前先保留真实命令和报告格式，不能只删掉入口 |
+| 历史策略对比（入口已迁移） | app.compare_policy_versions；tools为薄CLI | 仍使用历史manifest/checkpoint协议，需在不运行长评估的前提下补边界测试 |
 
 已明确分层的入口：run_motion_goal→app.motion_supervisor；run_candidate_closed_review→
 app.candidate_closed_review；run_fixed_height_diagnosis→app.fixed_height_diagnosis；

@@ -1,5 +1,15 @@
 # 架构重构证据与交接
 
+## 2026-09-24 阶段98：历史策略对比入口迁移
+
+- `tools/compare_policy_versions.py`改为薄CLI，完整实现迁至
+  `app.compare_policy_versions.main(root)`；候选、manifest、seed、randomization、缓存
+  checkpoint/evaluator/asset hash及失败状态协议保持原值。
+- robot环境--help通过，未运行历史评估。新增`test_compare_policy_entrypoint.py`，验证CLI
+  无Popen、app导入不解析参数/读写job/启动任务。
+- supervisor清单已将剩余直接子进程诊断收窄为continue_height_course、audit_observation_noise；
+  wait_for_completion、summarize_policy_comparison、export_model_registry仍是旧job文件边界。
+
 ## 2026-09-24 阶段97：全仓库静态与测试收口复核
 
 - 两仓库当前工作区除`.deep-copilot/`外无未提交源码改动；训练最新提交b3eb4ab/36147a4/
