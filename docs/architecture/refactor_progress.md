@@ -1250,3 +1250,8 @@ summarize_policy_comparison、export_model_registry仍直接读取或写job文�
 补充：迁移后将test_height_continuation和test_policy_comparison_gate的旧tools路径导入
 改为直接责任模块；没有保留已删除tools的Python导出别名。训练全套测试目前664 passed、
 2 warnings；sim2sim此前24 passed。job文件真实历史样本未被改写或加载执行。
+
+阶段99收口：tools全量AST扫描已无subprocess调用；所有工具只做CLI引导或只读入口，
+进程/状态所有权归app/adapters。训练全套664 passed、2 warnings；依赖图249模块/1045边，
+cycles、层级违规、仿真导入、缺失本地模块均为空。剩余仅是历史job文件真实样本读写验收、
+最终smoke/已有等价证据汇总与最终提交，不再有未迁移的tools进程入口。
