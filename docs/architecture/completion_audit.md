@@ -9,7 +9,7 @@
 |---|---|---|
 | 仓库自描述、最小阅读上下文 | 两仓库ARCHITECTURE、模块指南、静态依赖JSON；根README/AGENTS分离历史快照；本轮本地链接已核对 | 最终目录树和边界核对，确保指南与最终实现一致 |
 | 自有代码循环清零 | 2026-09-24最终静态检查：训练243模块/1027边、sim2sim39模块/78边，均cycles=[] | 动态进程依赖仍需最终汇总；不再有静态循环缺口 |
-| 单向分层 | 受管层级检查通过；envs不依赖utils；已迁移tools/scripts未反向导入其他tools或核心入口；compare_policy_versions/continue_height_course/audit_observation_noise已归app | 3个只读/job工具仍保留旧IO协议，详见supervisor_inventory；需最终复核 |
+| 单向分层 | 受管层级检查通过；envs不依赖utils；已迁移tools/scripts未反向导入其他tools或核心入口；compare_policy_versions/continue_height_course/audit_observation_noise及3个job工具已归app | 旧job文件格式需代表性读写测试，详见supervisor_inventory；需最终复核 |
 | 环境模块化 | 奖励、观测、控制、终止、物理reset、资产/actor/索引/随机化、Gym张量、课程窗口、命令重采样、DOF/PD初始随机化及原点布局已分离；environment_lifecycle指南记录调度与状态所有权 | 最终入口与代表性运行验收；调度本身归环境，不机械拆成代理 |
 | 工作流模块化 | motion评估、完成报告、状态存储、进程执行、验证调度、实验配置构造、轮次推进及恢复检查分离；高度附加门槛归evaluation；16个监督器入口已归app | supervisor_inventory.md中的应用内部进程/artifact职责/取消/恢复仍须核对，不以迁目录代替完成 |
 | 消除隐式全局状态 | registry由app工厂创建；配方不读环境/文件；具名指标buffer无重复别名；类配置容器按实例隔离；Torch JIT显式app调用；MuJoCo guide配置显式输入；FUDAN_SCALES/TERMINAL只读；未使用的135D导出脚本归档；GUI命令状态归PlayCommandState | 最终扫描模块初始化及第三方运行时边界；Torch开关边界见configuration指南 |

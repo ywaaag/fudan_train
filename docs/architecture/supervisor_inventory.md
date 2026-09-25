@@ -12,7 +12,7 @@
 | 闭链序列 | run_closed_sequences.py、run_closed_stop_comparison.py、run_dynamic_boundary.py | 命令序列与指标已有domain/evaluation；核对线程调度、STOP、hash校验与摘要落盘 |
 | 诊断与适配 | run_sim2sim_adaptation_pair.py、run_stop_ramp_diagnostic.py、validate_adaptation_candidates.py、validate_basic_dynamics.py | 子job发现/恢复、动态门槛与任务状态隔离，不能隐式提升模型 |
 | 闭链网格 | validate_closed_ramp.py、validate_closed_speed.py | ramp已有validation_schedule；核对剩余进程、逐方向停止和skipped统计 |
-| 历史只读/完成hook（待收口） | wait_for_completion.py、summarize_policy_comparison.py、export_model_registry.py | 旧job/diagnostic协议；迁移前先保留真实命令和报告格式，不能只删掉入口 |
+| 历史只读/完成hook（入口已迁移） | app.wait_for_completion、app.summarize_policy_comparison、app.export_model_registry；tools为薄CLI | 旧job/diagnostic文件格式仍需代表性读写测试，不能只删掉入口 |
 | 历史观测噪声诊断（入口已迁移） | app.audit_observation_noise；tools为薄CLI | 只传递diagnostic-mode和字面参数，未运行诊断 |
 | 历史高度续训（入口已迁移） | app.continue_height_course；tools为薄CLI | 保留round/seed/partial-candidate与STOP协议，需补边界测试 |
 | 历史策略对比（入口已迁移） | app.compare_policy_versions；tools为薄CLI | 仍使用历史manifest/checkpoint协议，需在不运行长评估的前提下补边界测试 |

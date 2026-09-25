@@ -98,6 +98,7 @@
     "wheel_legged_gym.app.continue_height_course": "plane/wheel_legged_gym/app/continue_height_course.py",
     "wheel_legged_gym.app.continue_stand_validated": "plane/wheel_legged_gym/app/continue_stand_validated.py",
     "wheel_legged_gym.app.experiment_inputs": "plane/wheel_legged_gym/app/experiment_inputs.py",
+    "wheel_legged_gym.app.export_model_registry": "plane/wheel_legged_gym/app/export_model_registry.py",
     "wheel_legged_gym.app.fixed_height_diagnosis": "plane/wheel_legged_gym/app/fixed_height_diagnosis.py",
     "wheel_legged_gym.app.motion_options": "plane/wheel_legged_gym/app/motion_options.py",
     "wheel_legged_gym.app.motion_resume": "plane/wheel_legged_gym/app/motion_resume.py",
@@ -118,6 +119,7 @@
     "wheel_legged_gym.app.run_stop_ramp_diagnostic": "plane/wheel_legged_gym/app/run_stop_ramp_diagnostic.py",
     "wheel_legged_gym.app.screen_height_checkpoints": "plane/wheel_legged_gym/app/screen_height_checkpoints.py",
     "wheel_legged_gym.app.stand_long_guard": "plane/wheel_legged_gym/app/stand_long_guard.py",
+    "wheel_legged_gym.app.summarize_policy_comparison": "plane/wheel_legged_gym/app/summarize_policy_comparison.py",
     "wheel_legged_gym.app.task_registry": "plane/wheel_legged_gym/app/task_registry.py",
     "wheel_legged_gym.app.torch_runtime": "plane/wheel_legged_gym/app/torch_runtime.py",
     "wheel_legged_gym.app.train_stand_long": "plane/wheel_legged_gym/app/train_stand_long.py",
@@ -126,6 +128,7 @@
     "wheel_legged_gym.app.validate_basic_dynamics": "plane/wheel_legged_gym/app/validate_basic_dynamics.py",
     "wheel_legged_gym.app.validate_closed_ramp": "plane/wheel_legged_gym/app/validate_closed_ramp.py",
     "wheel_legged_gym.app.validate_closed_speed": "plane/wheel_legged_gym/app/validate_closed_speed.py",
+    "wheel_legged_gym.app.wait_for_completion": "plane/wheel_legged_gym/app/wait_for_completion.py",
     "wheel_legged_gym.contracts": "plane/wheel_legged_gym/contracts/__init__.py",
     "wheel_legged_gym.contracts.base_config": "plane/wheel_legged_gym/contracts/base_config.py",
     "wheel_legged_gym.contracts.config_serialization": "plane/wheel_legged_gym/contracts/config_serialization.py",
@@ -705,6 +708,24 @@
       "kind": "import"
     },
     {
+      "source": "tools.export_model_registry",
+      "target": "wheel_legged_gym",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.export_model_registry",
+      "target": "wheel_legged_gym.app",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.export_model_registry",
+      "target": "wheel_legged_gym.app.export_model_registry",
+      "line": 10,
+      "kind": "import"
+    },
+    {
       "source": "tools.probe_closed_initialization",
       "target": "wheel_legged_gym",
       "line": 10,
@@ -1079,19 +1100,19 @@
     {
       "source": "tools.summarize_policy_comparison",
       "target": "wheel_legged_gym",
-      "line": 14,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.summarize_policy_comparison",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 14,
+      "target": "wheel_legged_gym.app",
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.summarize_policy_comparison",
-      "target": "wheel_legged_gym.evaluation.gates",
-      "line": 14,
+      "target": "wheel_legged_gym.app.summarize_policy_comparison",
+      "line": 10,
       "kind": "import"
     },
     {
@@ -1260,6 +1281,24 @@
       "source": "tools.verify_reference_smoke",
       "target": "wheel_legged_gym.adapters.artifacts.reference_smoke",
       "line": 7,
+      "kind": "import"
+    },
+    {
+      "source": "tools.wait_for_completion",
+      "target": "wheel_legged_gym",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.wait_for_completion",
+      "target": "wheel_legged_gym.app",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.wait_for_completion",
+      "target": "wheel_legged_gym.app.wait_for_completion",
+      "line": 10,
       "kind": "import"
     },
     {
@@ -2328,6 +2367,24 @@
       "source": "wheel_legged_gym.app.stand_long_guard",
       "target": "wheel_legged_gym.evaluation.stand_continuation",
       "line": 3,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.summarize_policy_comparison",
+      "target": "wheel_legged_gym",
+      "line": 9,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.summarize_policy_comparison",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 9,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.summarize_policy_comparison",
+      "target": "wheel_legged_gym.evaluation.gates",
+      "line": 9,
       "kind": "import"
     },
     {

@@ -1242,3 +1242,7 @@ summarize_policy_comparison、export_model_registry仍直接读取或写job文�
 阶段98再次补充：`audit_observation_noise.py`已迁移为app.audit_observation_noise.main(root, argv)，
 保留sampled/sampled_noisy模式和字面参数传递；新增3项边界测试，未运行实际诊断。
 剩余tools仅3个旧job文件读写工具，不再有直接子进程诊断入口。
+
+阶段98最终补充：wait_for_completion、summarize_policy_comparison、export_model_registry
+已迁移到app同名入口，tools只保留CLI引导；新增job_tool_entrypoints测试验证导入不读写文件、
+不启动进程。旧文件格式的真实读写对照仍待最终验收，不运行历史任务。
