@@ -1234,3 +1234,7 @@ summarize_policy_comparison、export_model_registry仍直接读取或写job文�
 - 全套230项测试通过，图210模块/902边，无循环/受管违规；更新README、ARCHITECTURE、
   兼容指南及依赖JSON。唯一残留旧路径为compare_source_contract的只读上游路径。
 - 未训练；整体goal仍按验收台账推进。
+阶段98后续补充：`continue_height_course.py`已迁移为app.continue_height_course.main(root)，
+保留round/seed、screen-job等待、部分候选、三轮停滞、STOP和子job status协议；robot环境
+入口可导入且未启动续训。新增test_continue_height_entrypoint.py验证CLI无Popen/导入无mkdir。
+剩余直接子进程诊断仅audit_observation_noise，另有三个只读/job文件工具。
