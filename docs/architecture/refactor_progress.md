@@ -1255,3 +1255,16 @@ summarize_policy_comparison、export_model_registry仍直接读取或写job文�
 进程/状态所有权归app/adapters。训练全套664 passed、2 warnings；依赖图249模块/1045边，
 cycles、层级违规、仿真导入、缺失本地模块均为空。剩余仅是历史job文件真实样本读写验收、
 最终smoke/已有等价证据汇总与最终提交，不再有未迁移的tools进程入口。
+
+## 2026-09-25 阶段100：最终代表性验证与目标收口
+
+- 最终训练启动 smoke：64 env、seed11、max_iterations=1、run_name=`architecture_final_smoke_20260925`，
+  退出0并生成model_1.pt；日志位于`plane/outputs/architecture_refactor_20260923/final_smoke.log`。
+- 最终测试：训练仓库664 passed、2 warnings；sim2sim仓库24 passed。依赖审计训练249模块/1045边、
+  sim2sim39模块/78边，cycles、受管层级违规、核心仿真导入和缺失本地模块均为空。tools AST无
+  subprocess调用，历史入口均为app薄CLI。
+- ONNX、closed/tree固定步长等价、正常/保护拒绝双路径、原dirty Git归档和分阶段提交均已在本记录
+  与验收台账索引；25D/125D/6D契约未改。
+- 剩余外部边界是第三方Isaac/PyTorch运行时开关、pynput/GUI交互、历史job文件格式和HAPI通知，
+  已由AGENTS、模块指南、process_interfaces和测试记录；不属于自有模块循环或向上依赖。
+  未运行历史长任务，不以GUI/均值/reward宣称运动能力。
