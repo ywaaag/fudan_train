@@ -6,7 +6,7 @@ subprocess.Popen。存在子进程调用不自动意味着设计错误；每个�
 
 | 分组 | tools文件 | 需要核对的边界 |
 |---|---|---|
-| 高度课程 | run_height_course.py、run_dual_height.py、screen_height_checkpoints.py | 课程/候选/转换验收与进程、artifact分离；保留seed、遇错提前停止与两高度完整执行语义 |
+| 高度课程（入口已迁移） | app.run_height_course、app.run_dual_height、app.screen_height_checkpoints；tools为薄CLI | 门槛已使用evaluation、配方使用experiments；仍核对进程/artifact边界，保留seed、遇错提前停止与两高度完整执行语义 |
 | 历史训练 | run_encoder_ablation.py、run_h3_low_speed.py、run_stand_ablation.py、train_stand_long.py | 已用evaluation.gate的保留；独有决策提取，进程取消/恢复语义明确 |
 | 闭链序列 | run_closed_sequences.py、run_closed_stop_comparison.py、run_dynamic_boundary.py | 命令序列与指标已有domain/evaluation；核对线程调度、STOP、hash校验与摘要落盘 |
 | 诊断与适配 | run_sim2sim_adaptation_pair.py、run_stop_ramp_diagnostic.py、validate_adaptation_candidates.py、validate_basic_dynamics.py | 子job发现/恢复、动态门槛与任务状态隔离，不能隐式提升模型 |

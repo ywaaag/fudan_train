@@ -102,7 +102,10 @@
     "wheel_legged_gym.app.motion_supervisor": "plane/wheel_legged_gym/app/motion_supervisor.py",
     "wheel_legged_gym.app.optimizer_overrides": "plane/wheel_legged_gym/app/optimizer_overrides.py",
     "wheel_legged_gym.app.random_seed": "plane/wheel_legged_gym/app/random_seed.py",
+    "wheel_legged_gym.app.run_dual_height": "plane/wheel_legged_gym/app/run_dual_height.py",
+    "wheel_legged_gym.app.run_height_course": "plane/wheel_legged_gym/app/run_height_course.py",
     "wheel_legged_gym.app.run_low_speed": "plane/wheel_legged_gym/app/run_low_speed.py",
+    "wheel_legged_gym.app.screen_height_checkpoints": "plane/wheel_legged_gym/app/screen_height_checkpoints.py",
     "wheel_legged_gym.app.stand_long_guard": "plane/wheel_legged_gym/app/stand_long_guard.py",
     "wheel_legged_gym.app.task_registry": "plane/wheel_legged_gym/app/task_registry.py",
     "wheel_legged_gym.app.torch_runtime": "plane/wheel_legged_gym/app/torch_runtime.py",
@@ -814,37 +817,19 @@
     {
       "source": "tools.run_dual_height",
       "target": "wheel_legged_gym",
-      "line": 16,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_dual_height",
-      "target": "wheel_legged_gym",
-      "line": 17,
+      "target": "wheel_legged_gym.app",
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_dual_height",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 16,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_dual_height",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 17,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_dual_height",
-      "target": "wheel_legged_gym.evaluation.gates",
-      "line": 16,
-      "kind": "import"
-    },
-    {
-      "source": "tools.run_dual_height",
-      "target": "wheel_legged_gym.evaluation.transitions",
-      "line": 17,
+      "target": "wheel_legged_gym.app.run_dual_height",
+      "line": 10,
       "kind": "import"
     },
     {
@@ -922,43 +907,19 @@
     {
       "source": "tools.run_height_course",
       "target": "wheel_legged_gym",
-      "line": 22,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_height_course",
-      "target": "wheel_legged_gym",
-      "line": 23,
+      "target": "wheel_legged_gym.app",
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.run_height_course",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 23,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_height_course",
-      "target": "wheel_legged_gym.evaluation.height_acceptance",
-      "line": 23,
-      "kind": "import"
-    },
-    {
-      "source": "tools.run_height_course",
-      "target": "wheel_legged_gym.experiments",
-      "line": 22,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_height_course",
-      "target": "wheel_legged_gym.experiments.recipes",
-      "line": 22,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.run_height_course",
-      "target": "wheel_legged_gym.experiments.recipes.height_course",
-      "line": 22,
+      "target": "wheel_legged_gym.app.run_height_course",
+      "line": 10,
       "kind": "import"
     },
     {
@@ -1072,43 +1033,19 @@
     {
       "source": "tools.screen_height_checkpoints",
       "target": "wheel_legged_gym",
-      "line": 18,
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.screen_height_checkpoints",
-      "target": "wheel_legged_gym",
-      "line": 19,
+      "target": "wheel_legged_gym.app",
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.screen_height_checkpoints",
-      "target": "wheel_legged_gym.evaluation",
-      "line": 19,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.screen_height_checkpoints",
-      "target": "wheel_legged_gym.evaluation.gates",
-      "line": 19,
-      "kind": "import"
-    },
-    {
-      "source": "tools.screen_height_checkpoints",
-      "target": "wheel_legged_gym.experiments",
-      "line": 18,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.screen_height_checkpoints",
-      "target": "wheel_legged_gym.experiments.recipes",
-      "line": 18,
-      "kind": "package_init"
-    },
-    {
-      "source": "tools.screen_height_checkpoints",
-      "target": "wheel_legged_gym.experiments.recipes.height_course",
-      "line": 18,
+      "target": "wheel_legged_gym.app.screen_height_checkpoints",
+      "line": 10,
       "kind": "import"
     },
     {
@@ -1964,6 +1901,84 @@
       "kind": "import"
     },
     {
+      "source": "wheel_legged_gym.app.run_dual_height",
+      "target": "wheel_legged_gym",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_dual_height",
+      "target": "wheel_legged_gym",
+      "line": 11,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_dual_height",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_dual_height",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 11,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_dual_height",
+      "target": "wheel_legged_gym.evaluation.gates",
+      "line": 10,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_dual_height",
+      "target": "wheel_legged_gym.evaluation.transitions",
+      "line": 11,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_height_course",
+      "target": "wheel_legged_gym",
+      "line": 12,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_height_course",
+      "target": "wheel_legged_gym",
+      "line": 13,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_height_course",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 13,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_height_course",
+      "target": "wheel_legged_gym.evaluation.height_acceptance",
+      "line": 13,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_height_course",
+      "target": "wheel_legged_gym.experiments",
+      "line": 12,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_height_course",
+      "target": "wheel_legged_gym.experiments.recipes",
+      "line": 12,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.run_height_course",
+      "target": "wheel_legged_gym.experiments.recipes.height_course",
+      "line": 12,
+      "kind": "import"
+    },
+    {
       "source": "wheel_legged_gym.app.run_low_speed",
       "target": "wheel_legged_gym",
       "line": 3,
@@ -1979,6 +1994,48 @@
       "source": "wheel_legged_gym.app.run_low_speed",
       "target": "wheel_legged_gym.evaluation.low_speed_relay",
       "line": 3,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.screen_height_checkpoints",
+      "target": "wheel_legged_gym",
+      "line": 9,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.screen_height_checkpoints",
+      "target": "wheel_legged_gym",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.screen_height_checkpoints",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.screen_height_checkpoints",
+      "target": "wheel_legged_gym.evaluation.gates",
+      "line": 10,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.screen_height_checkpoints",
+      "target": "wheel_legged_gym.experiments",
+      "line": 9,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.screen_height_checkpoints",
+      "target": "wheel_legged_gym.experiments.recipes",
+      "line": 9,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.screen_height_checkpoints",
+      "target": "wheel_legged_gym.experiments.recipes.height_course",
+      "line": 9,
       "kind": "import"
     },
     {

@@ -1,5 +1,17 @@
 # 架构重构证据与交接
 
+## 2026-09-24 阶段90：高度组应用入口与仿真导入解耦
+
+- 修改tools/run_height_course.py、run_dual_height.py、screen_height_checkpoints.py为薄CLI；
+  新增plane/wheel_legged_gym/app下三个同名模块，root显式传入，原main主体保留。
+  移除两处无用Isaac导入及重复sys.path设置；配方和门槛只依赖既有experiments/evaluation。
+- 新增plane/tests/test_height_supervisor_entrypoints.py及fixtures/height_supervisor_bodies.json，
+  6项测试验证与c5bcfcb旧main主体AST一致和导入无任务I/O。
+- 全套578 passed、2 warnings；robot环境height_course --help成功；静态230模块975边，
+  四类违规为空。未启动高度训练、历史补筛或通知。
+- 更新docs/modules/height_supervisors.md、supervisor_inventory.md、ARCHITECTURE、依赖JSON
+  及本记录。进程/artifact仍明确待核对，不把迁移目录当作工作流全部完成。
+
 ## 2026-09-24 阶段89：提交当前重构工作树
 
 - 用户明确要求Git提交。提交前两仓库index为空；逐项筛选当前tracked修改及未跟踪源码，

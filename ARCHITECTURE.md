@@ -88,6 +88,7 @@ MuJoCo 初始化和逐步测量已经归属于 sim2sim 仓库，未更改求解�
 - 修改motion评估恢复：入口为app.motion_resume.restore_evaluation_options，PID检查/文件读取留在app边界。
 - 修改闭链候选复核流程：读[候选复核边界](docs/modules/candidate_closed_review.md)，区分门槛、应用进程和报告生成。
 - 修改固定高度诊断/嵌套STOP传播：读[诊断进程边界](docs/modules/fixed_height_diagnosis.md)，不混用直接取消与子job协作停止协议。
+- 修改高度课程/双高度/补筛流程：读[高度应用入口](docs/modules/height_supervisors.md)，入口不再隐式加载Isaac。
 - 查看历史站立/低速监督器：读[显式启动边界](docs/modules/historical_supervisors.md)，导入不启动任务，CLI实际执行仍需训练授权。
 - 修改历史站立/低速验收：使用evaluation.stand_continuation或low_speed_relay；文件与进程不进入门槛模块。
 - 修改TensorBoard摘要：读[训练日志摘要](docs/modules/training_summary.md)，分开处理event读取和统计计算。
