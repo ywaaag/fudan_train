@@ -13,6 +13,12 @@
 - 已关闭静态循环、入口迁移和测试收口项；仍需完成supervisor_inventory中应用内部
   STOP/artifact/恢复协议的代表性复核，以及最终smoke/验收汇总和最后Git提交，goal保持active。
 
+补充核对：3个历史诊断tools（compare_policy_versions、continue_height_course、
+audit_observation_noise）仍直接维护旧子进程/报告协议，wait_for_completion、
+summarize_policy_comparison、export_model_registry仍直接读取或写job文件。架构测试将
+这些明确列为历史边界，其余已迁移入口禁止tools拥有Popen或status journal；不把允许列表当作
+永久架构层，后续需按真实命令测试后再迁移。
+
 ## 2026-09-24 阶段96：GUI播放命令状态实例化
 
 - 修改 `plane/wheel_legged_gym/scripts/play.py`：新增PlayCommandState，每次play会话独立

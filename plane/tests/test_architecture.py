@@ -58,6 +58,32 @@ def test_production_modules_do_not_evaluate_source_strings():
     assert violations == []
 
 
+def test_tools_are_cli_leaves_without_process_or_job_state_ownership():
+    """Process orchestration and status journals belong to app/adapters, never tools."""
+    import ast
+    root = Path(__file__).resolve().parents[2]
+    violations = []
+    legacy_process_tools = {
+        'compare_policy_versions.py', 'continue_height_course.py', 'audit_observation_noise.py',
+    }
+    for path in (root / 'tools').glob('*.py'):
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                if (isinstance(node.func.value, ast.Name) and node.func.value.id == 'subprocess'
+                        and path.name not in legacy_process_tools):
+                    violations.append(f'{path.name}:{node.lineno}: subprocess')
+            if isinstance(node, ast.Attribute) and node.attr in {'Popen', 'run'}:
+                if (isinstance(node.value, ast.Name) and node.value.id == 'subprocess'
+                        and path.name not in legacy_process_tools):
+                    violations.append(f'{path.name}:{node.lineno}: process')
+        if (path.name not in legacy_process_tools | {'wait_for_completion.py', 'summarize_policy_comparison.py',
+                              'export_model_registry.py'}
+                and ('status.json' in path.read_text() or 'completion_hook.json' in path.read_text())):
+            violations.append(f'{path.name}: job journal')
+    assert violations == []
+
+
 def test_no_silently_overridden_class_methods():
     """Duplicate methods hide implementations; property accessors are explicit exceptions."""
     import ast
