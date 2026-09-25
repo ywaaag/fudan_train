@@ -21,18 +21,18 @@ except ImportError:
     raise
 
 
-# --------------------
-# Global command state
-# --------------------
-cmd_x = 0.0
-ang_vel = 0.0
-cmd_height = 0.40
-running = True
-turn_left_pressed = False
-turn_right_pressed = False
-command_source = "keyboard"
-command_lock = threading.RLock()
-runtime_limits = None
+class PlayCommandState:
+    """Commands and keyboard/panel synchronization for one GUI session."""
+    def __init__(self):
+        self.cmd_x = 0.0
+        self.ang_vel = 0.0
+        self.cmd_height = 0.40
+        self.running = True
+        self.turn_left_pressed = False
+        self.turn_right_pressed = False
+        self.command_source = "keyboard"
+        self.runtime_limits = None
+        self.lock = threading.RLock()
 
 
 def _panel_range(env_min_name, env_max_name, fallback):
@@ -54,36 +54,34 @@ INITIAL_CAMERA_LOOK_AT = [20.0, 40.0, 0.0]
 
 
 
-def update_yaw_cmd():
-    global ang_vel
-    if turn_left_pressed and not turn_right_pressed:
-        ang_vel = YAW_STEP
-    elif turn_right_pressed and not turn_left_pressed:
-        ang_vel = -YAW_STEP
+def update_yaw_cmd(state):
+    if state.turn_left_pressed and not state.turn_right_pressed:
+        state.ang_vel = YAW_STEP
+    elif state.turn_right_pressed and not state.turn_left_pressed:
+        state.ang_vel = -YAW_STEP
     else:
-        ang_vel = 0.0
+        state.ang_vel = 0.0
 
 
-def get_command_state():
-    with command_lock:
+def get_command_state(state):
+    with state.lock:
         return {
-            "cmd_x": float(cmd_x),
-            "ang_vel": float(ang_vel),
-            "cmd_height": float(cmd_height),
-            "source": command_source,
+            "cmd_x": float(state.cmd_x),
+            "ang_vel": float(state.ang_vel),
+            "cmd_height": float(state.cmd_height),
+            "source": state.command_source,
         }
 
 
-def get_running_state():
-    with command_lock:
-        return bool(running)
+def get_running_state(state):
+    with state.lock:
+        return bool(state.running)
 
 
-def set_panel_limits(new_limits):
+def set_panel_limits(state, new_limits):
     """Update runtime command ranges used by the panel and command clamp."""
-    global runtime_limits
-    with command_lock:
-        runtime_limits = {
+    with state.lock:
+        state.runtime_limits = {
             "cmd_x": [float(new_limits["cmd_x"][0]), float(new_limits["cmd_x"][1])],
             "ang_vel": [float(new_limits["ang_vel"][0]), float(new_limits["ang_vel"][1])],
             "cmd_height": [
@@ -91,38 +89,33 @@ def set_panel_limits(new_limits):
                 float(new_limits["cmd_height"][1]),
             ],
         }
-        return {key: list(values) for key, values in runtime_limits.items()}
+        return {key: list(values) for key, values in state.runtime_limits.items()}
 
 
-def set_panel_command(payload):
+def set_panel_command(state, payload):
     """Apply a partial command update from the local web panel."""
-    global cmd_x, ang_vel, cmd_height, command_source
-    global turn_left_pressed, turn_right_pressed
-    with command_lock:
-        had_held_turn = turn_left_pressed or turn_right_pressed
+    with state.lock:
+        had_held_turn = state.turn_left_pressed or state.turn_right_pressed
         if "cmd_x" in payload:
-            cmd_x = float(payload["cmd_x"])
+            state.cmd_x = float(payload["cmd_x"])
         if "ang_vel" in payload:
-            ang_vel = float(payload["ang_vel"])
+            state.ang_vel = float(payload["ang_vel"])
         if "cmd_height" in payload:
-            cmd_height = float(payload["cmd_height"])
+            state.cmd_height = float(payload["cmd_height"])
         # A panel/gamepad command supersedes a held A/D key until the next
         # physical key event, preventing stale keyboard state from winning.
-        turn_left_pressed = False
-        turn_right_pressed = False
+        state.turn_left_pressed = False
+        state.turn_right_pressed = False
         if had_held_turn and "ang_vel" not in payload:
-            ang_vel = 0.0
-        command_source = str(payload.get("source", "panel"))[:32]
-        return get_command_state()
+            state.ang_vel = 0.0
+        state.command_source = str(payload.get("source", "panel"))[:32]
+        return get_command_state(state)
 
 
-def on_press(key):
-    global cmd_x, ang_vel, cmd_height, running, command_source
-    global turn_left_pressed, turn_right_pressed
-
+def on_press(state, key):
     if key == keyboard.Key.esc:
-        with command_lock:
-            running = False
+        with state.lock:
+            state.running = False
         print("[CMD] quit (ESC)")
         return False
 
@@ -132,92 +125,89 @@ def on_press(key):
         return
 
     if k == "q":
-        with command_lock:
-            running = False
+        with state.lock:
+            state.running = False
         print("[CMD] quit (q)")
         return False
 
-    with command_lock:
-        command_source = "keyboard"
+    with state.lock:
+        state.command_source = "keyboard"
         if k == "w":
-            cmd_x = LIN_VEL_CMD
-            print(f"[CMD] forward: x={cmd_x:.2f}")
+            state.cmd_x = LIN_VEL_CMD
+            print(f"[CMD] forward: x={state.cmd_x:.2f}")
         elif k == "s":
-            cmd_x = -LIN_VEL_CMD
-            print(f"[CMD] backward: x={cmd_x:.2f}")
+            state.cmd_x = -LIN_VEL_CMD
+            print(f"[CMD] backward: x={state.cmd_x:.2f}")
         elif k == "a":
-            if not turn_left_pressed:
+            if not state.turn_left_pressed:
                 print("[CMD] turn left (hold)")
-            turn_left_pressed = True
-            update_yaw_cmd()
+            state.turn_left_pressed = True
+            update_yaw_cmd(state)
         elif k == "d":
-            if not turn_right_pressed:
+            if not state.turn_right_pressed:
                 print("[CMD] turn right (hold)")
-            turn_right_pressed = True
-            update_yaw_cmd()
+            state.turn_right_pressed = True
+            update_yaw_cmd(state)
         elif k == "e":
-            cmd_x = 0.0
-            turn_left_pressed = False
-            turn_right_pressed = False
-            update_yaw_cmd()
+            state.cmd_x = 0.0
+            state.turn_left_pressed = False
+            state.turn_right_pressed = False
+            update_yaw_cmd(state)
             print("[CMD] stop")
         elif k == "x":
-            cmd_height += HEIGHT_STEP
-            print(f"[CMD] height up: h={cmd_height:.2f}")
+            state.cmd_height += HEIGHT_STEP
+            print(f"[CMD] height up: h={state.cmd_height:.2f}")
         elif k == "c":
-            cmd_height -= HEIGHT_STEP
-            print(f"[CMD] height down: h={cmd_height:.2f}")
+            state.cmd_height -= HEIGHT_STEP
+            print(f"[CMD] height down: h={state.cmd_height:.2f}")
 
 
-def on_release(key):
-    global turn_left_pressed, turn_right_pressed, command_source
+def on_release(state, key):
     try:
         k = key.char.lower()
     except Exception:
         return
 
-    with command_lock:
-        command_source = "keyboard"
+    with state.lock:
+        state.command_source = "keyboard"
         if k == "a":
-            turn_left_pressed = False
-            update_yaw_cmd()
+            state.turn_left_pressed = False
+            update_yaw_cmd(state)
         elif k == "d":
-            turn_right_pressed = False
-            update_yaw_cmd()
+            state.turn_right_pressed = False
+            update_yaw_cmd(state)
     return
 
 
-def apply_manual_commands(env, env_cfg):
-    global cmd_x, ang_vel, cmd_height
-
-    with command_lock:
-        limits = runtime_limits or {
+def apply_manual_commands(state, env, env_cfg):
+    with state.lock:
+        limits = state.runtime_limits or {
             "cmd_x": env_cfg.commands.ranges.lin_vel_x,
             "ang_vel": env_cfg.commands.ranges.ang_vel_yaw,
             "cmd_height": env_cfg.commands.ranges.height,
         }
-        cmd_x = float(
+        state.cmd_x = float(
             np.clip(
-                cmd_x,
+            state.cmd_x,
                 limits["cmd_x"][0],
                 limits["cmd_x"][1],
             )
         )
-        ang_vel = float(
+        state.ang_vel = float(
             np.clip(
-                ang_vel,
+            state.ang_vel,
                 limits["ang_vel"][0],
                 limits["ang_vel"][1],
             )
         )
-        cmd_height = float(
+        state.cmd_height = float(
             np.clip(
-                cmd_height,
+            state.cmd_height,
                 limits["cmd_height"][0],
                 limits["cmd_height"][1],
             )
         )
-        local_cmd_x, local_ang_vel, local_cmd_height = cmd_x, ang_vel, cmd_height
+        local_cmd_x, local_ang_vel, local_cmd_height = state.cmd_x, state.ang_vel, state.cmd_height
 
     env.commands[:, 2] = local_cmd_height
 
@@ -241,7 +231,7 @@ def apply_manual_commands(env, env_cfg):
 
 def play(args):
     task_registry = create_task_registry()
-    global running, runtime_limits
+    state = PlayCommandState()
 
     print("\n====== Keyboard Control Mode (NO Enter) ======")
     print("w      : forward")
@@ -255,7 +245,10 @@ def play(args):
     print("camera : fixed overview")
     print("=============================================\n")
 
-    listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+    listener = keyboard.Listener(
+        on_press=lambda key: on_press(state, key),
+        on_release=lambda key: on_release(state, key),
+    )
     listener.start()
 
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
@@ -281,8 +274,8 @@ def play(args):
     # The checkpoint was trained with a narrow height range ([0.40, 0.40]),
     # which made the original panel height slider appear locked.  These are
     # play-time limits only; the training configuration is not modified.
-    with command_lock:
-        runtime_limits = {
+    with state.lock:
+        state.runtime_limits = {
             "cmd_x": _panel_range(
                 "WHEEL_LEG_PANEL_X_MIN",
                 "WHEEL_LEG_PANEL_X_MAX",
@@ -304,7 +297,7 @@ def play(args):
     if getattr(env, "viewer", None) is not None:
         env.set_camera(INITIAL_CAMERA_POSITION, INITIAL_CAMERA_LOOK_AT)
 
-    apply_manual_commands(env, env_cfg)
+    apply_manual_commands(state, env, env_cfg)
     obs, obs_history = env.get_observations()
 
     train_cfg.runner.resume = True
@@ -337,16 +330,16 @@ def play(args):
         try:
             panel_port = int(os.environ.get("WHEEL_LEG_PANEL_PORT", "8765"))
             panel = WebPanelServer(
-                command_getter=get_command_state,
-                command_setter=set_panel_command,
+                command_getter=lambda: get_command_state(state),
+                command_setter=lambda payload: set_panel_command(state, payload),
                 telemetry=telemetry,
                 limits={
-                    "cmd_x": runtime_limits["cmd_x"],
-                    "ang_vel": runtime_limits["ang_vel"],
-                    "cmd_height": runtime_limits["cmd_height"],
+                    "cmd_x": state.runtime_limits["cmd_x"],
+                    "ang_vel": state.runtime_limits["ang_vel"],
+                    "cmd_height": state.runtime_limits["cmd_height"],
                 },
-                running_getter=get_running_state,
-                limits_setter=set_panel_limits,
+                running_getter=lambda: get_running_state(state),
+                limits_setter=lambda limits: set_panel_limits(state, limits),
                 metadata={
                     "task": getattr(args, "task", "wheel_legged"),
                     "experiment_name": getattr(args, "experiment_name", ""),
@@ -360,15 +353,15 @@ def play(args):
 
     i = 0
     try:
-        while running and i < 100000:
-            apply_manual_commands(env, env_cfg)
+        while get_running_state(state) and i < 100000:
+            apply_manual_commands(state, env, env_cfg)
             if is_sequence_policy:
                 actions, _ = policy(obs, obs_history)
             else:
                 actions = policy(obs)
 
             obs, _, _, _, _, obs_history = env.step(actions)
-            apply_manual_commands(env, env_cfg)
+            apply_manual_commands(state, env, env_cfg)
 
             if i % 5 == 0:
                 telemetry.append(

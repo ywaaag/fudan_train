@@ -216,7 +216,6 @@
     "wheel_legged_gym.ports.processes": "plane/wheel_legged_gym/ports/processes.py",
     "wheel_legged_gym.scripts.evaluate_policy_comparison": "plane/wheel_legged_gym/scripts/evaluate_policy_comparison.py",
     "wheel_legged_gym.scripts.evaluate_standing": "plane/wheel_legged_gym/scripts/evaluate_standing.py",
-    "wheel_legged_gym.scripts.export_encoder_jit": "plane/wheel_legged_gym/scripts/export_encoder_jit.py",
     "wheel_legged_gym.scripts.isaac_command_grid": "plane/wheel_legged_gym/scripts/isaac_command_grid.py",
     "wheel_legged_gym.scripts.isaac_parity_trace": "plane/wheel_legged_gym/scripts/isaac_parity_trace.py",
     "wheel_legged_gym.scripts.play": "plane/wheel_legged_gym/scripts/play.py",

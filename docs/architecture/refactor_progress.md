@@ -1,5 +1,33 @@
 # 架构重构证据与交接
 
+## 2026-09-24 阶段96：GUI播放命令状态实例化
+
+- 修改 `plane/wheel_legged_gym/scripts/play.py`：新增PlayCommandState，每次play会话独立
+  持有命令、按键、running、RLock和panel limits；keyboard、web panel和仿真循环通过显式
+  lambda/参数绑定访问。保持w/s/a/d/e/x/c行为、互斥转向、panel抢占、环境变量范围、
+  jump ramp及相机参数不变；训练domain不读取GUI状态。
+- 新增 `plane/tests/test_play_state_boundary.py`，静态验证状态字段、回调首参和模块级状态
+  缺失；不启动Isaac、pynput或GUI。更新play_gui指南、ARCHITECTURE、completion_audit、
+  依赖JSON及本记录。
+- 652项基线加本轮测试后全套654 passed、2 warnings；静态243模块1027边，循环/层级/
+  仿真导入/缺失本地模块均为0；未启动GUI、训练、仿真或通知。
+- 当前剩余项收窄为第三方运行时边界、最终全仓库动态审计、代表性统一smoke/验收和Git
+  收尾；goal仍保持active。
+
+## 2026-09-24 阶段95：移除未使用的135D导出副作用并记录GUI边界
+
+- 核对 `scripts/export_encoder_jit.py`：仓库无调用方，使用旧27D×5=135D输入、硬编码
+  `/root/gpufree-data`路径，导入即读checkpoint/写JIT，与当前25D/125D/6D契约无关。
+  按用户取消旧用法兼容要求删除运行文件，将原始字节精确归档到
+  `docs/history/export_encoder_jit_135.py.txt`（长度1436、SHA256
+  6bb9bddc765d7f98322a5c647063396a4ee0ce8e3f68e809ef70fd080bd87fde）；当前ONNX入口不变。
+- AST扫描确认 `scripts/play.py` 的GUI模块级命令状态/RLock/runtime_limits仍是唯一明确的
+ 训练仓库共享可变交互状态缺口；新增 `docs/modules/play_gui.md`记录所有权、迁移计划和
+ 交互测试要求，不在无GUI测试情况下修改它。
+- 更新compatibility、ARCHITECTURE、completion_audit、依赖JSON及本记录。全套652 passed、
+  2 warnings；静态243模块1027边四类违规为空；未训练/启动GUI/通知。
+  Goal仍未完成，下一项是GUI状态迁移或最终在有合适测试时明确其边界。
+
 ## 2026-09-24 阶段94：共享常量冻结与GUI全局状态缺口确认
 
 - AST扫描包内模块顶层可变集合/调用，发现FUDAN_SCALES和TERMINAL仍可跨调用修改。
