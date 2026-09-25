@@ -16,6 +16,7 @@ MuJoCo的after_step已移除，测量只使用on_measurement快照。
 | utils/helpers.py（已移除） | contracts.config_serialization、app.arguments/random_seed、adapters.artifacts及adapters.isaacgym责任模块 |
 | utils/task_registry、utils/terrain（已移除） | app.task_registry、adapters.isaacgym.terrain_generation |
 | tools/run_motion_goal.py | app.motion_supervisor |
+| scripts/export_encoder_jit.py（已移除） | 135D旧脚本原文归docs/history/export_encoder_jit_135.py.txt；当前完整策略使用plane/export_onnx/export_onnx.py及verify_onnx.py |
 | tools/run_candidate_closed_review.py | app.candidate_closed_review；门槛归evaluation.closed_precheck |
 | tools/audit_stand_push、continue_stand_validated、run_low_speed、stand_long_guard | app同名main(root)，导入无任务副作用 |
 | tools/probe_closed_initialization、probe_tree_ramp、audit_closed_mapping | adapters.mujoco进程接口 |
