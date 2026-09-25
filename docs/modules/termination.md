@@ -1,0 +1,12 @@
+# 终止判定与reset执行分离
+
+`domain/termination.check_termination`接收显式张量、配置、地形边界和TerminationState，
+更新fail/timeout/edge/reset及method streak。没有Gym调用，不执行重置、不修改命令。
+环境check_termination负责传入状态并显式接收输出，reset_idx仍拥有后续生命周期。
+
+保留的关键语义：timeout使用严格大于max_episode_length；method有接触warmup和streak，
+stand不因双轮短暂失去接触触发wheel_loss；legacy failure计数达到时间阈值才reset。
+heightfield/trimesh计算边界，其余mesh类型保留原edge buffer；timeout不能当作跌倒。
+
+test_termination_equivalence.py直接执行新环境方法，与冻结旧方法对照8种模式、每种5步，
+比较所有状态张量。阈值和各逻辑运算顺序未优化或统一，禁止把架构重构当成放宽保护。

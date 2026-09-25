@@ -1,172 +1,67 @@
-# 自有机器人 Fudan Isaac Gym 独立训练仓库
+# Fudan轮腿机器人训练
 
-这个仓库是从已验证的 `/home/kellen/fudan_rl_wheel_leg/plane` 独立复制的
-第一阶段训练线。原 Fudan 目录保持不变，便于随时复现参考结果。
+基于Isaac Gym Preview 4训练自有六DOF树模型策略，评估checkpoint并导出ONNX。
+完整闭链MuJoCo验证由独立的`/home/kellen/wheel_leg_sim2sim`仓库负责。
 
-## 当前交接状态
+## 从哪里开始
 
-**2026-09-20 夜间结果：** 30轮短训后，model6900通过前后±4m/s、原地±4rad/s及
-低速组合转弯的固定命令三种子验收（93/93），ONNX一致性通过。高速后退转弯仍未达标，
-连续三轮改善不足已自动暂停；动态切换和sim2sim未完成。
-模型路径、进步原因、此前实现错误和证据边界见 [夜间训练复盘](docs/overnight_motion_goal.md)。
+- 修改代码：先读[ARCHITECTURE](ARCHITECTURE.md)，再读目标模块指南；不依赖历史聊天。
+- 协作约束：[AGENTS](AGENTS.md)。架构等价重构进行中，不自动恢复长训练。
+- 重构进度：[改动与验证](docs/architecture/refactor_progress.md)、[完整验收台账](docs/architecture/completion_audit.md)。
+- 模型证据：[动态启停记录](docs/dynamic_start_stop.md)、[模型分支](docs/model_branches.md)。
+  文档是对应日期的实验记录，模型编号或reward上涨不等于当前验收通过。
+- 运行命令：[COMMANDS](COMMANDS.md)；当前CLI路径保留，已删除的Python旧入口见[迁移表](docs/modules/compatibility.md)。历史续训示例不是新训练授权。
 
-**2026-09-20：LEGACY_SPEED2_STOP v2 model1400 已通过0/±0.5/±1/±1.5/±2m/s三seed全部27项稳态验收。**
-路径：`plane/logs/wheel_legged/Sep19_23-08-55_legacy_speed2_stop_20260919_230848/model_1400.pt`。
-ONNX一致性通过。−1m/s误差接近门槛；尚未通过yaw、转弯、反向切换或sim2sim。
-旧model700保留。见 [最新平移阶段结果及上一轮实现错误](docs/legacy_speed2_stop.md)。下文为历史实验记录。
+## 目录与责任
 
-**最新 encoder 配对消融已完成：** 同源冻结/更新各500 iteration。冻结组末尾失稳，
-更新组更稳定但仍未通过完整±1验收；保留原model100低速候选。新增逐命令加权统计，
-诊断未改变更新组训练结果。见 [encoder对照结论](docs/encoder_ablation.md)。
-
-由于本项目移植自 `fudan_rl_wheel_leg`，已完成原项目与当前实现的契约审计；两者的
-asset、初始状态、wheel PD、reward、command 和 PPO 配置并不等价。见
-[移植契约对照](docs/source_contract_migration.md)。
-
-已完成 `LEGACY_URDF` 配置对照：原始 reward/PPO 在当前 URDF 上改善了前进，但 zero/reverse
-仍失败，不能直接替代当前主线。见 [对照结果](docs/legacy_urdf_ablation.md)。
-
-**最新 ±1 m/s 续训已完成但未通过。** H3_SPEED1追加500 iteration并检查全部保存点；
-model200保留低速、改善+1，但-1不足；model600停车和+0.5退化。
-仍保留下面的model100低速候选，训练已暂停，见 [±1课程结果](docs/h3_speed1.md)。
-
-**2026-09-19 最新：H3 低速迁移短训完成。**
-`Sep19_09-17-38_h3_low_speed_20260919_091730/model_100.pt` 已通过三种子
-`0、±0.5 m/s` 验收（9/9），选为当前低速候选；ONNX 数值一致性通过。
-±1 m/s 尚未通过，未自动升速。见 [本轮记录](docs/h3_low_speed_migration.md)。
-
-此前完成 8 个候选的统一验收（48 组、240 项）。当时推荐的运动迁移起点为
-`Sep05_17-41-43_H3_from_H2_best_v1/model_15800.pt`；站立参考仍保留
-`Sep18_21-21-37_stand_validated_20260918_212129/model_3100.pt`。
-这批旧候选均未通过完整初始门槛；两条失败的 LOW_SPEED run 不继续盲目延长。
-
-- [当前验收结论与复现方法](docs/policy_version_comparison.md)
-- [模型分支、继承关系和全量 checkpoint 清单](docs/model_branches.md)
-
-重构历史见 [`HANDOFF_METHOD_V1.md`](HANDOFF_METHOD_V1.md)。其中早期 ±2/±3 课程进度
-不是当前验收结论；下面保留的旧启动示例也不作为本次推荐训练命令。
-
-  cd /home/kellen/fudan_train/plane
-
-  source /home/kellen/anaconda3/etc/profile.d/conda.sh
-  conda activate fudan_leg
-
-  export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
-  export PYTHONPATH=/home/kellen/fudan_train/plane
-  export CUDA_VISIBLE_DEVICES=0
-
-  python wheel_legged_gym/scripts/train.py \
-    --task=wheel_legged \
-    --headless \
-    --num_envs=4096 \
-    --resume \
-    --load_run=Sep05_16-07-37_v4 \
-    --checkpoint=15600 \
-    --policy_experiment=H7 \
-    --max_iterations=3000 \
-    --run_name=H7_fixed_3ms_v1
-
-
-
-
-  source /home/kellen/anaconda3/etc/profile.d/conda.sh
-  conda activate fudan_leg
-
-  tensorboard \
-    --logdir=/home/kellen/fudan_train/plane/logs/wheel_legged \
-    --port=6006 \
-    --bind_all \
-    --reload_interval=5 \
-    --load_fast=false
-
-
-## Asset
-
-训练资产是 `assets/wheel_leg_train.urdf`：
-
-- 6 个 scalar DOF；
-- 4 个腿 position target，2 个轮 velocity target；
-- 25D observation，5 帧 history（125D）；
-- 质量总和与 `wheeled_infantry.xml` 的 compiled MJCF 一致；
-- 被动五连杆和导向轮固定在名义姿态；
-- 完整闭链模型仍使用项目根目录的 `wheeled_infantry.xml`，只用于后续 MuJoCo sim2sim。
-
-该 URDF 是训练近似模型，不是最终闭链动力学模型。完整命令请见
-[`COMMANDS.md`](COMMANDS.md)。
-
-## Environment
-
-使用旧版独立环境，不要在 Isaac Lab 环境中运行：
-
-```bash
-conda activate fudan_leg
-export LD_LIBRARY_PATH=/home/kellen/anaconda3/envs/fudan_leg/lib:${LD_LIBRARY_PATH:-}
-export PYTHONPATH=/home/kellen/isaacgym/isaacgym/python
-cd /home/kellen/fudan_train/plane
-python -m pip install --no-deps -e .
+```text
+plane/wheel_legged_gym/
+  contracts/       配置结构与序列化
+  experiments/     显式输入的实验配方
+  domain/          命令、奖励、几何、观测与终止计算
+  learning/        网络、PPO、rollout存储和训练循环
+  evaluation/      验收门槛、动态响应与候选评分
+  ports/           工作流所需进程、artifact、通知接口
+  adapters/        Isaac Gym、MuJoCo进程、文件及消息实现
+  workflows/       评估、导出、报告等用例
+  app/             CLI配置与依赖组装
+  envs/            现有环境协调器（配置归contracts，实验归experiments）
+  scripts/         原训练/评估/GUI入口
+plane/tests/       回归与架构测试
+plane/export_onnx/ 原ONNX导出/核验入口
+assets/            固定机器人资产
+plane/logs/        原checkpoint与训练日志，禁止整体清理
+plane/outputs/     验收结果与重构证据，保留旧结果
+tools/            仓库CLI与尚待迁移的历史监督器
+docs/             模块指南、实验记录、架构图及历史归档
 ```
 
-## Smoke training
+目录迁移尚未全部结束；剩余职责以验收台账为准。依赖箭头和允许方向见ARCHITECTURE，
+静态边及源码行号见[dependencies.json](docs/architecture/dependencies.json)。
+跨仓库进程接口见[process_interfaces.json](docs/architecture/process_interfaces.json)。
+
+## 固定策略接口
+
+观测25D；history五帧125D，oldest→newest；动作6D，left-first。
+腿为position target，轮为velocity target，由混合PD产生torque。
+训练physics dt=0.005s、decimation=2。完整scale、gains与limits见AGENTS；本轮不调整。
+
+## 只读检查与测试
 
 ```bash
-mkdir -p logs/wheel_legged
-python wheel_legged_gym/scripts/train.py \
-  --task=wheel_legged --headless --num_envs=64 \
-  --max_iterations=10 --seed=7 --run_name=self_urdf_smoke
+cd /home/kellen/fudan_train
+python3 tools/check_architecture.py
+PYTHONPATH=/home/kellen/fudan_train/plane \
+LD_LIBRARY_PATH=/home/kellen/anaconda3/envs/fudan_leg/lib \
+/home/kellen/anaconda3/envs/fudan_leg/bin/python -m pytest plane/tests -q
 ```
 
-本次已验证通过。每次训练会按时间戳建立 run 目录，可用下面的命令找到最新 checkpoint：
+训练/Isaac评估必须使用`fudan_leg`；MuJoCo公开验证入口使用`robot`。
+这些检查命令不启动长训练。完整仿真结果、checkpoint和ONNX等价证据另见重构记录。
 
-```bash
-find logs/wheel_legged -maxdepth 2 -name 'model_10.pt' -printf '%h/%f\n' | sort
-```
+## 历史记录
 
-这只证明资产加载、reset、rollout、PPO update 和 checkpoint 正常，不能视为策略已经学会，也不能用于实机。
-
-## 可视化检查
-
-将 `<run_name>` 替换为 `find` 输出的目录名（例如
-`Aug29_21-31-42_self_urdf_final_smoke`）：
-
-```bash
-python wheel_legged_gym/scripts/play.py \
-  --task=wheel_legged --experiment_name=wheel_legged \
-  --load_run=<run_name> --checkpoint=10
-```
-
-## Next run
-
-先用 `logs/wheel_legged/.../model_10.pt` 做有限 play/可视化检查，再决定是否增加到 100～500 iterations。每次只改一个变量；不要同时改资产、PD、reward 和 PPO。
-
-训练前必须确认：默认姿态、左右对称、轮子接地、六个关节动作方向和关节极限。当前树状 URDF 的轮半径约为 `0.06 m`，默认零关节姿态下轮心相对 base 约为 `-0.33993 m`，因此目标车高保持 `0.40 m`，避免轮子穿入地面后被接触求解器锁死。若要研究 `0.30 m`，必须先定义对应的腿关节默认角和可行工作空间。正式 sim2sim 前还要在完整 MJCF 中实现闭链约束误差和虚拟串联力矩映射验证。
-
-## Source
-
-参考实现来源：Fudan `fudan_rl_wheel_leg`，commit
-`8204e853dfd2ed06d85a322e1a998c3d20a3be2c`。本副本的自有资产生成器为
-`tools/build_tree_urdf.py`。
-
-## MuJoCo sim2sim
-
-The independent MuJoCo validation runners are kept in the sibling repository
-`/home/kellen/wheel_leg_sim2sim`; this repository contains the training tree
-model and its parity asset only.
-Its current leg adapter is intentionally approximate and must not be treated as
-the final parallel-link torque mapping.
-
-Solver settings can be compared explicitly:
-
-```bash
-cd /home/kellen/wheel_leg_sim2sim
-python sim2sim_closed_policy.py --help
-```
-
-The runner prints `closure_max` in metres. A lower timestep and higher solver
-iterations reduce numerical closure residual, but do not replace the required
-active-link torque mapping.
-
-The current 20-second headless zero-command acceptance reached 20,000 physics
-steps with two wheel-ground contacts, zero base-ground contacts, symmetric
-support, and `closure_max` about 1.13 mm. Motion-command sim2sim remains an
-open follow-up; the present static trim/command gate is explicitly an adapter
-baseline, not the final locomotion controller.
+此前根README中的模型快照、旧启动命令和说明完整保存在
+[README原文归档](docs/history/README_before_architecture_20260923.md)。
+[原AGENTS交接快照](docs/history/AGENTS_before_architecture_20260923.md)保留历史上下文。
+历史文件里的“当前/最新”只代表当时记录；以当前源码、配置和具体run manifest为准。

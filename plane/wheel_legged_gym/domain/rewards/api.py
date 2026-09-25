@@ -1,0 +1,66 @@
+"""Public reward API. Immutable dispatch preserves explicit supported equation names."""
+from types import MappingProxyType
+from .inputs import RewardInputs
+from . import equations
+
+EQUATIONS = MappingProxyType({
+    "_method_task_gate": equations._method_task_gate,
+    "_method_wheel_terms": equations._method_wheel_terms,
+    "_reward_track_vx_coarse": equations._reward_track_vx_coarse,
+    "_reward_track_vx_fine": equations._reward_track_vx_fine,
+    "_reward_track_vx_gap": equations._reward_track_vx_gap,
+    "_reward_track_yaw_coarse": equations._reward_track_yaw_coarse,
+    "_reward_track_yaw_fine": equations._reward_track_yaw_fine,
+    "_reward_track_yaw_gap": equations._reward_track_yaw_gap,
+    "_reward_height_cost": equations._reward_height_cost,
+    "_reward_lateral_velocity": equations._reward_lateral_velocity,
+    "_reward_wheel_slip": equations._reward_wheel_slip,
+    "_reward_airborne_wheel_spin": equations._reward_airborne_wheel_spin,
+    "_reward_wheel_contact_loss": equations._reward_wheel_contact_loss,
+    "_reward_forbidden_contact": equations._reward_forbidden_contact,
+    "_reward_torque_cost": equations._reward_torque_cost,
+    "_reward_power_cost": equations._reward_power_cost,
+    "_reward_action_second_diff": equations._reward_action_second_diff,
+    "_reward_lin_vel_z": equations._reward_lin_vel_z,
+    "_reward_ang_vel_xy": equations._reward_ang_vel_xy,
+    "_reward_orientation": equations._reward_orientation,
+    "_reward_base_height": equations._reward_base_height,
+    "_reward_base_height_enhance": equations._reward_base_height_enhance,
+    "_reward_torques": equations._reward_torques,
+    "_reward_power": equations._reward_power,
+    "_reward_dof_vel": equations._reward_dof_vel,
+    "_reward_dof_acc": equations._reward_dof_acc,
+    "_reward_action_rate": equations._reward_action_rate,
+    "_reward_action_smooth": equations._reward_action_smooth,
+    "_reward_collision": equations._reward_collision,
+    "_reward_termination": equations._reward_termination,
+    "_reward_dof_pos_limits": equations._reward_dof_pos_limits,
+    "_reward_dof_vel_limits": equations._reward_dof_vel_limits,
+    "_reward_torque_limits": equations._reward_torque_limits,
+    "_reward_tracking_lin_vel": equations._reward_tracking_lin_vel,
+    "_reward_tracking_lin_vel_enhance": equations._reward_tracking_lin_vel_enhance,
+    "_reward_high_speed_tracking": equations._reward_high_speed_tracking,
+    "_reward_high_speed_yaw_tracking": equations._reward_high_speed_yaw_tracking,
+    "_reward_high_speed_yaw_penalty": equations._reward_high_speed_yaw_penalty,
+    "_reward_high_speed_slip": equations._reward_high_speed_slip,
+    "_reward_tracking_ang_vel": equations._reward_tracking_ang_vel,
+    "_reward_tracking_ang_vel_enhance": equations._reward_tracking_ang_vel_enhance,
+    "_zero_command_mask": equations._zero_command_mask,
+    "_reward_zero_base_velocity": equations._reward_zero_base_velocity,
+    "_reward_zero_wheel_velocity": equations._reward_zero_wheel_velocity,
+    "_reward_low_speed_tracking": equations._reward_low_speed_tracking,
+    "_reward_zero_yaw_wheel_symmetry": equations._reward_zero_yaw_wheel_symmetry,
+    "_reward_theta0_equ_0": equations._reward_theta0_equ_0,
+    "_reward_tracking_lin_vel_pbrs": equations._reward_tracking_lin_vel_pbrs,
+    "_reward_tracking_ang_vel_pbrs": equations._reward_tracking_ang_vel_pbrs,
+    "_reward_stumble": equations._reward_stumble,
+    "_reward_stand_still": equations._reward_stand_still,
+    "_reward_stand_bilateral_geometry": equations._reward_stand_bilateral_geometry,
+    "_reward_nominal_state": equations._reward_nominal_state,
+    "_reward_feet_contact_forces": equations._reward_feet_contact_forces,
+})
+
+
+def evaluate(name: str, inputs: RewardInputs):
+    """Compute one reward from an explicit state snapshot, without simulator access."""
+    return EQUATIONS[name](inputs)

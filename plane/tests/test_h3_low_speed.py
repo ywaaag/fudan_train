@@ -1,8 +1,8 @@
 import isaacgym
 import pytest
-from wheel_legged_gym.envs.wheel_legged.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import apply_policy_experiment
-from wheel_legged_gym.envs.wheel_legged.h3_low_speed import validate_source
+from wheel_legged_gym.contracts.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
+from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
+from wheel_legged_gym.adapters.artifacts.legacy_sources import validate_h3_low_speed_source as validate_source
 
 
 def test_h3_migration_preserves_low_speed_objective():

@@ -6,6 +6,8 @@ physics timestep/decimation and disables stochastic evaluation features.
 
 from __future__ import annotations
 
+from wheel_legged_gym.adapters.isaacgym.evaluation_setup import build_evaluation_args, disable_evaluation_randomization
+
 import argparse
 import json
 from pathlib import Path
@@ -17,67 +19,19 @@ import numpy as np
 import onnxruntime as ort
 import torch
 
-from wheel_legged_gym.envs import *  # noqa: F401,F403
-from wheel_legged_gym.utils import task_registry
+from wheel_legged_gym.app.bootstrap import create_task_registry
 
 
 PLANE_ROOT = Path(__file__).resolve().parents[2]
 POLICY = PLANE_ROOT / "outputs/wheel_policy_2900.onnx"
 
 
-def _gym_args() -> SimpleNamespace:
-    return SimpleNamespace(
-        task="wheel_legged",
-        sim_device="cuda:0",
-        sim_device_type="cuda",
-        sim_device_id=0,
-        compute_device_id=0,
-        graphics_device_id=-1,
-        physics_engine=gymapi.SIM_PHYSX,
-        use_gpu=True,
-        use_gpu_pipeline=True,
-        pipeline="gpu",
-        subscenes=0,
-        num_threads=0,
-        headless=True,
-        rl_device="cuda:0",
-        num_envs=1,
-        seed=1,
-        max_iterations=None,
-        resume=False,
-        experiment_name=None,
-        run_name=None,
-        load_run=None,
-        checkpoint=None,
-        horovod=False,
-        exptid="",
-    )
 
 
-def _disable_randomization(cfg) -> None:
-    cfg.noise.add_noise = False
-    names = (
-        "randomize_friction",
-        "randomize_restitution",
-        "randomize_base_mass",
-        "randomize_inertia",
-        "randomize_base_com",
-        "randomize_Kp",
-        "randomize_Kd",
-        "randomize_motor_torque",
-        "randomize_default_dof_pos",
-        "randomize_action_delay",
-        "push_robots",
-        "lift_robots",
-        "downward_impulse_robots",
-        "vmc_force_events",
-    )
-    for name in names:
-        if hasattr(cfg.domain_rand, name):
-            setattr(cfg.domain_rand, name, False)
 
 
 def run(policy_path: Path, policy_steps: int, command: np.ndarray, log_every: int) -> dict:
+    task_registry = create_task_registry()
     if policy_steps < 1:
         raise ValueError("policy_steps must be positive")
     env_cfg, _ = task_registry.get_cfgs(name="wheel_legged")
@@ -89,9 +43,9 @@ def run(policy_path: Path, policy_steps: int, command: np.ndarray, log_every: in
     env_cfg.commands.ranges.lin_vel_x = [float(command[0]), float(command[0])]
     env_cfg.commands.ranges.ang_vel_yaw = [float(command[1]), float(command[1])]
     env_cfg.commands.ranges.height = [float(command[2]), float(command[2])]
-    _disable_randomization(env_cfg)
+    disable_evaluation_randomization(env_cfg)
 
-    env, _ = task_registry.make_env(name="wheel_legged", args=_gym_args(), env_cfg=env_cfg)
+    env, _ = task_registry.make_env(name="wheel_legged", args=build_evaluation_args(), env_cfg=env_cfg)
     env.reset()
     obs, history = env.get_observations()
     session = ort.InferenceSession(str(policy_path), providers=["CPUExecutionProvider"])
@@ -188,6 +142,8 @@ def main() -> None:
         np.array([args.forward, args.yaw, args.height], dtype=np.float64),
         args.log_every,
     )
+
+
 
 
 if __name__ == "__main__":

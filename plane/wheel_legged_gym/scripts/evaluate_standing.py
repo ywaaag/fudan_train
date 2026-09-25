@@ -8,16 +8,17 @@ import isaacgym  # must precede torch
 import torch
 from isaacgym import gymtorch
 from isaacgym.torch_utils import quat_rotate_inverse
-from wheel_legged_gym.envs import *
-from wheel_legged_gym.utils import task_registry
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import (
-    apply_training_profile, _apply_method_randomization,
+from wheel_legged_gym.app.bootstrap import create_task_registry
+from wheel_legged_gym.experiments.primitives import (
+    apply_method_randomization,
 )
-from wheel_legged_gym.scripts.isaac_parity_trace import _gym_args, _disable_randomization
-from wheel_legged_gym.scripts.isaac_command_grid import load_policy
+from wheel_legged_gym.app.experiment_inputs import apply_training_profile
+from wheel_legged_gym.adapters.isaacgym.evaluation_setup import build_evaluation_args, disable_evaluation_randomization
+from wheel_legged_gym.adapters.isaacgym.policy_io import load_policy
 
 
 def main():
+    task_registry = create_task_registry()
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--checkpoint', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
@@ -38,12 +39,12 @@ def main():
         parser.error('push-delta-v must be within [0,0.5]')
     cfg, train = task_registry.get_cfgs(name='wheel_legged')
     if opts.profile != 'method_v1':
-        from wheel_legged_gym.envs.wheel_legged.policy_experiments import apply_policy_experiment
+        from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
         apply_policy_experiment(cfg, opts.profile, train)
     else:
         apply_training_profile(cfg, train, phase='stand', level=0)
-    _disable_randomization(cfg)
-    _apply_method_randomization(cfg, opts.randomization_level)
+    disable_evaluation_randomization(cfg)
+    apply_method_randomization(cfg, opts.randomization_level)
     cfg.domain_rand.push_robots = False  # audit uses an explicit reproducible schedule
     cfg.env.num_envs = opts.num_envs
     cfg.env.episode_length_s = opts.seconds + 10
@@ -55,7 +56,7 @@ def main():
         cfg.commands.sampling_strategy = 'uniform'
         cfg.commands.ranges.lin_vel_x = [opts.vx, opts.vx]
         cfg.commands.ranges.ang_vel_yaw = [0., 0.]
-    args = _gym_args()
+    args = build_evaluation_args()
     if opts.gui:
         args.headless = False
         args.graphics_device_id = 0

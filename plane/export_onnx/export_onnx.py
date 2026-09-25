@@ -3,7 +3,7 @@ import argparse
 import torch
 import torch.nn as nn
 
-from wheel_legged_gym.rsl_rl.modules.actor_critic_sequence import ActorCriticSequence
+from wheel_legged_gym.learning.modules.actor_critic_sequence import ActorCriticSequence
 
 # =============================
 # 配置（与你原来一致）

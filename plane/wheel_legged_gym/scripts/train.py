@@ -34,20 +34,19 @@ import json
 from datetime import datetime
 
 import isaacgym
-from wheel_legged_gym.envs import *
-from wheel_legged_gym.utils import get_args, task_registry
+from wheel_legged_gym.app.bootstrap import create_task_registry
+from wheel_legged_gym.app.arguments import get_args
 import torch
 from pathlib import Path
 
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import (
-    apply_training_profile,
-    apply_policy_experiment,
-    enforce_optimizer_overrides,
-    write_experiment_manifest,
-)
+from wheel_legged_gym.app.experiment_inputs import apply_training_profile
+from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
+from wheel_legged_gym.app.optimizer_overrides import enforce_optimizer_overrides
+from wheel_legged_gym.adapters.artifacts.experiment_manifest import write_experiment_manifest
 
 
 def train(args):
+    task_registry = create_task_registry()
     if str(args.policy_experiment).upper() == 'FUDAN_STAND' and args.resume:
         raise ValueError('FUDAN_STAND reproduction starts from scratch; use a new run without --resume')
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
@@ -64,7 +63,7 @@ def train(args):
             # Full resume is safe only within the same recorded experiment.
             # Validate before allocating the simulator or loading optimizer state.
             from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
-            from wheel_legged_gym.utils import get_load_path
+            from wheel_legged_gym.adapters.artifacts.checkpoints import get_load_path
             root = Path(WHEEL_LEGGED_GYM_ROOT_DIR) / 'logs' / (args.experiment_name or train_cfg.runner.experiment_name)
             checkpoint = Path(get_load_path(str(root), load_run=args.load_run, checkpoint=args.checkpoint))
             previous = json.loads((checkpoint.parent / 'policy_experiment.json').read_text())
@@ -79,46 +78,46 @@ def train(args):
         manifest = apply_policy_experiment(env_cfg, args.policy_experiment, train_cfg)
     if str(args.policy_experiment).upper() in {'MOTION_GOAL','HEIGHT_COURSE'}:
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
-        from wheel_legged_gym.utils import get_load_path
-        from wheel_legged_gym.envs.wheel_legged.motion_goal import validate_source
+        from wheel_legged_gym.adapters.artifacts.checkpoints import get_load_path
+        from wheel_legged_gym.app.experiment_inputs import validate_motion_source as validate_source
         if str(args.policy_experiment).upper() == 'HEIGHT_COURSE':
-            from wheel_legged_gym.envs.wheel_legged.height_course import validate_source
+            from wheel_legged_gym.app.experiment_inputs import validate_height_source as validate_source
         root=Path(WHEEL_LEGGED_GYM_ROOT_DIR)/'logs'/(args.experiment_name or train_cfg.runner.experiment_name)
         checkpoint=Path(get_load_path(str(root),load_run=args.load_run,checkpoint=args.checkpoint))
         manifest.update(validate_source(checkpoint,args.resume,args.resume_mode,env_cfg))
         matching_resume=True
     if str(args.policy_experiment).upper() in {'LEGACY_ANCHORS','LEGACY_SPEED2','LEGACY_SPEED2_STOP','LEGACY_YAW'}:
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
-        from wheel_legged_gym.utils import get_load_path
-        from wheel_legged_gym.envs.wheel_legged.legacy_anchors import validate_source
+        from wheel_legged_gym.adapters.artifacts.checkpoints import get_load_path
+        from wheel_legged_gym.adapters.artifacts.legacy_sources import validate_legacy_anchors_source as validate_source
         if str(args.policy_experiment).upper() == 'LEGACY_SPEED2':
-            from wheel_legged_gym.envs.wheel_legged.legacy_speed2 import validate_source
+            from wheel_legged_gym.adapters.artifacts.legacy_sources import validate_legacy_speed2_source as validate_source
         if str(args.policy_experiment).upper() == 'LEGACY_SPEED2_STOP':
-            from wheel_legged_gym.envs.wheel_legged.legacy_speed2_stop import validate_source
+            from wheel_legged_gym.adapters.artifacts.legacy_sources import validate_legacy_speed2_stop_source as validate_source
         if str(args.policy_experiment).upper() == 'LEGACY_YAW':
-            from wheel_legged_gym.envs.wheel_legged.legacy_yaw import validate_source
+            from wheel_legged_gym.adapters.artifacts.legacy_sources import validate_legacy_yaw_source as validate_source
         root=Path(WHEEL_LEGGED_GYM_ROOT_DIR)/'logs'/(args.experiment_name or train_cfg.runner.experiment_name)
         checkpoint=Path(get_load_path(str(root),load_run=args.load_run,checkpoint=args.checkpoint))
         manifest.update(validate_source(checkpoint,args.resume,args.resume_mode,env_cfg))
         matching_resume=True
     if str(args.policy_experiment).upper() in {'EXPLORE_STOP_RETENTION','EXPLORE_CLEAN_OBS'}:
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
-        from wheel_legged_gym.utils import get_load_path
-        from wheel_legged_gym.envs.wheel_legged.stop_retention import validate_source
+        from wheel_legged_gym.adapters.artifacts.checkpoints import get_load_path
+        from wheel_legged_gym.adapters.artifacts.legacy_sources import validate_stop_retention_source as validate_source
         root = Path(WHEEL_LEGGED_GYM_ROOT_DIR) / 'logs' / (args.experiment_name or train_cfg.runner.experiment_name)
         checkpoint = Path(get_load_path(str(root), load_run=args.load_run, checkpoint=args.checkpoint))
         manifest.update(validate_source(checkpoint,args.resume,args.resume_mode,manifest))
     if str(args.policy_experiment).upper() in {'H3_SPEED1', 'ENCODER_FROZEN', 'ENCODER_UPDATING', 'ENCODER_ANCHORED', 'ANCHORED_WHEEL_EXPLORE'}:
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
-        from wheel_legged_gym.utils import get_load_path
-        from wheel_legged_gym.envs.wheel_legged.h3_speed1 import validate_source
+        from wheel_legged_gym.adapters.artifacts.checkpoints import get_load_path
+        from wheel_legged_gym.adapters.artifacts.legacy_sources import validate_h3_speed1_source as validate_source
         root = Path(WHEEL_LEGGED_GYM_ROOT_DIR) / 'logs' / (args.experiment_name or train_cfg.runner.experiment_name)
         checkpoint = Path(get_load_path(str(root), load_run=args.load_run, checkpoint=args.checkpoint))
         manifest.update(validate_source(checkpoint, args.resume, args.resume_mode, manifest))
     if str(args.policy_experiment).upper() == 'H3_LOW_SPEED':
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
-        from wheel_legged_gym.utils import get_load_path
-        from wheel_legged_gym.envs.wheel_legged.h3_low_speed import validate_source
+        from wheel_legged_gym.adapters.artifacts.checkpoints import get_load_path
+        from wheel_legged_gym.adapters.artifacts.legacy_sources import validate_h3_low_speed_source as validate_source
         root = Path(WHEEL_LEGGED_GYM_ROOT_DIR) / 'logs' / (args.experiment_name or train_cfg.runner.experiment_name)
         checkpoint = Path(get_load_path(str(root), load_run=args.load_run, checkpoint=args.checkpoint))
         manifest.update(validate_source(checkpoint, args.resume, args.resume_mode))
@@ -126,7 +125,7 @@ def train(args):
         if not args.resume or args.resume_mode != 'full':
             raise ValueError('LOW_SPEED requires explicit full-state warm start')
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
-        from wheel_legged_gym.utils import get_load_path
+        from wheel_legged_gym.adapters.artifacts.checkpoints import get_load_path
         root = Path(WHEEL_LEGGED_GYM_ROOT_DIR) / 'logs' / (args.experiment_name or train_cfg.runner.experiment_name)
         checkpoint = Path(get_load_path(str(root), load_run=args.load_run, checkpoint=args.checkpoint))
         previous = json.loads((checkpoint.parent/'policy_experiment.json').read_text())
@@ -140,7 +139,7 @@ def train(args):
         if not args.resume or args.resume_mode != 'full':
             raise ValueError('Standing controlled fine-tune requires --resume --resume_mode=full')
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
-        from wheel_legged_gym.utils import get_load_path
+        from wheel_legged_gym.adapters.artifacts.checkpoints import get_load_path
         root = Path(WHEEL_LEGGED_GYM_ROOT_DIR) / 'logs' / (args.experiment_name or train_cfg.runner.experiment_name)
         checkpoint = Path(get_load_path(str(root), load_run=args.load_run, checkpoint=args.checkpoint))
         previous = json.loads((checkpoint.parent / 'policy_experiment.json').read_text())
@@ -163,24 +162,41 @@ def train(args):
     else:
         enforce_optimizer_overrides(ppo_runner, manifest)
     if str(args.policy_experiment).upper() == 'H3_LOW_SPEED':
-        from wheel_legged_gym.envs.wheel_legged.h3_low_speed import verify_and_restore_std
+        from wheel_legged_gym.adapters.artifacts.checkpoint_migration import verify_and_restore_std
         manifest['migration_verification'] = verify_and_restore_std(ppo_runner, checkpoint)
     task_registry.save_cfgs(name=args.task)
     if str(args.policy_experiment).upper() in {'MOTION_GOAL','HEIGHT_COURSE'}:
-        from wheel_legged_gym.envs.wheel_legged.h3_speed1 import verify_full_resume
+        from wheel_legged_gym.adapters.artifacts.checkpoint_migration import verify_full_resume
         manifest['resume_verification']=verify_full_resume(ppo_runner,checkpoint,
             expected_iteration=manifest.get('height_spec',manifest.get('motion_goal_spec'))['source_iteration'])
         manifest['effective_start_learning_rate']=ppo_runner.alg.learning_rate
+        if manifest.get('freeze_motion_encoder',False):
+            ppo_runner.alg.freeze_encoder_updates=True
+        if manifest.get('dynamic_fixed_lr'):
+            manifest['restored_ppo_learning_rate']=ppo_runner.alg.learning_rate
+            ppo_runner.alg.learning_rate=manifest['dynamic_fixed_lr']
+            ppo_runner.alg.schedule='fixed'
+            for group in ppo_runner.alg.optimizer.param_groups:group['lr']=manifest['dynamic_fixed_lr']
+            manifest['effective_start_learning_rate']=ppo_runner.alg.learning_rate
+            manifest['optimizer'].update(learning_rate=ppo_runner.alg.learning_rate,schedule='fixed')
+        if manifest.get('dynamic_reference_coef'):
+            import copy
+            ppo_runner.alg.reference_policy=copy.deepcopy(ppo_runner.alg.actor_critic).eval()
+            for parameter in ppo_runner.alg.reference_policy.parameters():parameter.requires_grad_(False)
+            ppo_runner.alg.reference_coef=manifest['dynamic_reference_coef']
+            ppo_runner.alg.reference_dynamic_stride=env_cfg.commands.start_stop_stride
+            ppo_runner.alg.storage.track_minibatch_env_ids=True
+            manifest['reference_checkpoint_sha256']=manifest['source_checkpoint_sha256']
     if str(args.policy_experiment).upper() in {'LEGACY_ANCHORS','LEGACY_SPEED2','LEGACY_SPEED2_STOP','LEGACY_YAW'}:
-        from wheel_legged_gym.envs.wheel_legged.h3_speed1 import verify_full_resume
+        from wheel_legged_gym.adapters.artifacts.checkpoint_migration import verify_full_resume
         manifest['resume_verification']=verify_full_resume(ppo_runner,checkpoint,
             expected_iteration={'LEGACY_ANCHORS':500,'LEGACY_SPEED2':700,'LEGACY_SPEED2_STOP':900,'LEGACY_YAW':1400}[str(args.policy_experiment).upper()])
         manifest['effective_start_learning_rate']=ppo_runner.alg.learning_rate
     if str(args.policy_experiment).upper() in {'EXPLORE_STOP_RETENTION','EXPLORE_CLEAN_OBS'}:
-        from wheel_legged_gym.envs.wheel_legged.h3_speed1 import verify_full_resume
+        from wheel_legged_gym.adapters.artifacts.checkpoint_migration import verify_full_resume
         manifest['resume_verification']=verify_full_resume(ppo_runner,checkpoint,expected_iteration=500)
     if str(args.policy_experiment).upper() in {'H3_SPEED1', 'ENCODER_FROZEN', 'ENCODER_UPDATING', 'ENCODER_ANCHORED', 'ANCHORED_WHEEL_EXPLORE'}:
-        from wheel_legged_gym.envs.wheel_legged.h3_speed1 import verify_full_resume
+        from wheel_legged_gym.adapters.artifacts.checkpoint_migration import verify_full_resume
         manifest['resume_verification'] = verify_full_resume(ppo_runner, checkpoint)
     if str(args.policy_experiment).upper() == 'ANCHORED_WHEEL_EXPLORE':
         model = ppo_runner.alg.actor_critic

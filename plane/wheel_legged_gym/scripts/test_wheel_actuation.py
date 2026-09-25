@@ -3,11 +3,12 @@
 import isaacgym  # noqa: F401
 import torch
 
-from wheel_legged_gym.envs import *  # noqa: F401,F403
-from wheel_legged_gym.utils import get_args, task_registry
+from wheel_legged_gym.app.bootstrap import create_task_registry
+from wheel_legged_gym.app.arguments import get_args
 
 
 def main():
+    task_registry = create_task_registry()
     args = get_args()
     env_cfg, _ = task_registry.get_cfgs(name=args.task)
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 1)

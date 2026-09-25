@@ -13,22 +13,23 @@ import isaacgym  # must precede torch
 import numpy as np
 import torch
 from isaacgym.torch_utils import quat_rotate_inverse
-from wheel_legged_gym.envs import *  # noqa
-from wheel_legged_gym.utils import task_registry
-from wheel_legged_gym.utils.helpers import class_to_dict
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import (
-    apply_training_profile, _apply_method_randomization,
+from wheel_legged_gym.app.bootstrap import create_task_registry
+from wheel_legged_gym.contracts.config_serialization import class_to_dict
+from wheel_legged_gym.experiments.primitives import (
+    apply_method_randomization,
 )
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import apply_policy_experiment
-from wheel_legged_gym.scripts.isaac_parity_trace import _gym_args, _disable_randomization
-from wheel_legged_gym.scripts.isaac_command_grid import load_policy, _set_fixed_ranges
+from wheel_legged_gym.app.experiment_inputs import apply_training_profile
+from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
+from wheel_legged_gym.adapters.isaacgym.evaluation_setup import build_evaluation_args, disable_evaluation_randomization
+from wheel_legged_gym.adapters.isaacgym.policy_io import load_policy, set_fixed_command_ranges
 
 
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def main():
+def main(argv=None):
+    task_registry = create_task_registry()
     p = argparse.ArgumentParser(__doc__)
     p.add_argument('--checkpoint', type=Path, required=True)
     p.add_argument('--out', type=Path, required=True)
@@ -39,13 +40,17 @@ def main():
     p.add_argument('--initial-commands', type=float, nargs='+', help='Optional vx before one timed switch; no reset at switch')
     p.add_argument('--initial-yaw-commands', type=float, nargs='+')
     p.add_argument('--switch-at', type=float, default=5.)
+    p.add_argument('--transition-ramp-seconds',type=float,default=0.,help='Explicit linear command ramp; zero preserves step protocol')
+    p.add_argument('--trace-stride', type=int, default=10)
     p.add_argument('--envs-per-command', type=int, default=16)
     p.add_argument('--seed', type=int, default=19)
     p.add_argument('--randomization-level', type=int, choices=[0, 1], default=1)
     p.add_argument('--seconds', type=float, default=25)
     p.add_argument('--warmup', type=float, default=5)
     p.add_argument('--profile', choices=['method_v1','LEGACY_URDF'], default='method_v1')
-    a = p.parse_args()
+    p.add_argument('--diagnostic-mode',choices=['sampled','sampled_noisy'],help='Diagnostic action/noise mode; never an acceptance run')
+    a = p.parse_args(argv)
+    if a.trace_stride<1:p.error('trace-stride must be positive')
     if a.height_commands is None:
         a.height_commands = [.4] * len(a.commands)
     if (len(a.height_commands) != len(a.commands) or not np.isfinite(a.height_commands).all()
@@ -56,6 +61,8 @@ def main():
     if len(a.yaw_commands) != len(a.commands) or not np.isfinite(a.commands + a.yaw_commands).all():
         p.error('vx/yaw lists must have equal length and finite values')
     transition = a.initial_commands is not None
+    if a.transition_ramp_seconds<0 or (a.transition_ramp_seconds and not transition):
+        p.error('Nonnegative transition ramp requires initial commands')
     if (a.initial_yaw_commands is not None or a.initial_height_commands is not None) and not transition:
         p.error('initial yaw requires initial commands')
     if transition:
@@ -72,6 +79,8 @@ def main():
             p.error('initial lists must match target lists; require 0 < switch-at < warmup')
     if not 0 <= a.warmup < a.seconds or a.envs_per_command < 1:
         p.error('require seconds > warmup >= 0 and positive environment count')
+    if transition and a.switch_at+a.transition_ramp_seconds>=a.warmup:
+        p.error('Steady warmup must end after the command ramp')
     if a.out.exists():
         raise FileExistsError(a.out)
     cfg, train = task_registry.get_cfgs(name='wheel_legged')
@@ -79,8 +88,8 @@ def main():
         apply_policy_experiment(cfg, 'LEGACY_URDF', train)
     else:
         apply_training_profile(cfg, train, phase='translate', level=0)
-    _disable_randomization(cfg)
-    _apply_method_randomization(cfg, a.randomization_level)
+    disable_evaluation_randomization(cfg)
+    apply_method_randomization(cfg, a.randomization_level)
     cfg.domain_rand_level = a.randomization_level
     cfg.domain_rand.push_robots = False
     cfg.commands.sampling_strategy = 'uniform'
@@ -91,7 +100,8 @@ def main():
     cfg.terrain.mesh_type = 'plane'
     cfg.terrain.curriculum = False
     cfg.commands.ranges.height = [.4, .4]
-    args = _gym_args()
+    if a.diagnostic_mode:cfg.noise.add_noise=a.diagnostic_mode=='sampled_noisy'
+    args = build_evaluation_args()
     args.num_envs, args.seed = cfg.env.num_envs, a.seed
     env, _ = task_registry.make_env(name='wheel_legged', args=args, env_cfg=cfg)
     try:
@@ -100,7 +110,7 @@ def main():
         initial_commands = (np.repeat(np.array(list(zip(a.initial_commands, a.initial_yaw_commands,
             a.initial_height_commands))), a.envs_per_command, axis=0)
             if transition else commands)
-        _set_fixed_ranges(env, initial_commands)
+        set_fixed_command_ranges(env, initial_commands)
         env.reset()
         obs, history = env.get_observations()
         target = torch.tensor(initial_commands, device=env.device, dtype=torch.float)
@@ -131,10 +141,15 @@ def main():
         joint_max = torch.full_like(joint_sums,-float('inf'))
         torque_max = torch.zeros_like(joint_sums)
         response_trace = []
+        travelled=torch.zeros(env.num_envs,device=env.device)
         for step in range(round(a.seconds / env.dt)):
-            if transition and step == round(a.switch_at / env.dt):
-                _set_fixed_ranges(env, commands)
-                target = torch.tensor(commands, device=env.device, dtype=torch.float)
+            switch_step=round(a.switch_at/env.dt)
+            ramp_steps=round(a.transition_ramp_seconds/env.dt)
+            if transition and switch_step<=step<=switch_step+ramp_steps:
+                fraction=1. if ramp_steps==0 else min(1.,(step-switch_step)/ramp_steps)
+                actual=initial_commands+(commands-initial_commands)*fraction
+                set_fixed_command_ranges(env, actual)
+                target = torch.tensor(actual, device=env.device, dtype=torch.float)
                 env.commands[:, :3] = target
                 # Replace only current command channels, preserving the four past frames.
                 # Recomputing observations here would append an extra history frame.
@@ -145,25 +160,38 @@ def main():
             if not torch.allclose(obs[:, 6:9], target * env.commands_scale):
                 raise RuntimeError('Command is not present in policy observation')
             with torch.inference_mode():
-                action, latent = policy.act_inference(obs, history)
+                if a.diagnostic_mode:
+                    action=policy.act(obs,history)
+                    latent=policy.latent
+                else:
+                    action, latent = policy.act_inference(obs, history)
                 encoder_error = (env.base_lin_vel[:, 0] - latent[:, 0]/env.obs_scales.lin_vel).abs()
             if not torch.isfinite(action).all():
                 raise RuntimeError('Nonfinite policy action')
-            before_saturation = env.command_metric_preclip_torque_saturation_sum.clone()
+            before_saturation = env.command_metrics.preclip_torque_saturation_sum.clone()
+            before_xy=env.root_states[:,:2].clone()
             obs, _, _, dones, info, history = env.step(action)
             timeout = info.get('time_outs', torch.zeros_like(dones)).bool()
             failures += (dones.bool() & ~timeout).float()
             timeouts += (dones.bool() & timeout).float()
             body_contact = (env.contact_forces[:, nonwheel].norm(dim=-1) > 1).any(dim=-1).float()
             nonwheel_full += body_contact
-            if transition and step % 10 == 0:
+            if transition and step>=round(a.switch_at/env.dt):
+                travelled+=(env.root_states[:,:2]-before_xy).norm(dim=-1)
+            if transition and step % a.trace_stride == 0:
                 response_trace.append({'time': (step+1)*env.dt,
+                    'applied_command':target.detach().cpu().tolist(),
+                    'wheel_vertical_force_n':env.contact_forces[:,env.feet_indices,2].cpu().tolist(),
+                    'path_since_switch_m':travelled.cpu().tolist(),
+                    'wheel_contacts':(env.contact_forces[:,env.feet_indices,2]>1).cpu().tolist(),
+                    'roll':torch.atan2(-env.projected_gravity[:,1],-env.projected_gravity[:,2]).cpu().tolist(),
+                    'resets':(failures+timeouts).cpu().tolist(),
                     'height': env.base_height.detach().cpu().tolist(),
                     'vx': env.base_lin_vel[:, 0].detach().cpu().tolist(),
                     'yaw': env.base_ang_vel[:, 2].detach().cpu().tolist()})
             # Counters reset with episodes; post-reset samples are not valid
             # torque observations. Any reset independently fails acceptance.
-            sat = (env.command_metric_preclip_torque_saturation_sum - before_saturation).clamp(min=0)
+            sat = (env.command_metrics.preclip_torque_saturation_sum - before_saturation).clamp(min=0)
             sat = torch.where(dones.bool(), torch.zeros_like(sat), sat)
             if step < round(a.warmup / env.dt):
                 continue
@@ -228,11 +256,16 @@ def main():
             'results': results, 'note': 'Reset counts cover warmup too; metrics after warmup include reset trajectories. Any reset fails the gate.'}
         if transition:
             payload.update(schema='matched_policy_transition_v1',
+                trace_dt=env.dt*a.trace_stride,
                 switch_at=round(a.switch_at/env.dt)*env.dt,
+                transition_ramp_seconds=round(a.transition_ramp_seconds/env.dt)*env.dt,
                 initial_commands=list(map(list,zip(a.initial_commands,a.initial_yaw_commands,a.initial_height_commands))),
                 response_trace=response_trace,
                 transition_note='No reset at switch; 10 Hz per-environment response trace. Metrics and gate cover post-warmup steady state, not transient smoothness.')
         a.out.parent.mkdir(parents=True, exist_ok=True)
+        if a.diagnostic_mode:
+            payload.update(diagnostic_only=True,deterministic=False,noise=a.diagnostic_mode=='sampled_noisy',
+                noise_mode=a.diagnostic_mode,limitation='Noise draws also affect RNG/reset trajectory; same seed does not guarantee identical physical initial states. Read recorded states.')
         a.out.write_text(json.dumps(payload, indent=2)+'\n')
         print(json.dumps({'out': str(a.out), 'results': [{k:v for k,v in r.items()
             if k in ['command','metrics','failure_count','timeout_count']} for r in results]}))

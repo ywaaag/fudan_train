@@ -33,8 +33,10 @@ import os
 from datetime import datetime
 
 import isaacgym
-from wheel_legged_gym.envs import *
-from wheel_legged_gym.utils import get_args, export_policy_as_jit, task_registry, Logger
+from wheel_legged_gym.app.bootstrap import create_task_registry
+from wheel_legged_gym.utils.logger import Logger
+from wheel_legged_gym.app.arguments import get_args
+from wheel_legged_gym.adapters.artifacts.jit_export import export_policy_as_jit
 
 import torch
 import pytest
@@ -42,6 +44,7 @@ import pytest
 
 @pytest.mark.skip(reason="Legacy manual Isaac Gym smoke requires CLI args; run scripts/train.py instead")
 def test_env(args):
+    task_registry = create_task_registry()
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 10)

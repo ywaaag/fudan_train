@@ -14,6 +14,13 @@ FILES={
  'ppo':'wheel_legged_gym/rsl_rl/algorithms/ppo.py',
  'sequence_policy':'wheel_legged_gym/rsl_rl/modules/actor_critic_sequence.py',
 }
+PORT_FILES={
+ 'wheel_config':'wheel_legged_gym/contracts/wheel_legged_config.py',
+ 'base_config':'wheel_legged_gym/contracts/legged_robot_config.py',
+ 'base_env':'wheel_legged_gym/envs/base/legged_robot.py',
+ 'ppo':'wheel_legged_gym/learning/algorithms/ppo.py',
+ 'sequence_policy':'wheel_legged_gym/learning/modules/actor_critic_sequence.py',
+}
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
@@ -36,14 +43,14 @@ def main():
     report={'upstream':str(UP),'port':str(ROOT),'read_only':True,
             'status':'non_equivalent_physics_and_training_contract','files':{}}
     for key,rel in FILES.items():
-        a,b=UP/rel,ROOT/'plane'/rel
+        a,b=UP/rel,ROOT/'plane'/PORT_FILES[key]
         old,new=literals(a),literals(b)
         changed={k:{'upstream':v,'port':new.get(k)} for k,v in old.items() if new.get(k)!=v}
         diff=''.join(difflib.unified_diff(
             a.read_text().splitlines(True) if a.exists() else [],
             b.read_text().splitlines(True) if b.exists() else [],
             fromfile=str(a),tofile=str(b),n=1))
-        report['files'][key]={'relative_path':rel,'upstream_sha256':digest(a),
+        report['files'][key]={'relative_path':rel,'port_relative_path':PORT_FILES[key],'upstream_sha256':digest(a),
             'port_sha256':digest(b),'literal_config_changes':changed,
             'diff_lines':len(diff.splitlines()),'diff_excerpt':diff.splitlines()[:80]}
     report['explicit_findings']=[

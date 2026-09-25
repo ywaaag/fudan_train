@@ -6,7 +6,7 @@ import os
 import numpy as np
 import torch
 
-from wheel_legged_gym.rsl_rl.modules.actor_critic_sequence import ActorCriticSequence
+from wheel_legged_gym.learning.modules.actor_critic_sequence import ActorCriticSequence
 
 
 def main():

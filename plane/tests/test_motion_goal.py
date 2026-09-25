@@ -2,8 +2,8 @@ import isaacgym
 import sys
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'tools'))
-from wheel_legged_gym.envs.wheel_legged.motion_goal import STAGES,stage_bank
-from run_motion_goal import assess
+from wheel_legged_gym.experiments.recipes.motion_goal import STAGES,stage_bank
+from wheel_legged_gym.evaluation.motion_candidates import assess
 
 
 def test_all_stages_retain_previous_commands_and_reach_targets():

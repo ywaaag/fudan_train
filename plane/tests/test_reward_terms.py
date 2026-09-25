@@ -3,7 +3,7 @@ from __future__ import annotations
 import isaacgym  # noqa: F401  # Isaac Gym must initialize before torch.
 import torch
 
-from wheel_legged_gym.envs.base.reward_terms import (
+from wheel_legged_gym.domain.rewards.terms import (
     capped_tracking_terms,
     wheel_rolling_terms,
 )

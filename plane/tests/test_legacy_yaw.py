@@ -3,9 +3,9 @@ import sys
 from pathlib import Path
 import torch
 import pytest
-from wheel_legged_gym.envs.base.command_sampling import sample_fixed_bank
-from wheel_legged_gym.envs.wheel_legged.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import apply_policy_experiment
+from wheel_legged_gym.domain.commands.command_sampling import sample_fixed_bank
+from wheel_legged_gym.contracts.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
+from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tools'))
 from run_h3_low_speed import audit_grid

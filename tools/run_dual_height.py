@@ -1,4 +1,10 @@
 """One-policy two-height parking, then no-reset transition checks if steady gates pass."""
+
+import sys
+from pathlib import Path
+_cli_package_root = str(Path(__file__).resolve().parents[1] / "plane")
+if _cli_package_root not in sys.path:
+    sys.path.insert(0, _cli_package_root)
 import json
 import os
 import sys
@@ -7,8 +13,8 @@ import subprocess
 import fcntl
 from pathlib import Path
 from datetime import datetime
-from compare_policy_versions import gate
-from summarize_transitions import summarize
+from wheel_legged_gym.evaluation.gates import gate
+from wheel_legged_gym.evaluation.transitions import summarize
 ROOT=Path(__file__).resolve().parents[1]
 
 

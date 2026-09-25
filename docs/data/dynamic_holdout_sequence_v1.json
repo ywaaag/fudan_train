@@ -1,0 +1,15 @@
+{
+  "interpolation": "linear",
+  "description": "Independent low-speed sequence; endpoint speeds absent from training target bank; max slope 1 m/s^2, fixed 0.40m.",
+  "keyframes": [
+    {"time": 0, "command": [0, 0, 0.4]},
+    {"time": 2.13, "command": [0, 0, 0.4]},
+    {"time": 3.13, "command": [0.8, 0, 0.4]},
+    {"time": 5.47, "command": [0.8, 0, 0.4]},
+    {"time": 6.57, "command": [-0.3, 0, 0.4]},
+    {"time": 8.31, "command": [-0.3, 0, 0.4]},
+    {"time": 9.21, "command": [0.6, 0, 0.4]},
+    {"time": 11.83, "command": [0.6, 0, 0.4]},
+    {"time": 12.43, "command": [0, 0, 0.4]}
+  ]
+}

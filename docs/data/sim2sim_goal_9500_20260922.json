@@ -1,0 +1,158 @@
+{
+  "policy": "plane/outputs/motion_goal_20260921_143444/accepted_basic_motion.onnx",
+  "sha256": "9a0cbf8c01f62840019d34202b0e8069191e4f38c3bfce9341f140183499f788",
+  "capabilities": [
+    {
+      "capability": "stop",
+      "source": "plane/outputs/closed_ramp_v2_20260921_202701/zero.json",
+      "evidence_sha256": "5f2b629234c6d172354a4668e37d73be5fb9c7469c2985c73bfa9a131d7f4ce6",
+      "schedule": {
+        "target": [
+          0.0,
+          0.0,
+          0.4
+        ],
+        "settle_seconds": 2.0,
+        "ramp_seconds": 10.0,
+        "metrics_warmup_seconds": 14.0,
+        "steady_window": true
+      },
+      "checks": {
+        "same_policy": true,
+        "initialization": true,
+        "contract": true,
+        "physical": true,
+        "steady_20s": true,
+        "vx_tracking": true,
+        "yaw_tracking": true,
+        "height_tracking": true
+      },
+      "passed": true,
+      "vx_mae": 0.012391915329778664,
+      "yaw_mae": 0.005839042354387398,
+      "failure": null
+    },
+    {
+      "capability": "forward4",
+      "source": "plane/outputs/closed_ramp_v2_20260921_202701/vx_1_4.json",
+      "evidence_sha256": "5e91fcf89cf347c4800755c398634765688f41bb405c0dfdd2f0dc2b9b81a720",
+      "schedule": {
+        "target": [
+          4.0,
+          0.0,
+          0.4
+        ],
+        "settle_seconds": 2.0,
+        "ramp_seconds": 10.0,
+        "metrics_warmup_seconds": 14.0,
+        "steady_window": true
+      },
+      "checks": {
+        "same_policy": true,
+        "initialization": true,
+        "contract": true,
+        "physical": true,
+        "steady_20s": true,
+        "vx_tracking": true,
+        "yaw_tracking": true,
+        "height_tracking": true
+      },
+      "passed": true,
+      "vx_mae": 0.060299723128578696,
+      "yaw_mae": 0.0024527222637295994,
+      "failure": null
+    },
+    {
+      "capability": "reverse4",
+      "source": "plane/outputs/closed_ramp_v2_20260921_202701/vx_-1_4.json",
+      "evidence_sha256": "f14016e485cb97bb6a3639f7902ea9d47a4e99905bd50e98ba482e331a63e050",
+      "schedule": {
+        "target": [
+          -4.0,
+          0.0,
+          0.4
+        ],
+        "settle_seconds": 2.0,
+        "ramp_seconds": 10.0,
+        "metrics_warmup_seconds": 14.0,
+        "steady_window": true
+      },
+      "checks": {
+        "same_policy": true,
+        "initialization": true,
+        "contract": true,
+        "physical": true,
+        "steady_20s": true,
+        "vx_tracking": false,
+        "yaw_tracking": true,
+        "height_tracking": true
+      },
+      "passed": false,
+      "vx_mae": 0.1208239320778003,
+      "yaw_mae": 0.014785978559719356,
+      "failure": null
+    },
+    {
+      "capability": "yaw_positive4",
+      "source": "plane/outputs/closed_yaw_boundary_20260922/slow30_yaw_4.json",
+      "evidence_sha256": "a34c5bad6dbc6a62d408f624e6854952f9e9d2f2cb86fe8033b69e2d1e9a11ad",
+      "schedule": {
+        "target": [
+          0.0,
+          4.0,
+          0.4
+        ],
+        "settle_seconds": 2.0,
+        "ramp_seconds": 30.0,
+        "metrics_warmup_seconds": 34.0,
+        "steady_window": true
+      },
+      "checks": {
+        "same_policy": true,
+        "initialization": true,
+        "contract": true,
+        "physical": true,
+        "steady_20s": true,
+        "vx_tracking": true,
+        "yaw_tracking": true,
+        "height_tracking": true
+      },
+      "passed": true,
+      "vx_mae": 0.03737578609076117,
+      "yaw_mae": 0.01897591604704836,
+      "failure": null
+    },
+    {
+      "capability": "yaw_negative4",
+      "source": "plane/outputs/closed_ramp_v2_20260921_202701/yaw_-1_4.json",
+      "evidence_sha256": "2da1a3ba6aa2d88c4650659c2adfb987e9f3239333ad246bdd7a815c7f081f35",
+      "schedule": {
+        "target": [
+          0.0,
+          -4.0,
+          0.4
+        ],
+        "settle_seconds": 2.0,
+        "ramp_seconds": 10.0,
+        "metrics_warmup_seconds": 14.0,
+        "steady_window": true
+      },
+      "checks": {
+        "same_policy": true,
+        "initialization": true,
+        "contract": true,
+        "physical": false,
+        "steady_20s": false,
+        "vx_tracking": false,
+        "yaw_tracking": false,
+        "height_tracking": false
+      },
+      "passed": false,
+      "vx_mae": null,
+      "yaw_mae": null,
+      "failure": "Invalid standing contact: wheels=(0, 2), protected_contacts=0, nonwheel_ground_contacts=0, nonwheel_obstacle_contacts=0. Check the physical MJCF stance before enabling LQR."
+    }
+  ],
+  "goal_complete": false,
+  "limits": "Passes apply only to each recorded ramp-and-hold protocol, not arbitrary commands or real hardware. Mapping and all safety gates unchanged."
+}

@@ -4,8 +4,8 @@ import pytest
 from types import SimpleNamespace
 import wheel_legged_gym.envs
 from wheel_legged_gym.utils.command_diagnostics import CommandDiagnostics
-from wheel_legged_gym.envs.wheel_legged.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import apply_policy_experiment
+from wheel_legged_gym.contracts.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
+from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
 
 
 def test_time_weighting_empty_bins_and_reward_deltas(tmp_path):

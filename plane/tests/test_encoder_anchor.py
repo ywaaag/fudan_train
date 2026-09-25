@@ -1,8 +1,8 @@
 import isaacgym
 import torch
-from wheel_legged_gym.rsl_rl.storage.rollout_storage import RolloutStorage
-from wheel_legged_gym.envs.wheel_legged.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import apply_policy_experiment
+from wheel_legged_gym.learning.storage.rollout_storage import RolloutStorage
+from wheel_legged_gym.contracts.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
+from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
 
 
 def test_encoder_anchor_is_single_ablation_variable():

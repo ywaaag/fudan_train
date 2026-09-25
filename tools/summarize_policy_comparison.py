@@ -1,11 +1,17 @@
 """Export compact tables and verify matched initial states in a comparison job."""
+
+import sys
+from pathlib import Path
+_cli_package_root = str(Path(__file__).resolve().parents[1] / "plane")
+if _cli_package_root not in sys.path:
+    sys.path.insert(0, _cli_package_root)
 import argparse
 import csv
 import json
 from collections import defaultdict
 from pathlib import Path
 
-from compare_policy_versions import gate
+from wheel_legged_gym.evaluation.gates import gate
 
 
 def main():

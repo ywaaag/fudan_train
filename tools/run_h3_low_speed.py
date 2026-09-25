@@ -1,4 +1,10 @@
 """Bounded H3 migration training with recorded independent checkpoint audits."""
+
+import sys
+from pathlib import Path
+_cli_package_root = str(Path(__file__).resolve().parents[1] / "plane")
+if _cli_package_root not in sys.path:
+    sys.path.insert(0, _cli_package_root)
 import fcntl
 import argparse
 import json
@@ -7,7 +13,7 @@ from pathlib import Path
 import subprocess
 import sys
 from datetime import datetime
-from compare_policy_versions import gate
+from wheel_legged_gym.evaluation.gates import gate
 
 ROOT = Path(__file__).resolve().parents[1]
 PLANE = ROOT/'plane'

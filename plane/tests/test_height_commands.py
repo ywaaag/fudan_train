@@ -1,6 +1,6 @@
 import isaacgym
 import torch
-from wheel_legged_gym.envs.base.height_commands import alternate_height
+from wheel_legged_gym.domain.commands.height_commands import alternate_height
 
 
 def test_switch_preserves_motion_and_retention():

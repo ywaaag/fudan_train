@@ -1,7 +1,7 @@
 import isaacgym
-from wheel_legged_gym.envs.wheel_legged.wheel_legged_config import WheelLeggedCfg,WheelLeggedCfgPPO
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import apply_policy_experiment
-from wheel_legged_gym.utils.helpers import class_to_dict
+from wheel_legged_gym.contracts.wheel_legged_config import WheelLeggedCfg,WheelLeggedCfgPPO
+from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
+from wheel_legged_gym.contracts.config_serialization import class_to_dict
 
 
 def test_legacy_command_change_preserves_effective_recipe():

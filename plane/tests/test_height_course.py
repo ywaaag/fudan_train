@@ -1,9 +1,9 @@
 import isaacgym
 import torch
 import pytest
-from wheel_legged_gym.envs.base.command_sampling import sample_height_bank
-from wheel_legged_gym.envs.wheel_legged.height_course import STAGES,height_bank
-from wheel_legged_gym.envs.wheel_legged.motion_goal import stage_bank
+from wheel_legged_gym.domain.commands.command_sampling import sample_height_bank
+from wheel_legged_gym.experiments.recipes.height_course import STAGES,height_bank
+from wheel_legged_gym.experiments.recipes.motion_goal import stage_bank
 
 
 def test_height_bank_keeps_full_motion_and_paired_height_targets():
@@ -40,8 +40,8 @@ def test_dual_height_has_equal_exposure_in_one_policy():
 
 def test_fixed_height_diagnostics_sample_only_requested_parking_target(tmp_path,monkeypatch):
     import json
-    from wheel_legged_gym.envs.wheel_legged.height_course import apply_height_course
-    from wheel_legged_gym.envs.wheel_legged.wheel_legged_config import WheelLeggedCfg,WheelLeggedCfgPPO
+    from wheel_legged_gym.app.experiment_inputs import apply_height_course
+    from wheel_legged_gym.contracts.wheel_legged_config import WheelLeggedCfg,WheelLeggedCfgPPO
     path=tmp_path/'spec.json';monkeypatch.setenv('FUDAN_HEIGHT_SPEC',str(path))
     for stage,h in [('fixed35',.35),('fixed45',.45)]:
         path.write_text(json.dumps({'stage':stage}))
@@ -78,9 +78,9 @@ def test_reweight_changes_only_variable_height_exposure():
 
 def test_height_gain_changes_only_height_contribution(tmp_path,monkeypatch):
     import json
-    from wheel_legged_gym.envs.wheel_legged.height_course import apply_height_course
-    from wheel_legged_gym.envs.wheel_legged.wheel_legged_config import WheelLeggedCfg,WheelLeggedCfgPPO
-    from wheel_legged_gym.utils.helpers import class_to_dict
+    from wheel_legged_gym.app.experiment_inputs import apply_height_course
+    from wheel_legged_gym.contracts.wheel_legged_config import WheelLeggedCfg,WheelLeggedCfgPPO
+    from wheel_legged_gym.contracts.config_serialization import class_to_dict
     path=tmp_path/'spec.json';monkeypatch.setenv('FUDAN_HEIGHT_SPEC',str(path))
     path.write_text(json.dumps({'stage':'near','variable_repeats':4}))
     before,bt=WheelLeggedCfg(),WheelLeggedCfgPPO();apply_height_course(before,bt)

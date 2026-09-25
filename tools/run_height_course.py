@@ -1,4 +1,10 @@
 """Height expansion gated by low-speed height tracking and full 40cm motion retention."""
+
+import sys
+from pathlib import Path
+_cli_package_root = str(Path(__file__).resolve().parents[1] / "plane")
+if _cli_package_root not in sys.path:
+    sys.path.insert(0, _cli_package_root)
 import os
 import sys
 import json
@@ -13,8 +19,8 @@ ROOT=Path(__file__).resolve().parents[1]
 PLANE=ROOT/'plane'
 sys.path.insert(0,str(PLANE))
 import isaacgym
-from wheel_legged_gym.envs.wheel_legged.height_course import STAGES,height_bank
-from compare_policy_versions import gate
+from wheel_legged_gym.experiments.recipes.height_course import STAGES,height_bank
+from wheel_legged_gym.evaluation.height_acceptance import assess_height_row
 
 
 def main():
@@ -88,12 +94,7 @@ def main():
                      ['--height-commands']+[str(h) for v,w,h in bank],tag)
                 data=json.loads(out.read_text())
                 for row in data['results']:
-                    row['gate']=gate(row)
-                    height_tolerance=.005 if stage=='micro' else .015
-                    if row['metrics']['height_mae']>height_tolerance:
-                        row['gate']['passed']=False;row['gate']['failed_checks'].append('height_tracking')
-                    if row['nonwheel_contact_full_fraction']>0:
-                        row['gate']['passed']=False;row['gate']['failed_checks'].append('full_contact')
+                    assess_height_row(row,stage)
                     records.append(dict(row,seed=seed))
             passed=all(r['gate']['passed'] for r in records)
             result={'checkpoint':str(candidate),'stage':stage,'passed':passed,

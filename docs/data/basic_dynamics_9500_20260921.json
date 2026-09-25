@@ -1,0 +1,548 @@
+{
+  "job": "plane/outputs/basic_dynamics_20260921_153028",
+  "results": {
+    "steady": {
+      "steady_passed": 75,
+      "total": 75
+    },
+    "linear": {
+      "steady_passed": 36,
+      "total": 36,
+      "cases": [
+        {
+          "initial": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            -1.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.5099999886006117,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.006319756619632244,
+          "max_directional_overshoot": 0.09414052963256836
+        },
+        {
+          "initial": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            1.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.5299999881535769,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.012249264866113663,
+          "max_directional_overshoot": 0.017773747444152832
+        },
+        {
+          "initial": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            -2.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.7399999834597111,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.007166059222072363,
+          "max_directional_overshoot": 0.0802764892578125
+        },
+        {
+          "initial": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            2.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 1.0199999772012234,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.008581914938986301,
+          "max_directional_overshoot": 0.11305594444274902
+        },
+        {
+          "initial": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            -4.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 1.0699999760836363,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 0.9985842771485676,
+          "max_abs_roll": 0.010821392759680748,
+          "max_directional_overshoot": 0.0920405387878418
+        },
+        {
+          "initial": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            4.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 1.1799999736249447,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.012016655877232552,
+          "max_directional_overshoot": 0.08365058898925781
+        },
+        {
+          "initial": [
+            -1.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.7599999830126762,
+          "max_stop_distance_m": 0.36402010917663574,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.012519649229943752,
+          "max_directional_overshoot": 0
+        },
+        {
+          "initial": [
+            1.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.8499999810010195,
+          "max_stop_distance_m": 0.2814442813396454,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.013104925863444805,
+          "max_directional_overshoot": 0.07688406854867935
+        },
+        {
+          "initial": [
+            -2.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 1.0599999763071537,
+          "max_stop_distance_m": 1.0697487592697144,
+          "failure_count": 0.0,
+          "min_contact_fraction": 0.9998750832778148,
+          "max_abs_roll": 0.017297571524977684,
+          "max_directional_overshoot": 0.008089923299849033
+        },
+        {
+          "initial": [
+            2.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 1.289999971166253,
+          "max_stop_distance_m": 0.8777925372123718,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.03707951679825783,
+          "max_directional_overshoot": 0.15456952154636383
+        },
+        {
+          "initial": [
+            -4.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 4.25999990478158,
+          "max_stop_distance_m": 12.587388038635254,
+          "failure_count": 0.0,
+          "min_contact_fraction": 0.9963357761492339,
+          "max_abs_roll": 0.030207855626940727,
+          "max_directional_overshoot": 0.014302864670753479
+        },
+        {
+          "initial": [
+            4.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 2.1599999517202377,
+          "max_stop_distance_m": 3.6565163135528564,
+          "failure_count": 0.0,
+          "min_contact_fraction": 0.9986675549633578,
+          "max_abs_roll": 0.03786947578191757,
+          "max_directional_overshoot": 0.16844196617603302
+        }
+      ]
+    },
+    "spin": {
+      "steady_passed": 24,
+      "total": 24,
+      "cases": [
+        {
+          "initial": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            -3.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.17999999597668648,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.006415580864995718,
+          "max_directional_overshoot": 0.04543805122375488
+        },
+        {
+          "initial": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            3.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.17999999597668648,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.008622347377240658,
+          "max_directional_overshoot": 0.09413909912109375
+        },
+        {
+          "initial": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            -4.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.25999999418854713,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.016352100297808647,
+          "max_directional_overshoot": 0.05499267578125
+        },
+        {
+          "initial": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            4.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.2899999935179949,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.011730289086699486,
+          "max_directional_overshoot": 0.06670570373535156
+        },
+        {
+          "initial": [
+            0.0,
+            -3.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.12999999709427357,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.0029391832649707794,
+          "max_directional_overshoot": 0.03474937379360199
+        },
+        {
+          "initial": [
+            0.0,
+            3.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.11999999731779099,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 0.9966688874083944,
+          "max_abs_roll": 0.010009870864450932,
+          "max_directional_overshoot": 0.02840367890894413
+        },
+        {
+          "initial": [
+            0.0,
+            -4.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.1699999962002039,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.004978011827915907,
+          "max_directional_overshoot": 0.032702162861824036
+        },
+        {
+          "initial": [
+            0.0,
+            4.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.13999999687075615,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 0.9959193870752832,
+          "max_abs_roll": 0.007255328353494406,
+          "max_directional_overshoot": 0.0266867782920599
+        }
+      ]
+    },
+    "reverse": {
+      "steady_passed": 18,
+      "total": 18,
+      "cases": [
+        {
+          "initial": [
+            -0.5,
+            0.0,
+            0.4
+          ],
+          "target": [
+            0.5,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.5599999874830246,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.013445516116917133,
+          "max_directional_overshoot": 0.0029653310775756836
+        },
+        {
+          "initial": [
+            0.5,
+            0.0,
+            0.4
+          ],
+          "target": [
+            -0.5,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.8699999805539846,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.01091501209884882,
+          "max_directional_overshoot": 0.1312893033027649
+        },
+        {
+          "initial": [
+            -1.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            1.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.8199999816715717,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.015139254741370678,
+          "max_directional_overshoot": 0.07677984237670898
+        },
+        {
+          "initial": [
+            1.0,
+            0.0,
+            0.4
+          ],
+          "target": [
+            -1.0,
+            0.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 1.1199999749660492,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.02392842061817646,
+          "max_directional_overshoot": 0.15409600734710693
+        },
+        {
+          "initial": [
+            0.0,
+            -1.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            1.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.1099999975413084,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.0027966410852968693,
+          "max_directional_overshoot": 0.04535031318664551
+        },
+        {
+          "initial": [
+            0.0,
+            1.0,
+            0.4
+          ],
+          "target": [
+            0.0,
+            -1.0,
+            0.4
+          ],
+          "settled_envs": 48,
+          "total_envs": 48,
+          "worst_settling_s": 0.1599999964237213,
+          "max_stop_distance_m": null,
+          "failure_count": 0.0,
+          "min_contact_fraction": 1.0,
+          "max_abs_roll": 0.007463399320840836,
+          "max_directional_overshoot": 0.0033533573150634766
+        }
+      ]
+    }
+  },
+  "conclusion": "Steady retained; braking distance and linear switching fail requested dynamic targets. No training changes."
+}

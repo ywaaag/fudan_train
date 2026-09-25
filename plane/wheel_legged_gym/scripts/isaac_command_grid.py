@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from wheel_legged_gym.adapters.isaacgym.policy_io import load_policy, set_fixed_command_ranges
+
 import argparse
 import json
 from pathlib import Path
@@ -10,10 +12,9 @@ import isaacgym  # must precede torch
 import numpy as np
 import torch
 
-from wheel_legged_gym.envs import *  # noqa: F401,F403
-from wheel_legged_gym.rsl_rl.modules.actor_critic_sequence import ActorCriticSequence
-from wheel_legged_gym.scripts.isaac_parity_trace import _disable_randomization, _gym_args
-from wheel_legged_gym.utils import task_registry
+from wheel_legged_gym.learning.modules.actor_critic_sequence import ActorCriticSequence
+from wheel_legged_gym.adapters.isaacgym.evaluation_setup import disable_evaluation_randomization, build_evaluation_args
+from wheel_legged_gym.app.bootstrap import create_task_registry
 
 
 COMMAND_GRID = np.array(
@@ -31,38 +32,8 @@ COMMAND_GRID = np.array(
 WHEEL_RADIUS_M = 0.06
 
 
-def load_policy(checkpoint: Path, device: str) -> ActorCriticSequence:
-    model = ActorCriticSequence(
-        num_obs=25,
-        num_critic_obs=1,
-        num_actions=6,
-        num_encoder_obs=125,
-        latent_dim=3,
-        encoder_hidden_dims=[128, 64],
-        actor_hidden_dims=[128, 64, 32],
-        critic_hidden_dims=[256, 128, 64],
-        activation="elu",
-    )
-    payload = torch.load(checkpoint, map_location="cpu")
-    state = {
-        name: value
-        for name, value in payload["model_state_dict"].items()
-        if not name.startswith("critic.")
-    }
-    missing, unexpected = model.load_state_dict(state, strict=False)
-    actor_missing = [name for name in missing if not name.startswith("critic.")]
-    if actor_missing or unexpected:
-        raise ValueError(
-            f"checkpoint actor/encoder contract mismatch: missing={actor_missing}, unexpected={unexpected}"
-        )
-    return model.to(device).eval()
 
 
-def _set_fixed_ranges(env, commands: np.ndarray) -> None:
-    command_tensor = torch.as_tensor(commands, device=env.device, dtype=torch.float)
-    for key, column in (("lin_vel_x", 0), ("ang_vel_yaw", 1), ("height", 2)):
-        env.command_ranges[key][:, 0] = command_tensor[:, column]
-        env.command_ranges[key][:, 1] = command_tensor[:, column]
 
 
 def _command_pass(command: np.ndarray, mean_vx: float, mean_yaw: float) -> bool:
@@ -81,6 +52,7 @@ def run(
     seed: int,
     device_id: int,
 ) -> dict:
+    task_registry = create_task_registry()
     if not checkpoint.is_file():
         raise FileNotFoundError(checkpoint)
     if seconds <= 0.0 or not 0.0 <= warmup_seconds < seconds:
@@ -94,8 +66,8 @@ def run(
     env_cfg.terrain.curriculum = False
     env_cfg.commands.curriculum = False
     env_cfg.commands.sampling_strategy = "uniform"
-    _disable_randomization(env_cfg)
-    args = _gym_args()
+    disable_evaluation_randomization(env_cfg)
+    args = build_evaluation_args()
     args.num_envs = len(COMMAND_GRID)
     args.seed = seed
     args.compute_device_id = device_id
@@ -103,7 +75,7 @@ def run(
     args.sim_device = f"cuda:{device_id}"
     args.rl_device = f"cuda:{device_id}"
     env, _ = task_registry.make_env(name="wheel_legged", args=args, env_cfg=env_cfg)
-    _set_fixed_ranges(env, COMMAND_GRID)
+    set_fixed_command_ranges(env, COMMAND_GRID)
     env.reset()
     obs, history = env.get_observations()
     policy = load_policy(checkpoint, env.device)
@@ -212,6 +184,8 @@ def main() -> None:
         args.out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if not payload["passed"]:
         raise SystemExit(1)
+
+
 
 
 if __name__ == "__main__":

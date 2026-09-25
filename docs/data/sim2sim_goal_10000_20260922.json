@@ -1,0 +1,277 @@
+{
+  "policy": "plane/outputs/motion_goal_20260922_084744/accepted_basic_motion.onnx",
+  "sha256": "1177e2c46d3a831f98e7b4548b0cef4c0b8de8ea9af57ae1c3efddac63ae2468",
+  "capabilities": [
+    {
+      "capability": "stop",
+      "source": "plane/outputs/closed_ramp_v2_20260922_085731/zero.json",
+      "evidence_sha256": "bc5464a1224c3300ce561c7bacec4229e6cf5e5d89141f74f99dda076fd02dac",
+      "schedule": {
+        "target": [
+          0.0,
+          0.0,
+          0.4
+        ],
+        "settle_seconds": 2.0,
+        "ramp_seconds": 10.0,
+        "ramp_shape": "linear",
+        "metrics_warmup_seconds": 14.0,
+        "steady_window": true
+      },
+      "checks": {
+        "same_policy": true,
+        "initialization": true,
+        "correct_target": true,
+        "reset_height": true,
+        "fixed_step": true,
+        "full_policy_only": true,
+        "contract": true,
+        "physical": true,
+        "steady_20s": true,
+        "vx_tracking": true,
+        "yaw_tracking": true,
+        "height_tracking": true
+      },
+      "passed": true,
+      "vx_mae": 0.014421247219392922,
+      "yaw_mae": 0.006060959018304046,
+      "failure": null
+    },
+    {
+      "capability": "forward4",
+      "source": "plane/outputs/closed_target_trace_20260922_10000/vx_pos4.json",
+      "evidence_sha256": "0e02e3b055fee3efc13e892e5debf2c05c2ac2fe1e7536f54a2b139c6a2780ac",
+      "schedule": {
+        "target": [
+          4.0,
+          0.0,
+          0.4
+        ],
+        "settle_seconds": 2.0,
+        "ramp_seconds": 10.0,
+        "ramp_shape": "linear",
+        "metrics_warmup_seconds": 14.0,
+        "steady_window": true
+      },
+      "checks": {
+        "same_policy": true,
+        "initialization": true,
+        "correct_target": true,
+        "reset_height": true,
+        "fixed_step": true,
+        "full_policy_only": true,
+        "contract": true,
+        "physical": true,
+        "steady_20s": true,
+        "vx_tracking": true,
+        "yaw_tracking": true,
+        "height_tracking": true
+      },
+      "passed": true,
+      "vx_mae": 0.07984225546408055,
+      "yaw_mae": 0.004769762060383805,
+      "failure": null
+    },
+    {
+      "capability": "reverse4",
+      "source": "plane/outputs/closed_target_trace_20260922_10000/vx_neg4.json",
+      "evidence_sha256": "7c314360068862ff3a989d3171242900ee94ad48102eba2180e757fdb7d15d48",
+      "schedule": {
+        "target": [
+          -4.0,
+          0.0,
+          0.4
+        ],
+        "settle_seconds": 2.0,
+        "ramp_seconds": 10.0,
+        "ramp_shape": "linear",
+        "metrics_warmup_seconds": 14.0,
+        "steady_window": true
+      },
+      "checks": {
+        "same_policy": true,
+        "initialization": true,
+        "correct_target": true,
+        "reset_height": true,
+        "fixed_step": true,
+        "full_policy_only": true,
+        "contract": true,
+        "physical": true,
+        "steady_20s": true,
+        "vx_tracking": true,
+        "yaw_tracking": true,
+        "height_tracking": true
+      },
+      "passed": true,
+      "vx_mae": 0.09666726258165068,
+      "yaw_mae": 0.015006051564528076,
+      "failure": null
+    },
+    {
+      "capability": "yaw_positive4",
+      "source": "plane/outputs/closed_target_trace_20260922_10000/yaw_pos4.json",
+      "evidence_sha256": "76593b9d073890f8120c6f7023f8809ad4726e1b7310887983af9e92e068207c",
+      "schedule": {
+        "target": [
+          0.0,
+          4.0,
+          0.4
+        ],
+        "settle_seconds": 2.0,
+        "ramp_seconds": 10.0,
+        "ramp_shape": "linear",
+        "metrics_warmup_seconds": 14.0,
+        "steady_window": true
+      },
+      "checks": {
+        "same_policy": true,
+        "initialization": true,
+        "correct_target": true,
+        "reset_height": true,
+        "fixed_step": true,
+        "full_policy_only": true,
+        "contract": true,
+        "physical": true,
+        "steady_20s": true,
+        "vx_tracking": true,
+        "yaw_tracking": true,
+        "height_tracking": true
+      },
+      "passed": true,
+      "vx_mae": 0.03487404628852306,
+      "yaw_mae": 0.01659036901973713,
+      "failure": null
+    },
+    {
+      "capability": "yaw_negative4",
+      "source": "plane/outputs/closed_target_trace_20260922_10000/yaw_neg4.json",
+      "evidence_sha256": "2b71022410f38dc861735a7acba47f8a1f093766861cc5932c1a338a27f3022a",
+      "schedule": {
+        "target": [
+          0.0,
+          -4.0,
+          0.4
+        ],
+        "settle_seconds": 2.0,
+        "ramp_seconds": 10.0,
+        "ramp_shape": "linear",
+        "metrics_warmup_seconds": 14.0,
+        "steady_window": true
+      },
+      "checks": {
+        "same_policy": true,
+        "initialization": true,
+        "correct_target": true,
+        "reset_height": true,
+        "fixed_step": true,
+        "full_policy_only": true,
+        "contract": true,
+        "physical": true,
+        "steady_20s": true,
+        "vx_tracking": true,
+        "yaw_tracking": true,
+        "height_tracking": true
+      },
+      "passed": true,
+      "vx_mae": 0.03763992840686278,
+      "yaw_mae": 0.018511721354803053,
+      "failure": null
+    },
+    {
+      "capability": "stop_from_forward4",
+      "source": "plane/outputs/closed_target_trace_20260922_10000/stop_from_forward4.json",
+      "evidence_sha256": "d064d1c2caea454a83d824cbd5ce7665a18bdb5784b6cf018aaf42b2c59d8923",
+      "schedule": {
+        "target": [
+          4.0,
+          0.0,
+          0.4
+        ],
+        "settle_seconds": 2.0,
+        "ramp_seconds": 10.0,
+        "ramp_shape": "linear",
+        "return_to_zero_after": 34.0,
+        "return_ramp_seconds": 10.0,
+        "measurement_target": [
+          0.0,
+          0.0,
+          0.4
+        ],
+        "metrics_warmup_seconds": 46.0,
+        "steady_window": true
+      },
+      "checks": {
+        "same_policy": true,
+        "initialization": true,
+        "correct_target": true,
+        "reset_height": true,
+        "fixed_step": true,
+        "full_policy_only": true,
+        "contract": true,
+        "physical": true,
+        "steady_20s": true,
+        "vx_tracking": true,
+        "yaw_tracking": true,
+        "height_tracking": true,
+        "reached_speed_before_stop": true,
+        "explicit_return_protocol": true
+      },
+      "passed": true,
+      "vx_mae": 0.014421095647354212,
+      "yaw_mae": 0.0060673462696090195,
+      "failure": null
+    },
+    {
+      "capability": "stop_from_reverse4",
+      "source": "plane/outputs/closed_target_trace_20260922_10000/stop_from_reverse4.json",
+      "evidence_sha256": "97468650159fafc51be5c7f8b1589bd617db22befb34372641f08d6f23f6d95d",
+      "schedule": {
+        "target": [
+          -4.0,
+          0.0,
+          0.4
+        ],
+        "settle_seconds": 2.0,
+        "ramp_seconds": 10.0,
+        "ramp_shape": "linear",
+        "return_to_zero_after": 34.0,
+        "return_ramp_seconds": 10.0,
+        "measurement_target": [
+          0.0,
+          0.0,
+          0.4
+        ],
+        "metrics_warmup_seconds": 46.0,
+        "steady_window": true
+      },
+      "checks": {
+        "same_policy": true,
+        "initialization": true,
+        "correct_target": true,
+        "reset_height": true,
+        "fixed_step": true,
+        "full_policy_only": true,
+        "contract": true,
+        "physical": true,
+        "steady_20s": true,
+        "vx_tracking": true,
+        "yaw_tracking": true,
+        "height_tracking": true,
+        "reached_speed_before_stop": true,
+        "explicit_return_protocol": true
+      },
+      "passed": true,
+      "vx_mae": 0.014418536531486958,
+      "yaw_mae": 0.006065626902697631,
+      "failure": null
+    }
+  ],
+  "goal_complete": true,
+  "limits": "Passes apply only to each recorded ramp-and-hold protocol, not arbitrary commands or real hardware. Mapping and all safety gates unchanged.",
+  "source_acceptance": {
+    "path": "plane/outputs/motion_goal_20260922_084744/r01_m10000_summary.json",
+    "sha256": "6ca7341bfc40fdb5b488c2a98b6dcc4bff3d3982e9017a672e9f9ea5fc5ff5f3",
+    "passed": true
+  },
+  "step_response": "Four +/-4 direct steps failed contact protection; not an arbitrary-command or fast-response acceptance."
+}

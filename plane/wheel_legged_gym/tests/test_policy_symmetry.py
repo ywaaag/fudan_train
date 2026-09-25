@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from wheel_legged_gym.rsl_rl.modules.policy_symmetry import (
+from wheel_legged_gym.learning.modules.policy_symmetry import (
     mirror_actions,
     mirror_history,
     mirror_observations,

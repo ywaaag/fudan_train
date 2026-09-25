@@ -1,8 +1,8 @@
 import isaacgym  # must precede torch
 import torch
-from wheel_legged_gym.envs.base.reward_terms import bilateral_geometry_cost
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import apply_training_profile
-from wheel_legged_gym.envs.wheel_legged.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
+from wheel_legged_gym.domain.rewards.terms import bilateral_geometry_cost
+from wheel_legged_gym.app.experiment_inputs import apply_training_profile
+from wheel_legged_gym.contracts.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
 
 
 def test_geometry_reflection_and_increasing_error():

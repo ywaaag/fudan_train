@@ -32,15 +32,17 @@ from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
 import os
 
 import isaacgym
-from isaacgym.torch_utils import *
-from wheel_legged_gym.envs import *
-from wheel_legged_gym.utils import get_args, export_policy_as_jit, task_registry, Logger
+from wheel_legged_gym.app.bootstrap import create_task_registry
+from wheel_legged_gym.utils.logger import Logger
+from wheel_legged_gym.app.arguments import get_args
+from wheel_legged_gym.adapters.artifacts.jit_export import export_policy_as_jit
 
 import numpy as np
 import torch
 
 
 def play(args):
+    task_registry = create_task_registry()
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing
     env_cfg.env.episode_length_s = 20

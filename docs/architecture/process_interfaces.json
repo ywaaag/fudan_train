@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "ownership": "Training invokes the independent MuJoCo repository through subprocess CLI only.",
+  "repository_resolution": {
+    "environment_at_cli_boundary": "FUDAN_SIM2SIM_ROOT",
+    "default": "sibling directory wheel_leg_sim2sim",
+    "interpreter": "current CLI interpreter; use robot Python for MuJoCo validation"
+  },
+  "interfaces": [
+    {
+      "training_entry": "tools/probe_closed_initialization.py",
+      "adapter": "wheel_legged_gym.adapters.mujoco.api.run_validation",
+      "external_entry": "validate_policy.py",
+      "inputs": [
+        "ONNX policy",
+        "initialization mode",
+        "time-only command options",
+        "optional sequence JSON"
+      ],
+      "outputs": [
+        "result/measurements/trace JSON"
+      ],
+      "state_hook": "initialization may write state; on_measurement receives a detached frozen snapshot"
+    },
+    {
+      "training_entry": "tools/probe_tree_ramp.py",
+      "adapter": "wheel_legged_gym.adapters.mujoco.api.run_tree_probe",
+      "external_entry": "probe_tree_ramp.py",
+      "inputs": [
+        "explicit training-root",
+        "forward/yaw target",
+        "output path"
+      ],
+      "outputs": [
+        "tree ramp result/trace JSON"
+      ],
+      "state_hook": "command_at receives time; on_measurement receives a detached frozen snapshot"
+    },
+    {
+      "training_entry": "tools/audit_closed_mapping.py",
+      "adapter": "wheel_legged_gym.adapters.mujoco.api.run_mapping_audit",
+      "external_entry": "audit_mapping.py",
+      "inputs": [
+        "captured qpos/qvel trace JSON",
+        "output path"
+      ],
+      "outputs": [
+        "finite-difference and virtual-work audit JSON"
+      ],
+      "state_hook": "offline local MuJoCo data only"
+    }
+  ],
+  "measurement_interface": {
+    "public": "on_measurement(snapshot)",
+    "removed": "after_step(model, data)",
+    "reason": "User prioritizes readability over unused legacy compatibility; all repository callers migrated."
+  }
+}

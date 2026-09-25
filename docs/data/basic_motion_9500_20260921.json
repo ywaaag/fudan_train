@@ -1,0 +1,40 @@
+{
+  "checkpoint": "/home/kellen/fudan_train/plane/logs/wheel_legged/Sep21_14-37-19_motion_goal_20260921_143444_r01_basic_motion/model_9500.pt",
+  "sha256": "6f120e632d6497926819ced8d25181c5ad08c7dd882ae4e4ed0f1e89cf713c23",
+  "acceptance": {
+    "safe": true,
+    "passed": true,
+    "passed_count": 75,
+    "total": 75,
+    "score": 0.613095611333847,
+    "failed_commands": [],
+    "motion_passed": true,
+    "geometry_passed": true,
+    "max_mean_mirror_distance_m": 0.02172539010643959,
+    "geometry_threshold_m": 0.03,
+    "geometry_by_command": {
+      "-4.0": 0.019668688997626305,
+      "-3.5": 0.02172539010643959,
+      "-3.0": 0.020688079297542572,
+      "-2.5": 0.017888188362121582,
+      "-2.0": 0.015871908515691757,
+      "-1.5": 0.014017898589372635,
+      "-1.0": 0.008179663680493832,
+      "-0.5": 0.001992851961404085,
+      "0.0": 0.002638425212353468,
+      "0.5": 0.00288567366078496,
+      "1.0": 0.006014694459736347,
+      "1.5": 0.016800377517938614,
+      "2.0": 0.018335480242967606,
+      "2.5": 0.016447365283966064,
+      "3.0": 0.013231086544692516,
+      "3.5": 0.009069429710507393,
+      "4.0": 0.004687214735895395
+    },
+    "motion_score": 0.613095611333847,
+    "posture_retained": true
+  },
+  "job": "plane/outputs/motion_goal_20260921_143444",
+  "onnx_log": "plane/outputs/motion_goal_20260921_143444/accepted_basic_motion_onnx_check.log",
+  "scope": "Steady simulation only; dynamic validation pending"
+}

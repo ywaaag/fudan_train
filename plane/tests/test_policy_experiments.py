@@ -5,18 +5,16 @@ import unittest
 import isaacgym  # must precede torch in the Isaac Gym environment
 import torch
 
-from wheel_legged_gym.envs.base.command_sampling import (
+from wheel_legged_gym.domain.commands.command_sampling import (
     MODE_FORWARD,
     MODE_REVERSE,
     MODE_SMALL,
     MODE_ZERO,
     sample_zero_reverse_mixture,
 )
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import (
-    apply_policy_experiment,
-    apply_training_profile,
-)
-from wheel_legged_gym.envs.wheel_legged.wheel_legged_config import (
+from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
+from wheel_legged_gym.app.experiment_inputs import apply_training_profile
+from wheel_legged_gym.contracts.wheel_legged_config import (
     WheelLeggedCfg,
     WheelLeggedCfgPPO,
 )
@@ -26,7 +24,7 @@ from wheel_legged_gym.scripts.select_policy_checkpoint import score_grid
 class PolicyExperimentTest(unittest.TestCase):
     def test_stand_entropy_survives_manifest_optimizer_overrides(self):
         from types import SimpleNamespace
-        from wheel_legged_gym.envs.wheel_legged.policy_experiments import enforce_optimizer_overrides
+        from wheel_legged_gym.app.optimizer_overrides import enforce_optimizer_overrides
         cfg, train = WheelLeggedCfg(), WheelLeggedCfgPPO()
         manifest = apply_training_profile(cfg, train, phase="stand", level=0)
         alg = SimpleNamespace(entropy_coef=train.algorithm.entropy_coef,
@@ -212,7 +210,7 @@ class PolicyExperimentTest(unittest.TestCase):
     def test_method_v1_command_sampling_uses_slot_ids(self):
         ranges = torch.tensor([[-1.0, 1.0]])
         yaw_ranges = torch.tensor([[-1.0, 1.0]])
-        from wheel_legged_gym.envs.base.command_sampling import sample_method_v1
+        from wheel_legged_gym.domain.commands.command_sampling import sample_method_v1
 
         linear, _, _ = sample_method_v1(
             ranges, yaw_ranges, phase="translate", slot_ids=torch.tensor([7])

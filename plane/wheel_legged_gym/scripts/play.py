@@ -9,8 +9,9 @@ import isaacgym
 import torch
 
 from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
-from wheel_legged_gym.envs import *
-from wheel_legged_gym.utils import get_args, export_policy_as_jit, task_registry
+from wheel_legged_gym.app.bootstrap import create_task_registry
+from wheel_legged_gym.app.arguments import get_args
+from wheel_legged_gym.adapters.artifacts.jit_export import export_policy_as_jit
 from wheel_legged_gym.utils.web_panel import TelemetryBuffer, WebPanelServer
 
 try:
@@ -239,6 +240,7 @@ def apply_manual_commands(env, env_cfg):
 
 
 def play(args):
+    task_registry = create_task_registry()
     global running, runtime_limits
 
     print("\n====== Keyboard Control Mode (NO Enter) ======")

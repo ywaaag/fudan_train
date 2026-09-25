@@ -6,14 +6,14 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'plane'))
 import isaacgym
 import torch
-from wheel_legged_gym.envs import *
-from wheel_legged_gym.utils import task_registry
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import apply_policy_experiment
-from wheel_legged_gym.scripts.isaac_parity_trace import _gym_args
-from wheel_legged_gym.scripts.isaac_command_grid import load_policy
+from wheel_legged_gym.app.bootstrap import create_task_registry
+from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
+from wheel_legged_gym.adapters.isaacgym.evaluation_setup import build_evaluation_args
+from wheel_legged_gym.adapters.isaacgym.policy_io import load_policy
 
 
 def main():
+    task_registry = create_task_registry()
     p=argparse.ArgumentParser(__doc__)
     p.add_argument('--checkpoint',required=True,type=Path)
     p.add_argument('--out',required=True,type=Path)
@@ -22,7 +22,7 @@ def main():
     cfg,train=task_registry.get_cfgs('wheel_legged')
     apply_policy_experiment(cfg,'HEIGHT_COURSE',train)
     cfg.env.num_envs=len(cfg.commands.height_bank)*4
-    args=_gym_args();args.num_envs=cfg.env.num_envs;args.seed=23
+    args=build_evaluation_args();args.num_envs=cfg.env.num_envs;args.seed=23
     env,_=task_registry.make_env('wheel_legged',args=args,env_cfg=cfg)
     try:
         model=load_policy(a.checkpoint,env.device)

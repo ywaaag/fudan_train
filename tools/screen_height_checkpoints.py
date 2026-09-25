@@ -1,4 +1,10 @@
 """Screen all missed micro checkpoints using the unchanged full command grid."""
+
+import sys
+from pathlib import Path
+_cli_package_root = str(Path(__file__).resolve().parents[1] / "plane")
+if _cli_package_root not in sys.path:
+    sys.path.insert(0, _cli_package_root)
 import json
 import os
 import sys
@@ -9,8 +15,8 @@ from datetime import datetime
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'plane'))
 import isaacgym
-from wheel_legged_gym.envs.wheel_legged.height_course import height_bank
-from compare_policy_versions import gate
+from wheel_legged_gym.experiments.recipes.height_course import height_bank
+from wheel_legged_gym.evaluation.gates import gate
 
 
 def main():

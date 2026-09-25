@@ -2,8 +2,8 @@ import isaacgym
 import torch
 from types import SimpleNamespace
 from wheel_legged_gym.envs.base.legged_robot import LeggedRobot
-from wheel_legged_gym.envs.wheel_legged.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
-from wheel_legged_gym.envs.wheel_legged.policy_experiments import apply_policy_experiment
+from wheel_legged_gym.contracts.wheel_legged_config import WheelLeggedCfg, WheelLeggedCfgPPO
+from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
 
 
 def test_reference_profile_isolated_and_standing():
