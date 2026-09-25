@@ -18,3 +18,10 @@
 
 验证：`PYTHONPATH=plane python -m pytest plane/tests/test_transition_summary.py plane/tests/test_policy_comparison_gate.py -q`。
 修改前同时检查现有失败样本，不能为了新模型通过而放宽阈值。
+
+本轮 `scripts/evaluate_policy_comparison.py` 新增显式分段速度/yaw、出弯和慢速反向
+命令，并附加 signed roll、侧向速度、轮力、曲率和轨迹字段；默认旧单斜坡
+时序未变。`evaluation.gates.gate` 的原门槛未改。严格转弯标签只在
+`tools/summarize_turn_envelope.py` 使用，并在本轮 `protocol.md` 先冻结；
+动态恢复须读 `response_trace` 的独立时间窗，不能用整段平均值代替。
+证据入口见 `docs/modules/turn_envelope.md`。

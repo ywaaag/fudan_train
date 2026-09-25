@@ -36,6 +36,11 @@ Stand随机化通过`stand_randomization_level`显式传给selection、primitive
 实验目录已不读取环境变量或来源文件；测试对这些边界做静态检查，依赖规则禁止
 experiments导入app/adapters/learning。
 
+新 `TURN_ENVELOPE` 由 app 读取显式 `FUDAN_TURN_SPEC` JSON，recipe 只接收
+字典，artifact 负责精确 R10200 路径/SHA/reward 来源验证；不能用旧
+`--turn-curriculum` 的 6900 起点替代。schema、运行命令和证据入口见
+`docs/modules/turn_envelope.md` 及本轮输出目录 `README.md`。
+
 历史来源门槛集中在`adapters/artifacts/legacy_sources.py`，每个`validate_<recipe>_source`
 保留各自的证据文件、profile、SHA、reward和resume模式检查，不能用宽松通用门槛替代。
 这些历史证据仍定位于仓库docs/data，路径深度已核对；未来增加新来源时应使用显式spec

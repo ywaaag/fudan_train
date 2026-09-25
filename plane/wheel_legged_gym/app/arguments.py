@@ -132,7 +132,7 @@ def get_args():
         {
             "name": "--policy_experiment",
             "type": str,
-            "help": "Policy experiment: H3, H7, method_v1, or FUDAN_STAND (pure standing).",
+            "help": "Policy experiment; TURN_ENVELOPE requires FUDAN_TURN_SPEC and exact R10200 full resume.",
         },
         {
             "name": "--phase",
@@ -166,4 +166,3 @@ def get_args():
     if args.sim_device == "cuda":
         args.sim_device += f":{args.sim_device_id}"
     return args
-

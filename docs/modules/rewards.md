@@ -18,3 +18,8 @@
 fixture来自重构前54个函数的四种配置分支，共216项，使用seed43的非零状态覆盖正负命令、
 reset、轮接触和几何；逐项精确比较并断言输入张量未修改。fixture不应随实现自动刷新。
 结构移动保留浮点运算顺序；发现语义bug应另立实验，不能改fixture来掩盖差异。
+
+2026-09-25 独立行为实验 `TURN_ENVELOPE`：仅 B 在
+`domain/rewards/turn_lean.py` 为 orientation 提供命令驱动的有界 roll 目标；
+A 和其他配方继续走冻结旧公式。权重仍为 -100，pitch 项未删。
+源码入口、spec、验证和树模型/闭链边界见 `docs/modules/turn_envelope.md`。

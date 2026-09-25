@@ -31,6 +31,7 @@
 import numpy as np
 import os
 import json
+import sys
 from datetime import datetime
 
 import isaacgym
@@ -76,12 +77,14 @@ def train(args):
             matching_resume = True
     else:
         manifest = apply_policy_experiment(env_cfg, args.policy_experiment, train_cfg)
-    if str(args.policy_experiment).upper() in {'MOTION_GOAL','HEIGHT_COURSE'}:
+    if str(args.policy_experiment).upper() in {'MOTION_GOAL','HEIGHT_COURSE','TURN_ENVELOPE'}:
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
         from wheel_legged_gym.adapters.artifacts.checkpoints import get_load_path
         from wheel_legged_gym.app.experiment_inputs import validate_motion_source as validate_source
         if str(args.policy_experiment).upper() == 'HEIGHT_COURSE':
             from wheel_legged_gym.app.experiment_inputs import validate_height_source as validate_source
+        if str(args.policy_experiment).upper() == 'TURN_ENVELOPE':
+            from wheel_legged_gym.app.experiment_inputs import validate_turn_source as validate_source
         root=Path(WHEEL_LEGGED_GYM_ROOT_DIR)/'logs'/(args.experiment_name or train_cfg.runner.experiment_name)
         checkpoint=Path(get_load_path(str(root),load_run=args.load_run,checkpoint=args.checkpoint))
         manifest.update(validate_source(checkpoint,args.resume,args.resume_mode,env_cfg))
@@ -165,10 +168,11 @@ def train(args):
         from wheel_legged_gym.adapters.artifacts.checkpoint_migration import verify_and_restore_std
         manifest['migration_verification'] = verify_and_restore_std(ppo_runner, checkpoint)
     task_registry.save_cfgs(name=args.task)
-    if str(args.policy_experiment).upper() in {'MOTION_GOAL','HEIGHT_COURSE'}:
+    if str(args.policy_experiment).upper() in {'MOTION_GOAL','HEIGHT_COURSE','TURN_ENVELOPE'}:
         from wheel_legged_gym.adapters.artifacts.checkpoint_migration import verify_full_resume
+        spec = manifest.get('turn_spec',manifest.get('height_spec',manifest.get('motion_goal_spec')))
         manifest['resume_verification']=verify_full_resume(ppo_runner,checkpoint,
-            expected_iteration=manifest.get('height_spec',manifest.get('motion_goal_spec'))['source_iteration'])
+            expected_iteration=spec['source_iteration'])
         manifest['effective_start_learning_rate']=ppo_runner.alg.learning_rate
         if manifest.get('freeze_motion_encoder',False):
             ppo_runner.alg.freeze_encoder_updates=True
@@ -184,9 +188,12 @@ def train(args):
             ppo_runner.alg.reference_policy=copy.deepcopy(ppo_runner.alg.actor_critic).eval()
             for parameter in ppo_runner.alg.reference_policy.parameters():parameter.requires_grad_(False)
             ppo_runner.alg.reference_coef=manifest['dynamic_reference_coef']
-            ppo_runner.alg.reference_dynamic_stride=env_cfg.commands.start_stop_stride
+            ppo_runner.alg.reference_dynamic_stride=(env_cfg.commands.turn_stride
+                if manifest.get('turn_spec') else env_cfg.commands.start_stop_stride)
             ppo_runner.alg.storage.track_minibatch_env_ids=True
             manifest['reference_checkpoint_sha256']=manifest['source_checkpoint_sha256']
+    if manifest.get('turn_spec'):
+        manifest['training_command'] = [sys.executable] + sys.argv
     if str(args.policy_experiment).upper() in {'LEGACY_ANCHORS','LEGACY_SPEED2','LEGACY_SPEED2_STOP','LEGACY_YAW'}:
         from wheel_legged_gym.adapters.artifacts.checkpoint_migration import verify_full_resume
         manifest['resume_verification']=verify_full_resume(ppo_runner,checkpoint,

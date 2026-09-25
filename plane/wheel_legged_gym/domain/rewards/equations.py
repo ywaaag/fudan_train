@@ -194,6 +194,11 @@ def _reward_orientation(state: RewardInputs):
         return normalized_huber(
             torch.norm(state.projected_gravity[:, :2], dim=1), 0.35, clip=1.0
         )
+    max_lean = getattr(state.cfg.rewards, 'turn_lean_max_rad', 0.)
+    if max_lean:
+        from wheel_legged_gym.domain.rewards.turn_lean import orientation_cost
+        return orientation_cost(state.projected_gravity, state.commands[:, 0],
+                                state.commands[:, 1], max_lean)
     return torch.sum(torch.square(state.projected_gravity[:, :2]), dim=1)
 
 

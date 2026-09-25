@@ -22,3 +22,8 @@ flowchart LR
 非选中行、随机数状态、reset时刻的buffer以及未知策略拒绝。
 真实64环境/seed11/1iteration smoke证据见
 `plane/outputs/architecture_refactor_20260923/resampling_smoke_equivalence.json`。
+
+2026-09-25 的 `turn_envelope` 是单独授权的行为变更：`env_id%4==0` 的
+转弯 cohort 使用 `domain/commands/turn_envelope.py` 开放命令调度，其他
+75% 环境仍用原 `basic_motion` bank。其 callback 只在该策略执行；旧五种
+策略的重采样顺序不变。验证和命令表见 `docs/modules/turn_envelope.md`。

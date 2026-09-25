@@ -38,3 +38,18 @@ def validate_height_source(path,resume,mode,cfg, *, spec):
     return {'source_checkpoint':str(path),'source_checkpoint_sha256':sha}
 
 
+def validate_turn_source(path, resume, mode, cfg, *, spec):
+    path = Path(path).resolve()
+    if not resume or mode != 'full' or path != Path(spec['source_checkpoint']).resolve():
+        raise ValueError('Turn envelope requires exact R10200 full resume')
+    sha = hashlib.sha256(path.read_bytes()).hexdigest()
+    if sha != spec['source_sha256']:
+        raise ValueError('Turn source checksum mismatch')
+    old = json.loads((path.parent / 'policy_experiment.json').read_text())
+    if old.get('profile') != 'motion_goal_v1' or old.get('resume_verification', {}).get('initial_iteration') != 10000:
+        raise ValueError('Unreviewed turn source manifest')
+    for key, value in old['reward_scales'].items():
+        if getattr(cfg.rewards.scales, key, 0.) != value:
+            raise ValueError('Turn source reward mismatch: ' + key)
+    return {'source_checkpoint': str(path), 'source_checkpoint_sha256': sha,
+            'source_manifest': str(path.parent / 'policy_experiment.json')}

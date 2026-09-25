@@ -14,14 +14,28 @@ class CommandBuffers:
 
 
 def resample(env_ids, *, state: CommandBuffers, ranges, config, device,
-             reset_start_stop, sample_heading):
+             reset_start_stop, sample_heading, reset_turn=None):
     """Mutate selected rows only; callbacks retain simulator-specific boundary behavior.
 
     The height draw runs even for height_bank, before its selected height override.
     Reset callback stays lazy and follows that draw; heading is always drawn last.
     """
     strategy = getattr(config, "sampling_strategy", "uniform")
-    if strategy == "height_bank":
+    if strategy == "turn_envelope":
+        from wheel_legged_gym.domain.commands.command_sampling import sample_fixed_bank
+        turn = env_ids.remainder(config.turn_stride) == 0
+        retained_ids, turn_ids = env_ids[~turn], env_ids[turn]
+        if len(retained_ids):
+            state.commands[retained_ids, :2] = sample_fixed_bank(
+                ranges['lin_vel_x'][retained_ids], ranges['ang_vel_yaw'][retained_ids],
+                state.segment_counter[retained_ids], config.retention_bank)
+        if len(turn_ids):
+            targets = sample_fixed_bank(
+                ranges['lin_vel_x'][turn_ids], ranges['ang_vel_yaw'][turn_ids],
+                state.segment_counter[turn_ids] // config.turn_stride, config.turn_bank)
+        state.sample_mode[env_ids] = -1
+        state.segment_counter[env_ids] += 1
+    elif strategy == "height_bank":
         from wheel_legged_gym.domain.commands.command_sampling import sample_height_bank
         height_selected = sample_height_bank(ranges['lin_vel_x'][env_ids],
             ranges['ang_vel_yaw'][env_ids], ranges['height'][env_ids],
@@ -103,6 +117,8 @@ def resample(env_ids, *, state: CommandBuffers, ranges, config, device,
 
     if getattr(config,'start_stop_ramp_seconds',0.)>0:
         reset_start_stop(state.commands,env_ids)
+    if strategy == 'turn_envelope' and len(turn_ids):
+        reset_turn(state.commands, turn_ids, targets)
     if strategy == 'height_bank':
         state.commands[env_ids, 2] = height_selected[:, 2]
 

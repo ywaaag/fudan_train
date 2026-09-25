@@ -582,6 +582,8 @@ class LeggedRobot(BaseTask):
             self._resample_commands(env_ids)
         if getattr(self.cfg.commands,'start_stop_ramp_seconds',0.)>0:
             self._get_start_stop_scheduler().advance(self.commands)
+        if getattr(self.cfg.commands,'sampling_strategy',None)=='turn_envelope':
+            self._get_turn_scheduler().advance(self.commands)
         if getattr(self.cfg.commands,'height_switch_interval',0.)>0:
             from wheel_legged_gym.domain.commands.height_commands import alternate_height
             alternate_height(self.commands,self.episode_length_buf,self.dt,
@@ -631,6 +633,13 @@ class LeggedRobot(BaseTask):
                 getattr(self.cfg.commands,'start_stop_stride',2))
         return self.start_stop_scheduler
 
+    def _get_turn_scheduler(self):
+        if not hasattr(self, 'turn_scheduler'):
+            from wheel_legged_gym.domain.commands.turn_envelope import TurnEnvelope
+            self.turn_scheduler = TurnEnvelope(self.num_envs, self.device, self.dt,
+                self.cfg.commands.turn_stride)
+        return self.turn_scheduler
+
     def _resample_commands(self, env_ids):
         resample_commands(
             env_ids,
@@ -639,6 +648,7 @@ class LeggedRobot(BaseTask):
             ranges=self.command_ranges, config=self.cfg.commands, device=self.device,
             reset_start_stop=lambda commands, ids: self._get_start_stop_scheduler().reset(commands, ids),
             sample_heading=torch_rand_float,
+            reset_turn=lambda commands, ids, targets: self._get_turn_scheduler().reset(commands, ids, targets),
         )
 
     def _compute_torques(self, actions):

@@ -252,3 +252,38 @@ pkill -f '/fudan_leg/bin/tensorboard'
 ```
 
 不要删除 `logs/`，其中包含 checkpoint、TensorBoard event 和每次运行保存的配置。
+
+## 固定高度转弯包络（已完成的有界 A/B；不可原名重跑）
+
+先读 `docs/modules/turn_envelope.md`，再读
+`plane/outputs/turn_envelope_20260925_162526/README.md`。本轮 A/B 已完成，
+下面命令只用于核对公开入口的参数形状。新实验必须另建输出目录、spec 和
+唯一 `run_name`，且需要新的明确训练授权；不要覆盖本轮产物。
+
+```bash
+cd /home/kellen/fudan_train/plane
+env PYTHONPATH=/home/kellen/fudan_train/plane \
+LD_LIBRARY_PATH=/home/kellen/anaconda3/envs/fudan_leg/lib \
+CUDA_VISIBLE_DEVICES=0 \
+FUDAN_TURN_SPEC=/absolute/path/to/new_spec.json \
+/home/kellen/anaconda3/envs/fudan_leg/bin/python \
+wheel_legged_gym/scripts/train.py \
+--task=wheel_legged --headless --num_envs=64 --max_iterations=1 --seed=23 \
+--policy_experiment=TURN_ENVELOPE --resume --resume_mode=full \
+--load_run=Sep22_11-19-04_motion_goal_20260922_111611_r01_basic_motion \
+--checkpoint=10200 --run_name=NEW_UNIQUE_TURN_SMOKE
+```
+
+`new_spec.json` 的 schema 见本轮 `A/spec.json` 或 `B/spec.json`；只能选分支
+`A`/`B`，来源 SHA 固定。64 环境 smoke 不能代替正式评估。执行评估时使用
+`scripts/evaluate_policy_comparison.py --help` 核对 `--yaw-delay-seconds`、
+`--yaw-exit-at` 和 `--yaw-exit-factor`；现有结果采用 16 环境/命令、
+seed 19/37/53，原 25 命令与转弯网格分开验收。只读汇总入口：
+
+```bash
+cd /home/kellen/fudan_train
+env PYTHONPATH=/home/kellen/fudan_train/plane \
+LD_LIBRARY_PATH=/home/kellen/anaconda3/envs/fudan_leg/lib \
+/home/kellen/anaconda3/envs/fudan_leg/bin/python \
+tools/summarize_turn_envelope.py --help
+```

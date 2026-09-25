@@ -22,6 +22,7 @@ from wheel_legged_gym.app.experiment_inputs import apply_training_profile
 from wheel_legged_gym.app.experiment_inputs import apply_policy_experiment
 from wheel_legged_gym.adapters.isaacgym.evaluation_setup import build_evaluation_args, disable_evaluation_randomization
 from wheel_legged_gym.adapters.isaacgym.policy_io import load_policy, set_fixed_command_ranges
+from wheel_legged_gym.domain.rewards.turn_lean import roll_reference
 
 
 def digest(path):
@@ -41,6 +42,12 @@ def main(argv=None):
     p.add_argument('--initial-yaw-commands', type=float, nargs='+')
     p.add_argument('--switch-at', type=float, default=5.)
     p.add_argument('--transition-ramp-seconds',type=float,default=0.,help='Explicit linear command ramp; zero preserves step protocol')
+    p.add_argument('--yaw-delay-seconds', type=float, default=0., help='Delay yaw ramp after the speed ramp begins')
+    p.add_argument('--yaw-exit-at', type=float, help='Begin a slow return to straight motion at this time')
+    p.add_argument('--yaw-exit-ramp-seconds', type=float, default=2.)
+    p.add_argument('--yaw-exit-factor', type=float, choices=[0., -1.], default=0.,
+                   help='0 returns to straight; -1 slowly reverses yaw')
+    p.add_argument('--lean-reference-max-deg', type=float, default=0.)
     p.add_argument('--trace-stride', type=int, default=10)
     p.add_argument('--envs-per-command', type=int, default=16)
     p.add_argument('--seed', type=int, default=19)
@@ -63,6 +70,12 @@ def main(argv=None):
     transition = a.initial_commands is not None
     if a.transition_ramp_seconds<0 or (a.transition_ramp_seconds and not transition):
         p.error('Nonnegative transition ramp requires initial commands')
+    if (a.yaw_delay_seconds < 0 or a.yaw_exit_ramp_seconds <= 0 or
+            not 0 <= a.lean_reference_max_deg <= 10 or
+            (a.yaw_delay_seconds and not transition) or
+            (a.yaw_exit_at is not None and not transition) or
+            (a.yaw_exit_factor and a.yaw_exit_at is None)):
+        p.error('Invalid staged turn protocol')
     if (a.initial_yaw_commands is not None or a.initial_height_commands is not None) and not transition:
         p.error('initial yaw requires initial commands')
     if transition:
@@ -79,8 +92,10 @@ def main(argv=None):
             p.error('initial lists must match target lists; require 0 < switch-at < warmup')
     if not 0 <= a.warmup < a.seconds or a.envs_per_command < 1:
         p.error('require seconds > warmup >= 0 and positive environment count')
-    if transition and a.switch_at+a.transition_ramp_seconds>=a.warmup:
+    if transition and a.switch_at+a.transition_ramp_seconds+a.yaw_delay_seconds>=a.warmup:
         p.error('Steady warmup must end after the command ramp')
+    if a.yaw_exit_at is not None and not a.warmup < a.yaw_exit_at < a.seconds-a.yaw_exit_ramp_seconds:
+        p.error('Yaw exit must follow steady warmup and finish before evaluation end')
     if a.out.exists():
         raise FileExistsError(a.out)
     cfg, train = task_registry.get_cfgs(name='wheel_legged')
@@ -132,7 +147,10 @@ def main(argv=None):
         names = ['vx', 'vx_mae', 'abs_vx', 'yaw', 'abs_yaw', 'height', 'height_mae',
                  'abs_roll', 'abs_pitch', 'left_contact', 'right_contact',
                  'nonwheel_contact', 'slip_rms', 'torque_saturation',
-                 'knee_mirror_m', 'wheel_mirror_m', 'encoder_vx_mae', 'action_clip', 'yaw_mae']
+                 'knee_mirror_m', 'wheel_mirror_m', 'encoder_vx_mae', 'action_clip', 'yaw_mae',
+                 'roll', 'roll_target', 'pitch', 'lateral_velocity', 'abs_lateral_velocity',
+                 'curvature', 'lateral_accel_command', 'lateral_accel_actual',
+                 'left_vertical_force', 'right_vertical_force']
         sums = torch.zeros(env.num_envs, len(names), device=env.device)
         maxima = torch.zeros_like(sums)
         count = 0
@@ -145,9 +163,18 @@ def main(argv=None):
         for step in range(round(a.seconds / env.dt)):
             switch_step=round(a.switch_at/env.dt)
             ramp_steps=round(a.transition_ramp_seconds/env.dt)
-            if transition and switch_step<=step<=switch_step+ramp_steps:
+            yaw_end_step = switch_step + ramp_steps + round(a.yaw_delay_seconds/env.dt)
+            exit_step = round(a.yaw_exit_at/env.dt) if a.yaw_exit_at is not None else None
+            exit_ramp_steps = round(a.yaw_exit_ramp_seconds/env.dt)
+            if transition and (switch_step<=step<=yaw_end_step or
+                               (exit_step is not None and step>=exit_step)):
                 fraction=1. if ramp_steps==0 else min(1.,(step-switch_step)/ramp_steps)
                 actual=initial_commands+(commands-initial_commands)*fraction
+                yaw_fraction=1. if ramp_steps==0 else min(1.,max(0.,(step-switch_step-round(a.yaw_delay_seconds/env.dt))/ramp_steps))
+                actual[:, 1]=initial_commands[:, 1]+(commands[:, 1]-initial_commands[:, 1])*yaw_fraction
+                if exit_step is not None and step>=exit_step:
+                    exit_fraction=min(1.,(step-exit_step)/exit_ramp_steps)
+                    actual[:, 1]=commands[:, 1]*(1.+(a.yaw_exit_factor-1.)*exit_fraction)
                 set_fixed_command_ranges(env, actual)
                 target = torch.tensor(actual, device=env.device, dtype=torch.float)
                 env.commands[:, :3] = target
@@ -181,14 +208,21 @@ def main(argv=None):
             if transition and step % a.trace_stride == 0:
                 response_trace.append({'time': (step+1)*env.dt,
                     'applied_command':target.detach().cpu().tolist(),
+                    'policy_command_scaled':obs[:, 6:9].detach().cpu().tolist(),
+                    'history_latest_command_scaled':history[:, -19:-16].detach().cpu().tolist(),
                     'wheel_vertical_force_n':env.contact_forces[:,env.feet_indices,2].cpu().tolist(),
                     'path_since_switch_m':travelled.cpu().tolist(),
                     'wheel_contacts':(env.contact_forces[:,env.feet_indices,2]>1).cpu().tolist(),
                     'roll':torch.atan2(-env.projected_gravity[:,1],-env.projected_gravity[:,2]).cpu().tolist(),
+                    'roll_target':(roll_reference(target[:,0],target[:,1],
+                        a.lean_reference_max_deg*np.pi/180).cpu().tolist()
+                        if a.lean_reference_max_deg else [0.]*env.num_envs),
                     'resets':(failures+timeouts).cpu().tolist(),
                     'height': env.base_height.detach().cpu().tolist(),
                     'vx': env.base_lin_vel[:, 0].detach().cpu().tolist(),
-                    'yaw': env.base_ang_vel[:, 2].detach().cpu().tolist()})
+                    'vy': env.base_lin_vel[:, 1].detach().cpu().tolist(),
+                    'yaw': env.base_ang_vel[:, 2].detach().cpu().tolist(),
+                    'base_xy':env.root_states[:, :2].detach().cpu().tolist()})
             # Counters reset with episodes; post-reset samples are not valid
             # torque observations. Any reset independently fails acceptance.
             sat = (env.command_metrics.preclip_torque_saturation_sum - before_saturation).clamp(min=0)
@@ -204,6 +238,9 @@ def main(argv=None):
                                         positions.reshape(-1, 3)).reshape(-1, 4, 3)
             mirror = local.new_tensor([1, -1, 1])
             vx, yaw = env.base_lin_vel[:, 0], env.base_ang_vel[:, 2]
+            signed_speed = torch.where(vx >= 0, vx.clamp(min=.1), vx.clamp(max=-.1))
+            roll_target=(roll_reference(target[:,0],target[:,1],a.lean_reference_max_deg*np.pi/180)
+                         if a.lean_reference_max_deg else torch.zeros_like(vx))
             if getattr(env, '_method_v1', False):
                 slip_metric = env._method_wheel_terms()['residual_rms']
             else:
@@ -215,7 +252,12 @@ def main(argv=None):
                 (local[:, 0]-local[:, 1]*mirror).norm(dim=-1),
                 (local[:, 2]-local[:, 3]*mirror).norm(dim=-1), encoder_error,
                 (action.abs() > env.cfg.normalization.clip_actions).float().mean(dim=-1),
-                (yaw-target[:, 1]).abs()], dim=-1)
+                (yaw-target[:, 1]).abs(), roll, roll_target, pitch,
+                env.base_lin_vel[:,1], env.base_lin_vel[:,1].abs(),
+                torch.where(vx.abs()>.1,yaw/signed_speed,torch.zeros_like(vx)),
+                target[:,0]*target[:,1],vx*yaw,
+                env.contact_forces[:,env.feet_indices[0],2].clamp_min(0),
+                env.contact_forces[:,env.feet_indices[1],2].clamp_min(0)], dim=-1)
             if not torch.isfinite(values).all():
                 raise RuntimeError('Nonfinite physics metrics')
             sums += values
@@ -259,6 +301,11 @@ def main(argv=None):
                 trace_dt=env.dt*a.trace_stride,
                 switch_at=round(a.switch_at/env.dt)*env.dt,
                 transition_ramp_seconds=round(a.transition_ramp_seconds/env.dt)*env.dt,
+                yaw_delay_seconds=round(a.yaw_delay_seconds/env.dt)*env.dt,
+                yaw_exit_at=a.yaw_exit_at,
+                yaw_exit_ramp_seconds=a.yaw_exit_ramp_seconds if a.yaw_exit_at is not None else None,
+                yaw_exit_factor=a.yaw_exit_factor if a.yaw_exit_at is not None else None,
+                lean_reference_max_deg=a.lean_reference_max_deg,
                 initial_commands=list(map(list,zip(a.initial_commands,a.initial_yaw_commands,a.initial_height_commands))),
                 response_trace=response_trace,
                 transition_note='No reset at switch; 10 Hz per-environment response trace. Metrics and gate cover post-warmup steady state, not transient smoothness.')
