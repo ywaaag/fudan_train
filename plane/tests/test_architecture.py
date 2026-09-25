@@ -63,9 +63,7 @@ def test_tools_are_cli_leaves_without_process_or_job_state_ownership():
     import ast
     root = Path(__file__).resolve().parents[2]
     violations = []
-    legacy_process_tools = {
-        'compare_policy_versions.py', 'continue_height_course.py', 'audit_observation_noise.py',
-    }
+    legacy_process_tools = set()
     for path in (root / 'tools').glob('*.py'):
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):

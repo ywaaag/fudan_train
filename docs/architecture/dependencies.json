@@ -89,6 +89,7 @@
     "wheel_legged_gym.adapters.processes.python_job": "plane/wheel_legged_gym/adapters/processes/python_job.py",
     "wheel_legged_gym.app": "plane/wheel_legged_gym/app/__init__.py",
     "wheel_legged_gym.app.arguments": "plane/wheel_legged_gym/app/arguments.py",
+    "wheel_legged_gym.app.audit_observation_noise": "plane/wheel_legged_gym/app/audit_observation_noise.py",
     "wheel_legged_gym.app.audit_stand_push": "plane/wheel_legged_gym/app/audit_stand_push.py",
     "wheel_legged_gym.app.bootstrap": "plane/wheel_legged_gym/app/bootstrap.py",
     "wheel_legged_gym.app.candidate_closed_review": "plane/wheel_legged_gym/app/candidate_closed_review.py",
@@ -485,6 +486,24 @@
       "source": "tools.audit_height_update",
       "target": "wheel_legged_gym.app.experiment_inputs",
       "line": 10,
+      "kind": "import"
+    },
+    {
+      "source": "tools.audit_observation_noise",
+      "target": "wheel_legged_gym",
+      "line": 9,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.audit_observation_noise",
+      "target": "wheel_legged_gym.app",
+      "line": 9,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.audit_observation_noise",
+      "target": "wheel_legged_gym.app.audit_observation_noise",
+      "line": 9,
       "kind": "import"
     },
     {

@@ -1238,3 +1238,7 @@ summarize_policy_comparison、export_model_registry仍直接读取或写job文�
 保留round/seed、screen-job等待、部分候选、三轮停滞、STOP和子job status协议；robot环境
 入口可导入且未启动续训。新增test_continue_height_entrypoint.py验证CLI无Popen/导入无mkdir。
 剩余直接子进程诊断仅audit_observation_noise，另有三个只读/job文件工具。
+
+阶段98再次补充：`audit_observation_noise.py`已迁移为app.audit_observation_noise.main(root, argv)，
+保留sampled/sampled_noisy模式和字面参数传递；新增3项边界测试，未运行实际诊断。
+剩余tools仅3个旧job文件读写工具，不再有直接子进程诊断入口。

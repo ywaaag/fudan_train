@@ -1,14 +1,13 @@
-"""Legacy CLI delegating explicit noise/action options; no monkey patch."""
-import subprocess
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+package_root = str(ROOT / 'plane')
+if package_root not in sys.path:
+    sys.path.insert(0, package_root)
 
-def main():
-    mode=sys.argv[1]
-    if mode not in ('sampled','sampled_noisy'):raise ValueError('Expected sampled or sampled_noisy')
-    entry=Path(__file__).resolve().parents[1]/'plane/wheel_legged_gym/scripts/evaluate_policy_comparison.py'
-    return subprocess.run([sys.executable,str(entry),'--diagnostic-mode',mode,*sys.argv[2:]]).returncode
+from wheel_legged_gym.app.audit_observation_noise import main
 
 
-if __name__=='__main__':raise SystemExit(main())
+if __name__ == '__main__':
+    raise SystemExit(main(ROOT))
