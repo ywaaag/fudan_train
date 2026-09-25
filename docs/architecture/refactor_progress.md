@@ -1,5 +1,16 @@
 # 架构重构证据与交接
 
+## 2026-09-24 阶段92：双姿态切换验收与应用解耦
+
+- 修改plane/wheel_legged_gym/evaluation/height_acceptance.py增加assess_height_transitions，
+  app/run_dual_height.py委托最终steady/response判断；保留原<=/.015/3秒与接触==0语义。
+- 新增plane/tests/test_height_transition_acceptance.py（41项），与冻结原判断比较边界、
+  None、NaN、基础拒绝、接触/未稳定及空集合；更新test_height_supervisor_entrypoints.py
+  仅展开已独立验证的判断调用，剩余应用AST继续与原主体一致。
+- 全套624 passed、2 warnings；231模块988边四类违规为空。更新height_supervisors指南、
+  依赖JSON及本记录；不改训练/课程/物理参数，未启动训练或仿真。
+  高度组进程/artifact边界和整体其他监督器仍待核对，goal未完成。
+
 ## 2026-09-24 阶段91：高度课程验收工作流
 
 - 新增plane/wheel_legged_gym/workflows/height_evaluation.py，显式依赖EvaluationArtifacts/

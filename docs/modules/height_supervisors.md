@@ -33,3 +33,9 @@ test_height_supervisor_entrypoints与提交c5bcfcb中的原main主体逐节点AS
 空结果沿用旧all([])语义，未以重构改变门槛。应用仍拥有STOP、日志、候选接受和升阶。
 test_height_evaluation对照冻结原应用片段，比较成功/失败行/空结果/进程异常/坏JSON的
 全部命令、调用顺序、结果与序列化字节；入口AST测试只展开这段已独立验证的工作流。
+
+双姿态切换的最终判断归`evaluation.height_acceptance.assess_height_transitions`，
+返回独立的steady/response布尔值。高度MAE<=.015、非轮接触==0、全部环境settled且
+最慢响应<=3秒的原规则保持；NaN仍被<=拒绝，不能直接复用课程中>才拒绝的判断。
+空记录/空响应仍保留all([])历史语义，样本完整性不能只靠这两个布尔值证明。
+test_height_transition_acceptance对照冻结原判断，覆盖精确边界、None、NaN和未稳定环境。

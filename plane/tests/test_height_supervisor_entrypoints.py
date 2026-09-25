@@ -18,6 +18,15 @@ def test_body_is_unchanged(name):
     count = 2 if name=='run_height_course' else 1
     actual = ast.Module(body=main.body[count:],type_ignores=[])
     expected = ast.parse(textwrap.dedent(BODIES[name]))
+    if name=='run_dual_height':
+        old_try = next(n for n in expected.body if isinstance(n,ast.Try))
+        old_checks = [n for n in old_try.body if isinstance(n,ast.Assign)
+                      and isinstance(n.targets[0],ast.Name) and n.targets[0].id in {'passed','settled'}]
+        new_try = next(n for n in actual.body if isinstance(n,ast.Try))
+        index = next(i for i,n in enumerate(new_try.body) if isinstance(n,ast.Assign)
+                     and isinstance(n.value,ast.Call) and isinstance(n.value.func,ast.Name)
+                     and n.value.func.id=='assess_height_transitions')
+        new_try.body[index:index+1] = old_checks
     if name=='run_height_course':
         old_loop = next(n for n in ast.walk(expected) if isinstance(n, ast.For)
                         and isinstance(n.target, ast.Name) and n.target.id=='stage')
