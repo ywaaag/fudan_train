@@ -1,5 +1,16 @@
 # 架构重构证据与交接
 
+## 2026-09-24 阶段91：高度课程验收工作流
+
+- 新增plane/wheel_legged_gym/workflows/height_evaluation.py，显式依赖EvaluationArtifacts/
+  PythonJob端口及height_acceptance；app/run_height_course.py仅组装JobFiles/run并接收结果。
+- 新增plane/tests/test_height_evaluation.py，5类场景对照冻结旧应用代码，检查命令、
+  全部seed顺序、结果及JSON字节、异常不写acceptance；更新test_height_supervisor_entrypoints.py，
+  仅展开已独立测试的工作流片段，剩余主函数AST仍与旧版精确比较。
+- 全套583 passed、2 warnings；231模块988边四类违规为空。未启动训练/仿真/通知。
+- 更新height_supervisors模块指南及依赖图JSON；本次减少应用验收细节，进程与升阶仍在app，
+  整体goal及监督器清单剩余项尚未完成。
+
 ## 2026-09-24 阶段90：高度组应用入口与仿真导入解耦
 
 - 修改tools/run_height_course.py、run_dual_height.py、screen_height_checkpoints.py为薄CLI；

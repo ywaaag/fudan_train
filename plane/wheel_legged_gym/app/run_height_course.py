@@ -10,7 +10,8 @@ import argparse
 import time
 from datetime import datetime
 from wheel_legged_gym.experiments.recipes.height_course import STAGES,height_bank
-from wheel_legged_gym.evaluation.height_acceptance import assess_height_row
+from wheel_legged_gym.adapters.artifacts.job_files import JobFiles
+from wheel_legged_gym.workflows.height_evaluation import evaluate_height_checkpoint
 
 def main(root):
     ROOT = Path(root)
@@ -76,21 +77,12 @@ def main(root):
             candidate=folder/f'model_{iteration+500}.pt'
             # Every training command; height endpoints cannot silently disappear.
             bank=sorted(set(height_bank(stage,opts.variable_repeats)))
-            records=[]
-            for seed in [19,37,53]:
-                tag=f'{stage}_seed{seed}';out=job/(tag+'.json')
-                run([PLANE/'wheel_legged_gym/scripts/evaluate_policy_comparison.py',
-                     '--checkpoint='+str(candidate),'--out='+str(out),'--seed='+str(seed),
-                     '--commands']+[str(v) for v,w,h in bank]+['--yaw-commands']+[str(w) for v,w,h in bank]+
-                     ['--height-commands']+[str(h) for v,w,h in bank],tag)
-                data=json.loads(out.read_text())
-                for row in data['results']:
-                    assess_height_row(row,stage)
-                    records.append(dict(row,seed=seed))
-            passed=all(r['gate']['passed'] for r in records)
-            result={'checkpoint':str(candidate),'stage':stage,'passed':passed,
-                    'passed_count':sum(r['gate']['passed'] for r in records),'total':len(records),'records':records}
-            (job/(stage+'_acceptance.json')).write_text(json.dumps(result,indent=2)+'\n')
+            result=evaluate_height_checkpoint(
+                candidate,stage,bank,
+                evaluation_script=PLANE/'wheel_legged_gym/scripts/evaluate_policy_comparison.py',
+                files=JobFiles(job),run=run,
+            )
+            passed=result['passed']
             state['history'].append({k:v for k,v in result.items() if k!='records'})
             if not passed:
                 state.update(status='paused_gate_failed',candidate=str(candidate));save();return
