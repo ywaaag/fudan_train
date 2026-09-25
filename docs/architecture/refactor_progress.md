@@ -1245,4 +1245,8 @@ summarize_policy_comparison、export_model_registry仍直接读取或写job文�
 
 阶段98最终补充：wait_for_completion、summarize_policy_comparison、export_model_registry
 已迁移到app同名入口，tools只保留CLI引导；新增job_tool_entrypoints测试验证导入不读写文件、
-不启动进程。旧文件格式的真实读写对照仍待最终验收，不运行历史任务。
+ 不启动进程。旧文件格式的真实读写对照仍待最终验收，不运行历史任务。
+
+补充：迁移后将test_height_continuation和test_policy_comparison_gate的旧tools路径导入
+改为直接责任模块；没有保留已删除tools的Python导出别名。训练全套测试目前664 passed、
+2 warnings；sim2sim此前24 passed。job文件真实历史样本未被改写或加载执行。

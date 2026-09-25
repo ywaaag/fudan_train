@@ -1,11 +1,5 @@
 """Reject false passes from directional bias, contact loss and reset trajectories."""
-import importlib.util
-from pathlib import Path
-
-spec = importlib.util.spec_from_file_location(
-    'compare_policy_versions', Path(__file__).resolve().parents[2]/'tools/compare_policy_versions.py')
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
+from wheel_legged_gym.evaluation import gates as module
 
 
 def valid_row(vx=.5):

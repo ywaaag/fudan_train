@@ -1,7 +1,4 @@
-import sys
-from pathlib import Path
-sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'tools'))
-from continue_height_course import assess
+from wheel_legged_gym.app.continue_height_course import assess
 
 
 def test_micro_constant_height_and_unsafe_candidates_rejected():
