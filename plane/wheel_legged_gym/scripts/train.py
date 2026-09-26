@@ -77,7 +77,7 @@ def train(args):
             matching_resume = True
     else:
         manifest = apply_policy_experiment(env_cfg, args.policy_experiment, train_cfg)
-    if str(args.policy_experiment).upper() in {'MOTION_GOAL','HEIGHT_COURSE','TURN_ENVELOPE'}:
+    if str(args.policy_experiment).upper() in {'MOTION_GOAL','HEIGHT_COURSE','TURN_ENVELOPE','TURN_LEAN_LONG'}:
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
         from wheel_legged_gym.adapters.artifacts.checkpoints import get_load_path
         from wheel_legged_gym.app.experiment_inputs import validate_motion_source as validate_source
@@ -85,9 +85,15 @@ def train(args):
             from wheel_legged_gym.app.experiment_inputs import validate_height_source as validate_source
         if str(args.policy_experiment).upper() == 'TURN_ENVELOPE':
             from wheel_legged_gym.app.experiment_inputs import validate_turn_source as validate_source
+        if str(args.policy_experiment).upper() == 'TURN_LEAN_LONG':
+            from wheel_legged_gym.adapters.artifacts.recipe_source import validate_turn_long_source as validate_source
         root=Path(WHEEL_LEGGED_GYM_ROOT_DIR)/'logs'/(args.experiment_name or train_cfg.runner.experiment_name)
         checkpoint=Path(get_load_path(str(root),load_run=args.load_run,checkpoint=args.checkpoint))
-        manifest.update(validate_source(checkpoint,args.resume,args.resume_mode,env_cfg))
+        if str(args.policy_experiment).upper() == 'TURN_LEAN_LONG':
+            manifest.update(validate_source(checkpoint,args.resume,args.resume_mode,env_cfg,
+                spec=manifest['turn_long_spec']))
+        else:
+            manifest.update(validate_source(checkpoint,args.resume,args.resume_mode,env_cfg))
         matching_resume=True
     if str(args.policy_experiment).upper() in {'LEGACY_ANCHORS','LEGACY_SPEED2','LEGACY_SPEED2_STOP','LEGACY_YAW'}:
         from wheel_legged_gym import WHEEL_LEGGED_GYM_ROOT_DIR
@@ -168,9 +174,10 @@ def train(args):
         from wheel_legged_gym.adapters.artifacts.checkpoint_migration import verify_and_restore_std
         manifest['migration_verification'] = verify_and_restore_std(ppo_runner, checkpoint)
     task_registry.save_cfgs(name=args.task)
-    if str(args.policy_experiment).upper() in {'MOTION_GOAL','HEIGHT_COURSE','TURN_ENVELOPE'}:
+    if str(args.policy_experiment).upper() in {'MOTION_GOAL','HEIGHT_COURSE','TURN_ENVELOPE','TURN_LEAN_LONG'}:
         from wheel_legged_gym.adapters.artifacts.checkpoint_migration import verify_full_resume
-        spec = manifest.get('turn_spec',manifest.get('height_spec',manifest.get('motion_goal_spec')))
+        spec = manifest.get('turn_long_spec',manifest.get('turn_spec',
+            manifest.get('height_spec',manifest.get('motion_goal_spec'))))
         manifest['resume_verification']=verify_full_resume(ppo_runner,checkpoint,
             expected_iteration=spec['source_iteration'])
         manifest['effective_start_learning_rate']=ppo_runner.alg.learning_rate
@@ -183,16 +190,26 @@ def train(args):
             for group in ppo_runner.alg.optimizer.param_groups:group['lr']=manifest['dynamic_fixed_lr']
             manifest['effective_start_learning_rate']=ppo_runner.alg.learning_rate
             manifest['optimizer'].update(learning_rate=ppo_runner.alg.learning_rate,schedule='fixed')
+        if manifest.get('turn_long_spec') and not spec['stage']['freeze_encoder']:
+            encoder_lr=spec['stage']['encoder_learning_rate']
+            for group in ppo_runner.alg.extra_optimizer.param_groups:group['lr']=encoder_lr
+            manifest['optimizer']['extra_learning_rate']=encoder_lr
+            manifest['effective_encoder_learning_rate']=encoder_lr
         if manifest.get('dynamic_reference_coef'):
             import copy
             ppo_runner.alg.reference_policy=copy.deepcopy(ppo_runner.alg.actor_critic).eval()
+            if manifest.get('turn_long_spec'):
+                teacher_state=torch.load(manifest['teacher_checkpoint'],map_location=ppo_runner.device)
+                ppo_runner.alg.reference_policy.load_state_dict(teacher_state['model_state_dict'])
             for parameter in ppo_runner.alg.reference_policy.parameters():parameter.requires_grad_(False)
             ppo_runner.alg.reference_coef=manifest['dynamic_reference_coef']
             ppo_runner.alg.reference_dynamic_stride=(env_cfg.commands.turn_stride
-                if manifest.get('turn_spec') else env_cfg.commands.start_stop_stride)
+                if manifest.get('turn_spec') or manifest.get('turn_long_spec')
+                else env_cfg.commands.start_stop_stride)
             ppo_runner.alg.storage.track_minibatch_env_ids=True
-            manifest['reference_checkpoint_sha256']=manifest['source_checkpoint_sha256']
-    if manifest.get('turn_spec'):
+            manifest['reference_checkpoint_sha256']=(manifest['teacher_checkpoint_sha256']
+                if manifest.get('turn_long_spec') else manifest['source_checkpoint_sha256'])
+    if manifest.get('turn_spec') or manifest.get('turn_long_spec'):
         manifest['training_command'] = [sys.executable] + sys.argv
     if str(args.policy_experiment).upper() in {'LEGACY_ANCHORS','LEGACY_SPEED2','LEGACY_SPEED2_STOP','LEGACY_YAW'}:
         from wheel_legged_gym.adapters.artifacts.checkpoint_migration import verify_full_resume

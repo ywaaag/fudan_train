@@ -72,9 +72,10 @@ def main():
             if state['status'] in TERMINAL:
                 if args.report_only:write_report(job,state)
                 else:review(job, state, args.codex)
-                if args.hapi_session:wake_session(job,args.hapi_session)
+                session_id = args.hapi_session or os.environ.get('HAPI_SESSION_ID')
+                if session_id:
+                    wake_session(job,session_id)
                 return
             if args.once:
                 return
             time.sleep(args.poll_seconds)
-

@@ -27,6 +27,11 @@ def read_turn_spec():
     return validate_spec(json.loads(Path(os.environ['FUDAN_TURN_SPEC']).read_text()))
 
 
+def read_turn_long_spec():
+    from wheel_legged_gym.experiments.recipes.turn_lean_long import validate_spec
+    return validate_spec(json.loads(Path(os.environ['FUDAN_TURN_LONG_SPEC']).read_text()))
+
+
 def apply_motion_goal(cfg, train):
     return motion_goal.apply_motion_goal(cfg, train, spec=read_motion_spec())
 
@@ -43,6 +48,8 @@ def apply_policy_experiment(env_cfg, name, train_cfg=None):
         spec = read_height_spec()
     elif str(name).upper() == 'TURN_ENVELOPE':
         spec = read_turn_spec()
+    elif str(name).upper() == 'TURN_LEAN_LONG':
+        spec = read_turn_long_spec()
     return selection.apply_policy_experiment(
         env_cfg, name, train_cfg, spec=spec,
         stand_randomization_level=os.environ.get('FUDAN_STAND_RANDOMIZATION_LEVEL'),

@@ -12,7 +12,7 @@ from pathlib import Path
 import isaacgym  # must precede torch
 import numpy as np
 import torch
-from isaacgym.torch_utils import quat_rotate_inverse
+from isaacgym.torch_utils import quat_rotate, quat_rotate_inverse
 from wheel_legged_gym.app.bootstrap import create_task_registry
 from wheel_legged_gym.contracts.config_serialization import class_to_dict
 from wheel_legged_gym.experiments.primitives import (
@@ -43,10 +43,13 @@ def main(argv=None):
     p.add_argument('--switch-at', type=float, default=5.)
     p.add_argument('--transition-ramp-seconds',type=float,default=0.,help='Explicit linear command ramp; zero preserves step protocol')
     p.add_argument('--yaw-delay-seconds', type=float, default=0., help='Delay yaw ramp after the speed ramp begins')
+    p.add_argument('--height-delay-seconds', type=float, default=0., help='Delay height ramp after the speed ramp begins')
     p.add_argument('--yaw-exit-at', type=float, help='Begin a slow return to straight motion at this time')
     p.add_argument('--yaw-exit-ramp-seconds', type=float, default=2.)
     p.add_argument('--yaw-exit-factor', type=float, choices=[0., -1.], default=0.,
                    help='0 returns to straight; -1 slowly reverses yaw')
+    p.add_argument('--height-return-at-exit', action='store_true',
+                   help='Restore initial height during the explicit yaw exit ramp')
     p.add_argument('--lean-reference-max-deg', type=float, default=0.)
     p.add_argument('--trace-stride', type=int, default=10)
     p.add_argument('--envs-per-command', type=int, default=16)
@@ -70,9 +73,11 @@ def main(argv=None):
     transition = a.initial_commands is not None
     if a.transition_ramp_seconds<0 or (a.transition_ramp_seconds and not transition):
         p.error('Nonnegative transition ramp requires initial commands')
-    if (a.yaw_delay_seconds < 0 or a.yaw_exit_ramp_seconds <= 0 or
+    if (a.yaw_delay_seconds < 0 or a.height_delay_seconds < 0 or a.yaw_exit_ramp_seconds <= 0 or
             not 0 <= a.lean_reference_max_deg <= 10 or
             (a.yaw_delay_seconds and not transition) or
+            (a.height_delay_seconds and not transition) or
+            (a.height_return_at_exit and a.yaw_exit_at is None) or
             (a.yaw_exit_at is not None and not transition) or
             (a.yaw_exit_factor and a.yaw_exit_at is None)):
         p.error('Invalid staged turn protocol')
@@ -92,7 +97,7 @@ def main(argv=None):
             p.error('initial lists must match target lists; require 0 < switch-at < warmup')
     if not 0 <= a.warmup < a.seconds or a.envs_per_command < 1:
         p.error('require seconds > warmup >= 0 and positive environment count')
-    if transition and a.switch_at+a.transition_ramp_seconds+a.yaw_delay_seconds>=a.warmup:
+    if transition and a.switch_at+a.transition_ramp_seconds+max(a.yaw_delay_seconds,a.height_delay_seconds)>=a.warmup:
         p.error('Steady warmup must end after the command ramp')
     if a.yaw_exit_at is not None and not a.warmup < a.yaw_exit_at < a.seconds-a.yaw_exit_ramp_seconds:
         p.error('Yaw exit must follow steady warmup and finish before evaluation end')
@@ -111,6 +116,7 @@ def main(argv=None):
     cfg.commands.curriculum = False
     cfg.commands.heading_command = False
     cfg.env.num_envs = len(a.commands) * a.envs_per_command
+    cfg.env.record_reset_reasons = True
     cfg.env.episode_length_s = a.seconds + 10
     cfg.terrain.mesh_type = 'plane'
     cfg.terrain.curriculum = False
@@ -136,6 +142,16 @@ def main(argv=None):
         assert obs.shape[1] == 25 and history.shape[1] == 125
         assert abs(env.dt - .01) < 1e-7 and abs(env.sim_params.dt - .005) < 1e-7
         body_names = env.gym.get_actor_rigid_body_names(env.envs[0], env.actor_handles[0])
+        body_properties = [env.gym.get_actor_rigid_body_properties(
+            env.envs[index], env.actor_handles[index]) for index in range(env.num_envs)]
+        body_masses = torch.tensor([[part.mass for part in properties]
+            for properties in body_properties], device=env.device, dtype=torch.float)
+        local_com = torch.tensor([[[part.com.x, part.com.y, part.com.z]
+            for part in properties] for properties in body_properties],
+            device=env.device, dtype=torch.float)
+        if body_masses.shape[1] != len(body_names) or not (body_masses > 0).all():
+            raise RuntimeError('Cannot measure mass-weighted whole-body COM')
+        total_mass = body_masses.sum(dim=1)
         nonwheel = [i for i, n in enumerate(body_names) if 'wheel' not in n]
         landmarks = [body_names.index(n) for n in ['left_leg_1_link', 'right_leg_1_link',
                                                   'left_wheel_link', 'right_wheel_link']]
@@ -144,13 +160,17 @@ def main(argv=None):
         failures = torch.zeros(env.num_envs, device=env.device)
         timeouts = torch.zeros_like(failures)
         nonwheel_full = torch.zeros_like(failures)
+        reset_reason_counts = {name: torch.zeros_like(failures) for name in
+            ('failure','timeout','edge','forbidden_contact','upright','wheel_contact_loss')}
         names = ['vx', 'vx_mae', 'abs_vx', 'yaw', 'abs_yaw', 'height', 'height_mae',
                  'abs_roll', 'abs_pitch', 'left_contact', 'right_contact',
                  'nonwheel_contact', 'slip_rms', 'torque_saturation',
                  'knee_mirror_m', 'wheel_mirror_m', 'encoder_vx_mae', 'action_clip', 'yaw_mae',
                  'roll', 'roll_target', 'pitch', 'lateral_velocity', 'abs_lateral_velocity',
                  'curvature', 'lateral_accel_command', 'lateral_accel_actual',
-                 'left_vertical_force', 'right_vertical_force']
+                 'left_vertical_force', 'right_vertical_force', 'com_height',
+                 'roll_target_mae', 'roll_overshoot', 'height_target',
+                 'soft_joint_limit_margin', 'mechanical_power_abs']
         sums = torch.zeros(env.num_envs, len(names), device=env.device)
         maxima = torch.zeros_like(sums)
         count = 0
@@ -164,17 +184,22 @@ def main(argv=None):
             switch_step=round(a.switch_at/env.dt)
             ramp_steps=round(a.transition_ramp_seconds/env.dt)
             yaw_end_step = switch_step + ramp_steps + round(a.yaw_delay_seconds/env.dt)
+            height_end_step = switch_step + ramp_steps + round(a.height_delay_seconds/env.dt)
             exit_step = round(a.yaw_exit_at/env.dt) if a.yaw_exit_at is not None else None
             exit_ramp_steps = round(a.yaw_exit_ramp_seconds/env.dt)
-            if transition and (switch_step<=step<=yaw_end_step or
+            if transition and (switch_step<=step<=max(yaw_end_step,height_end_step) or
                                (exit_step is not None and step>=exit_step)):
                 fraction=1. if ramp_steps==0 else min(1.,(step-switch_step)/ramp_steps)
                 actual=initial_commands+(commands-initial_commands)*fraction
                 yaw_fraction=1. if ramp_steps==0 else min(1.,max(0.,(step-switch_step-round(a.yaw_delay_seconds/env.dt))/ramp_steps))
                 actual[:, 1]=initial_commands[:, 1]+(commands[:, 1]-initial_commands[:, 1])*yaw_fraction
+                height_fraction=1. if ramp_steps==0 else min(1.,max(0.,(step-switch_step-round(a.height_delay_seconds/env.dt))/ramp_steps))
+                actual[:, 2]=initial_commands[:, 2]+(commands[:, 2]-initial_commands[:, 2])*height_fraction
                 if exit_step is not None and step>=exit_step:
                     exit_fraction=min(1.,(step-exit_step)/exit_ramp_steps)
                     actual[:, 1]=commands[:, 1]*(1.+(a.yaw_exit_factor-1.)*exit_fraction)
+                    if a.height_return_at_exit:
+                        actual[:, 2]=commands[:, 2]+(initial_commands[:, 2]-commands[:, 2])*exit_fraction
                 set_fixed_command_ranges(env, actual)
                 target = torch.tensor(actual, device=env.device, dtype=torch.float)
                 env.commands[:, :3] = target
@@ -201,6 +226,12 @@ def main(argv=None):
             timeout = info.get('time_outs', torch.zeros_like(dones)).bool()
             failures += (dones.bool() & ~timeout).float()
             timeouts += (dones.bool() & timeout).float()
+            for name, counts in reset_reason_counts.items():
+                counts += info['reset_reasons'][name].float()
+            com_offset = quat_rotate(env.rigid_body_states[:, :, 3:7].reshape(-1,4),
+                local_com.reshape(-1,3)).reshape(env.num_envs,len(body_names),3)
+            com_height = ((env.rigid_body_states[:, :, 2] + com_offset[:, :, 2]) *
+                body_masses).sum(dim=1) / total_mass
             body_contact = (env.contact_forces[:, nonwheel].norm(dim=-1) > 1).any(dim=-1).float()
             nonwheel_full += body_contact
             if transition and step>=round(a.switch_at/env.dt):
@@ -219,6 +250,7 @@ def main(argv=None):
                         if a.lean_reference_max_deg else [0.]*env.num_envs),
                     'resets':(failures+timeouts).cpu().tolist(),
                     'height': env.base_height.detach().cpu().tolist(),
+                    'com_height':com_height.detach().cpu().tolist(),
                     'vx': env.base_lin_vel[:, 0].detach().cpu().tolist(),
                     'vy': env.base_lin_vel[:, 1].detach().cpu().tolist(),
                     'yaw': env.base_ang_vel[:, 2].detach().cpu().tolist(),
@@ -241,6 +273,10 @@ def main(argv=None):
             signed_speed = torch.where(vx >= 0, vx.clamp(min=.1), vx.clamp(max=-.1))
             roll_target=(roll_reference(target[:,0],target[:,1],a.lean_reference_max_deg*np.pi/180)
                          if a.lean_reference_max_deg else torch.zeros_like(vx))
+            leg_limits = env.dof_pos_limits[[0,1,3,4]]
+            leg_positions = env.dof_pos[:, [0,1,3,4]]
+            joint_margin = torch.minimum(leg_positions-leg_limits[:,0],
+                leg_limits[:,1]-leg_positions).min(dim=1).values
             if getattr(env, '_method_v1', False):
                 slip_metric = env._method_wheel_terms()['residual_rms']
             else:
@@ -257,7 +293,10 @@ def main(argv=None):
                 torch.where(vx.abs()>.1,yaw/signed_speed,torch.zeros_like(vx)),
                 target[:,0]*target[:,1],vx*yaw,
                 env.contact_forces[:,env.feet_indices[0],2].clamp_min(0),
-                env.contact_forces[:,env.feet_indices[1],2].clamp_min(0)], dim=-1)
+                env.contact_forces[:,env.feet_indices[1],2].clamp_min(0),
+                com_height, (roll-roll_target).abs(),
+                (roll.abs()-roll_target.abs()).clamp_min(0), target[:,2],
+                joint_margin, (env.torques*env.dof_vel).abs().sum(dim=1)], dim=-1)
             if not torch.isfinite(values).all():
                 raise RuntimeError('Nonfinite physics metrics')
             sums += values
@@ -285,6 +324,8 @@ def main(argv=None):
                 'per_env_metrics': {n: means[sl, j].tolist() for j, n in enumerate(names)},
                 'max_abs_metrics': {n: maxima[sl, j].max().item() for j, n in enumerate(names)},
                 'torque_metric_valid_without_resets': bool((failures[sl]+timeouts[sl]).sum().item() == 0)})
+            results[-1]['reset_reason_counts'] = {
+                name: counts[sl].sum().item() for name, counts in reset_reason_counts.items()}
         configuration = {n: class_to_dict(getattr(cfg, n)) for n in
                          ['control', 'init_state', 'normalization', 'domain_rand', 'asset', 'sim', 'env']}
         payload = {'schema': 'matched_policy_grid_v1', 'checkpoint': str(a.checkpoint.resolve()),
@@ -294,6 +335,11 @@ def main(argv=None):
             'measurement_samples': count, 'deterministic': True, 'noise': False,
             'policy_dt': env.dt, 'physics_dt': env.sim_params.dt, 'dof_names': env.dof_names,
             'torque_limits': env.torque_limits.cpu().tolist(), 'configuration': configuration,
+            'body_names':body_names, 'total_mass_kg':total_mass.cpu().tolist(),
+            'measurement_scope':{
+                'com_height':'Actual per-environment rigid-body masses and local COM offsets rotated into world coordinates',
+                'soft_joint_limit_margin':'Minimum leg margin to configured soft position limits, sampled at 100 Hz',
+                'mechanical_power_abs':'Sum abs(torque * joint velocity) sampled at 100 Hz, not integrated energy'},
             'initial_root_states': initial_root, 'initial_observations': initial_obs,
             'results': results, 'note': 'Reset counts cover warmup too; metrics after warmup include reset trajectories. Any reset fails the gate.'}
         if transition:
@@ -302,9 +348,11 @@ def main(argv=None):
                 switch_at=round(a.switch_at/env.dt)*env.dt,
                 transition_ramp_seconds=round(a.transition_ramp_seconds/env.dt)*env.dt,
                 yaw_delay_seconds=round(a.yaw_delay_seconds/env.dt)*env.dt,
+                height_delay_seconds=round(a.height_delay_seconds/env.dt)*env.dt,
                 yaw_exit_at=a.yaw_exit_at,
                 yaw_exit_ramp_seconds=a.yaw_exit_ramp_seconds if a.yaw_exit_at is not None else None,
                 yaw_exit_factor=a.yaw_exit_factor if a.yaw_exit_at is not None else None,
+                height_return_at_exit=a.height_return_at_exit,
                 lean_reference_max_deg=a.lean_reference_max_deg,
                 initial_commands=list(map(list,zip(a.initial_commands,a.initial_yaw_commands,a.initial_height_commands))),
                 response_trace=response_trace,

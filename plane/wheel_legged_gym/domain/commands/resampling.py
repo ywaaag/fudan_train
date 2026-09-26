@@ -14,14 +14,39 @@ class CommandBuffers:
 
 
 def resample(env_ids, *, state: CommandBuffers, ranges, config, device,
-             reset_start_stop, sample_heading, reset_turn=None):
+             reset_start_stop, sample_heading, reset_turn=None, reset_height_skill=None):
     """Mutate selected rows only; callbacks retain simulator-specific boundary behavior.
 
     The height draw runs even for height_bank, before its selected height override.
     Reset callback stays lazy and follows that draw; heading is always drawn last.
     """
     strategy = getattr(config, "sampling_strategy", "uniform")
-    if strategy == "turn_envelope":
+    if strategy == "cornering_height_skill":
+        from wheel_legged_gym.domain.commands.command_sampling import sample_fixed_bank
+        slots = env_ids.remainder(config.cohort_cycle)
+        retained_ids = env_ids[slots.remainder(2) == 1]
+        height_ids = env_ids[torch.isin(slots, torch.as_tensor(config.height_slots, device=device))]
+        mid_ids = env_ids[torch.isin(slots, torch.as_tensor(config.mid_slots, device=device))]
+        high_ids = env_ids[torch.isin(slots, torch.as_tensor(config.high_slots, device=device))]
+        if len(retained_ids):
+            state.commands[retained_ids, :2] = sample_fixed_bank(
+                ranges['lin_vel_x'][retained_ids], ranges['ang_vel_yaw'][retained_ids],
+                state.segment_counter[retained_ids], config.retention_bank)
+        if len(height_ids):
+            table = state.commands.new_tensor(config.height_skill_bank)
+            height_targets = table[(state.segment_counter[height_ids] +
+                                    height_ids // config.cohort_cycle) % len(table)]
+        if len(mid_ids):
+            mid_targets = sample_fixed_bank(ranges['lin_vel_x'][mid_ids],
+                ranges['ang_vel_yaw'][mid_ids],
+                state.segment_counter[mid_ids] + mid_ids // config.cohort_cycle, config.turn_bank)
+        if len(high_ids):
+            high_targets = sample_fixed_bank(ranges['lin_vel_x'][high_ids],
+                ranges['ang_vel_yaw'][high_ids],
+                state.segment_counter[high_ids] + high_ids // config.cohort_cycle, config.high_turn_bank)
+        state.sample_mode[env_ids] = -1
+        state.segment_counter[env_ids] += 1
+    elif strategy == "turn_envelope":
         from wheel_legged_gym.domain.commands.command_sampling import sample_fixed_bank
         turn = env_ids.remainder(config.turn_stride) == 0
         retained_ids, turn_ids = env_ids[~turn], env_ids[turn]
@@ -119,6 +144,13 @@ def resample(env_ids, *, state: CommandBuffers, ranges, config, device,
         reset_start_stop(state.commands,env_ids)
     if strategy == 'turn_envelope' and len(turn_ids):
         reset_turn(state.commands, turn_ids, targets)
+    if strategy == 'cornering_height_skill':
+        if len(height_ids):
+            reset_height_skill(state.commands, height_ids, height_targets)
+        if len(mid_ids):
+            reset_turn(state.commands, mid_ids, mid_targets)
+        if len(high_ids):
+            reset_turn(state.commands, high_ids, high_targets)
     if strategy == 'height_bank':
         state.commands[env_ids, 2] = height_selected[:, 2]
 

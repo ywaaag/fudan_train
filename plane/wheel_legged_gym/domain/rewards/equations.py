@@ -209,7 +209,10 @@ def _reward_base_height(state: RewardInputs):
         return torch.abs(state.base_height - state.commands[:, 2])
     else:
         base_height_error = torch.square(state.base_height - state.commands[:, 2])
-        return torch.exp(-base_height_error / 0.001)
+        reward = torch.exp(-base_height_error / 0.001)
+        turn_scale = getattr(state.cfg.rewards, 'turn_height_reward_scale', 1.)
+        turn_target = state.commands[:, 2] < (.4 - 1.0e-4)
+        return torch.where(turn_target, reward * turn_scale, reward)
 
 
 def _reward_base_height_enhance(state: RewardInputs):

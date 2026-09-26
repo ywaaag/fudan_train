@@ -53,3 +53,29 @@ def validate_turn_source(path, resume, mode, cfg, *, spec):
             raise ValueError('Turn source reward mismatch: ' + key)
     return {'source_checkpoint': str(path), 'source_checkpoint_sha256': sha,
             'source_manifest': str(path.parent / 'policy_experiment.json')}
+
+
+def validate_turn_long_source(path, resume, mode, cfg, *, spec):
+    path = Path(path).resolve()
+    if not resume or mode != 'full' or path != Path(spec['source_checkpoint']).resolve():
+        raise ValueError('Turn exploration requires exact full-state source')
+    sha = hashlib.sha256(path.read_bytes()).hexdigest()
+    if sha != spec['source_sha256']:
+        raise ValueError('Turn exploration source checksum mismatch')
+    teacher = Path(spec['teacher_checkpoint']).resolve()
+    teacher_sha = hashlib.sha256(teacher.read_bytes()).hexdigest()
+    if teacher_sha != spec['teacher_sha256']:
+        raise ValueError('R10200 teacher checksum mismatch')
+    old = json.loads((path.parent / 'policy_experiment.json').read_text())
+    if spec['source_iteration'] == 10200:
+        if old.get('profile') != 'motion_goal_v1':
+            raise ValueError('Initial turn source is not R10200')
+    elif (old.get('profile') not in {'turn_lean_long_v1','cornering_height_skill_v1'} or
+          old.get('turn_long_spec', {}).get('stage', {}).get('phase', 99) > spec['stage']['phase']):
+        raise ValueError('Unreviewed exploration continuation source')
+    for key, value in old['reward_scales'].items():
+        if getattr(cfg.rewards.scales, key, 0.) != value:
+            raise ValueError('Turn exploration reward mismatch: ' + key)
+    return {'source_checkpoint': str(path), 'source_checkpoint_sha256': sha,
+            'source_manifest': str(path.parent / 'policy_experiment.json'),
+            'teacher_checkpoint': str(teacher), 'teacher_checkpoint_sha256': teacher_sha}

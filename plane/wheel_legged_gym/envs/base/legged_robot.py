@@ -271,6 +271,21 @@ class LeggedRobot(BaseTask):
         # compute observations, rewards, resets, ...
         self.check_termination()
         self.compute_reward()
+        if getattr(self.cfg.env, 'record_reset_reasons', False):
+            forbidden_limit = float(self.cfg.rewards.forbidden_contact_grace_s) / self.dt
+            wheel_limit = float(self.cfg.rewards.wheel_loss_grace_s) / self.dt
+            no_reason = torch.zeros_like(self.reset_buf, dtype=torch.bool)
+            self.extras['reset_reasons'] = {
+                'failure': self.fail_buf.bool().clone(),
+                'timeout': self.time_out_buf.bool().clone(),
+                'edge': self.edge_reset_buf.bool().clone(),
+                'forbidden_contact': (self.forbidden_contact_streak >= forbidden_limit).clone()
+                    if self._method_v1 else no_reason,
+                'upright': (self.upright_streak >= forbidden_limit).clone()
+                    if self._method_v1 else (self.projected_gravity[:, 2] > -.1).clone(),
+                'wheel_contact_loss': (self.wheel_loss_streak >= wheel_limit).clone()
+                    if self._method_v1 else no_reason,
+            }
         env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
         self.reset_idx(env_ids)
         self.compute_observations()  # in some cases a simulation step might be required to refresh some obs (for example body positions)
@@ -582,8 +597,10 @@ class LeggedRobot(BaseTask):
             self._resample_commands(env_ids)
         if getattr(self.cfg.commands,'start_stop_ramp_seconds',0.)>0:
             self._get_start_stop_scheduler().advance(self.commands)
-        if getattr(self.cfg.commands,'sampling_strategy',None)=='turn_envelope':
+        if getattr(self.cfg.commands,'sampling_strategy',None) in ('turn_envelope','cornering_height_skill'):
             self._get_turn_scheduler().advance(self.commands)
+        if getattr(self.cfg.commands,'sampling_strategy',None)=='cornering_height_skill':
+            self._get_height_skill_scheduler().advance(self.commands)
         if getattr(self.cfg.commands,'height_switch_interval',0.)>0:
             from wheel_legged_gym.domain.commands.height_commands import alternate_height
             alternate_height(self.commands,self.episode_length_buf,self.dt,
@@ -637,8 +654,26 @@ class LeggedRobot(BaseTask):
         if not hasattr(self, 'turn_scheduler'):
             from wheel_legged_gym.domain.commands.turn_envelope import TurnEnvelope
             self.turn_scheduler = TurnEnvelope(self.num_envs, self.device, self.dt,
-                self.cfg.commands.turn_stride)
+                self.cfg.commands.turn_stride,
+                turn_height=getattr(self.cfg.commands, 'turn_height', .4),
+                height_schedule=getattr(self.cfg.commands, 'turn_height_schedule', None),
+                slots=getattr(self.cfg.commands, 'turn_slots', None),
+                cycle=getattr(self.cfg.commands, 'cohort_cycle', 20),
+                entry_range=getattr(self.cfg.commands, 'turn_entry_range', (.5, 1.5)),
+                hold_range=getattr(self.cfg.commands, 'turn_hold_range', (2., 5.)),
+                speed_ramp_seconds=getattr(self.cfg.commands, 'turn_speed_ramp_seconds', 2.),
+                yaw_ramp_seconds=getattr(self.cfg.commands, 'turn_yaw_ramp_seconds', 2.))
         return self.turn_scheduler
+
+    def _get_height_skill_scheduler(self):
+        if not hasattr(self, 'height_skill_scheduler'):
+            from wheel_legged_gym.domain.commands.height_skill import HeightSkill
+            self.height_skill_scheduler = HeightSkill(self.num_envs, self.device, self.dt,
+                self.cfg.commands.height_slots, cycle=self.cfg.commands.cohort_cycle,
+                entry_range=self.cfg.commands.turn_entry_range,
+                hold_range=self.cfg.commands.turn_hold_range,
+                ramp_seconds=self.cfg.commands.turn_yaw_ramp_seconds)
+        return self.height_skill_scheduler
 
     def _resample_commands(self, env_ids):
         resample_commands(
@@ -649,6 +684,7 @@ class LeggedRobot(BaseTask):
             reset_start_stop=lambda commands, ids: self._get_start_stop_scheduler().reset(commands, ids),
             sample_heading=torch_rand_float,
             reset_turn=lambda commands, ids, targets: self._get_turn_scheduler().reset(commands, ids, targets),
+            reset_height_skill=lambda commands, ids, targets: self._get_height_skill_scheduler().reset(commands, ids, targets),
         )
 
     def _compute_torques(self, actions):

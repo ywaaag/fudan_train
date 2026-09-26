@@ -4,6 +4,9 @@ from .primitives import apply_training_profile, apply_legacy_experiment
 
 def apply_policy_experiment(env_cfg, name: str | None, train_cfg=None, *, spec=None,
                             stand_randomization_level=None) -> dict:
+    if str(name).upper() == 'TURN_LEAN_LONG':
+        from wheel_legged_gym.experiments.recipes.turn_lean_long import apply_turn_lean_long
+        return apply_turn_lean_long(env_cfg, train_cfg, spec=spec)
     if str(name).upper() == 'TURN_ENVELOPE':
         from wheel_legged_gym.experiments.recipes.turn_envelope import apply_turn_envelope
         return apply_turn_envelope(env_cfg, train_cfg, spec=spec)

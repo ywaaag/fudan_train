@@ -132,7 +132,7 @@ def get_args():
         {
             "name": "--policy_experiment",
             "type": str,
-            "help": "Policy experiment; TURN_ENVELOPE requires FUDAN_TURN_SPEC and exact R10200 full resume.",
+            "help": "Policy experiment; TURN_ENVELOPE uses FUDAN_TURN_SPEC, TURN_LEAN_LONG uses FUDAN_TURN_LONG_SPEC.",
         },
         {
             "name": "--phase",
