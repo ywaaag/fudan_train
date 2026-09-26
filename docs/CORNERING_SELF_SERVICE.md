@@ -84,8 +84,15 @@ height reward 公式在 `domain/rewards/equations.py`，本阶段仅将 `base_he
 
 安全查看工具及完整命令先读 `docs/CODEX_TOOL_INDEX.md`。
 `tools/review_turn_lean_long.py` 现按每个转弯点的 `|vx*yaw|` 从 spec 选择
-0.40/0.38/0.36m；旧固定高度 spec 仍使用原高度。它尚未包含**独立高度技能**
-及其回到 0.40m 的专项组，因此不能只用其转弯组宣称高度技能验收。已有逐点匹配评估命令见
+0.40/0.38/0.36m；旧固定高度 spec 仍使用原高度。含 `cohort_plan` 的新 spec
+还会单独写出 `height_skill.json` 与 `height_entry_exit.json`；必须等三 seed 完整结果
+及 `summarize_turn_envelope.py --long` 汇总后，才运行
+`python3 tools/screen_turn_lean_candidates.py REVIEW_DIR --out NEW_RESULT.json`。
+该筛选器拒绝缺测、协议不一致和保留能力退化，不会默认推荐最后 checkpoint。
+旧 review 若已有 `long_evaluation_summary.json` 且缺 metric/gate SHA，使用
+`tools/summarize_turn_envelope.py --long --job REVIEW_DIR --summary-out REVIEW_DIR/long_evaluation_summary_v2.json`
+生成旁路索引；不覆盖旧结果。
+已有逐点匹配评估命令见
 `plane/outputs/high_speed_cornering_20260926/evaluate_candidates.sh`；该脚本绑定
 旧模型和旧输出，仅读取作模板，不原样重跑。公开评估入口是
 `plane/wheel_legged_gym/scripts/evaluate_policy_comparison.py`；它启动 Isaac 仿真，

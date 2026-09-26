@@ -106,13 +106,19 @@ def main(root):
         'entry_exit':(entry_exit_pairs(spec,train_pairs),spec,12),
         'slow_reverse':([(sv*2.,sw*.5) for sv in (-1.,1.) for sw in (-1.,1.)],spec,11),
     }
+    if spec['stage'].get('cohort_plan') is not None:
+        height_pairs = [(vx,0.) for height in (.38,.36) for vx in (0.,-.5,.5)]
+        configurations['height_skill'] = (height_pairs,spec,None)
+        configurations['height_entry_exit'] = (height_pairs,spec,12)
     commands = []
     for seed in args.seeds:
         folder = review / 'acceptance' / args.model_label / ('seed'+str(seed))
         folder.mkdir(parents=True, exist_ok=True)
         for group,(pairs,turn_spec,exit_at) in configurations.items():
             speeds,yaws=zip(*pairs)
-            heights=target_heights(pairs,turn_spec)
+            heights=([height for height in (.38,.36) for _ in (0.,-.5,.5)]
+                     if group in ('height_skill','height_entry_exit')
+                     else target_heights(pairs,turn_spec))
             out = folder / (group+'.json')
             if out.exists():
                 raise FileExistsError(out)

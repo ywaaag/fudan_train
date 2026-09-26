@@ -20,6 +20,19 @@ from wheel_legged_gym.evaluation.training_summary import (
 )
 
 
+class NoHeightProgress(Exception):
+    pass
+
+
+def height_skill_stagnant(probes):
+    if len(probes) < 3 or any(probe['height_skill_passed'] for probe in probes[-3:]):
+        return False
+    def error(probe):
+        rows = [row for row in probe['height_rows'] if row['command'][2] == .38]
+        return sum(row['height_mae'] for row in rows) / len(rows)
+    return error(probes[-3]) - error(probes[-1]) < .003
+
+
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -220,11 +233,28 @@ def main(root):
             if collapsed >= 3:
                 os.kill(args.trainer_pid, signal.SIGINT)
                 raise RuntimeError('Retention probe failed three consecutive milestones')
+            if spec['stage'].get('cohort_plan') is not None and len(state['milestones']) >= 3:
+                recent = [json.loads(Path(entry['probe']).read_text())
+                          for entry in state['milestones'][-3:]]
+                if height_skill_stagnant(recent):
+                    os.kill(args.trainer_pid, signal.SIGINT)
+                    raise NoHeightProgress('Three milestones without a 0.38m height pass or 3mm MAE improvement')
         while alive(args.trainer_pid):
             time.sleep(args.poll_seconds)
         state.update(status='finished_pending_review', child_pid=None)
     except InterruptedError as exc:
         state.update(status='stopped', error=str(exc), child_pid=None)
+    except NoHeightProgress as exc:
+        for _ in range(30):
+            if not alive(args.trainer_pid):
+                break
+            time.sleep(1)
+        if alive(args.trainer_pid):
+            state.update(status='error', error=str(exc)+'; trainer did not exit after SIGINT',
+                         child_pid=args.trainer_pid)
+        else:
+            state.update(status='paused_no_improvement_needs_diagnosis',
+                         error=str(exc), child_pid=None)
     except Exception as exc:
         if alive(args.trainer_pid):
             os.kill(args.trainer_pid, signal.SIGINT)

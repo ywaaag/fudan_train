@@ -18,8 +18,8 @@ from wheel_legged_gym.experiments.recipes.turn_lean_long import (
 )
 from wheel_legged_gym.app import turn_lean_review
 from wheel_legged_gym.app.turn_lean_review import command as review_command, target_heights, entry_exit_pairs
-from wheel_legged_gym.app.turn_lean_monitor import probe_command
-from tools.summarize_turn_envelope import lean_aware_checks
+from wheel_legged_gym.app.turn_lean_monitor import probe_command, height_skill_stagnant
+from tools.summarize_turn_envelope import lean_aware_checks, height_skill_checks
 
 
 def spec():
@@ -146,7 +146,11 @@ def test_review_cli_passes_scheduled_heights_to_evaluator(tmp_path,monkeypatch):
     s=spec()
     s['stage'].update(turn_height=.4,phase=3,
         pairs=[[1.,.5],[2.5,.6],[3.,1.]],
-        height_schedule=[[1.5,.38],[2.5,.36]])
+        height_schedule=[[1.5,.38],[2.5,.36]],
+        cohort_plan={'fractions':{'retention':.5,'height':.2,'mid_turn':.25,'high_turn':.05},
+            'height_bank':[[0.,.38],[-.5,.38],[.5,.38]],
+            'mid_pairs':[[1.,.5],[2.5,.6]],'high_pairs':[[3.,1.]],
+            'unclip_base_height':True})
     spec_path=tmp_path/'spec.json'
     spec_path.write_text(json.dumps(s))
     passed=[]
@@ -168,6 +172,23 @@ def test_review_cli_passes_scheduled_heights_to_evaluator(tmp_path,monkeypatch):
     assert heights('turn_train') == [.4]*4+[.38]*4+[.36]*4
     assert heights('turn_holdout') == [.36]*4
     assert heights('entry_exit') == [.38]*4+[.36]*4
+    assert heights('height_skill') == [.38]*3+[.36]*3
+    assert heights('height_entry_exit') == [.38]*3+[.36]*3
+    assert '--height-return-at-exit' in by_name['height_entry_exit']
+
+
+def test_height_skill_requires_every_environment_to_reach_target():
+    metrics=dict(nonwheel_contact=0.,left_contact=1.,right_contact=1.,
+        height_mae=.01,vx_mae=.01,yaw_mae=.01,abs_yaw=.01,
+        torque_saturation=0.)
+    per_env=dict(height_mae=[.01,.014],vx_mae=[.01,.02],yaw_mae=[.01,.02],
+        left_contact=[1.,1.],right_contact=[1.,1.],slip_rms=[.01,.02],
+        abs_pitch=[.01,.02],soft_joint_limit_margin=[.4,.5])
+    row=dict(command=[0.,0.,.38],metrics=metrics,per_env_metrics=per_env,
+        failure_count=0,timeout_count=0,survival_fraction=1.)
+    assert height_skill_checks(row)['passed']
+    per_env['height_mae'][1]=.016
+    assert not height_skill_checks(row)['passed']
 
 
 def test_milestone_probe_uses_stage_height_and_separate_command_ramps():
@@ -205,6 +226,22 @@ def test_cornering_height_cohorts_and_reward_gradient():
     assert fraction == .5 and mask.sum() == 10
 
 
+def test_adjusted_height_cohort_keeps_half_retention_and_high_boundary():
+    s=spec()
+    s['stage'].update(phase=3,turn_height=.4,lean_max_deg=8.,
+        pairs=[[1.,.5],[2.5,.6],[3.,1.]],
+        cohort_plan={'fractions':{'retention':.5,'height':.3,'mid_turn':.15,'high_turn':.05},
+            'height_bank':[[0.,.38],[-.5,.38],[.5,.38]],
+            'mid_pairs':[[1.,.5],[2.5,.6]],'high_pairs':[[3.,1.]],
+            'unclip_base_height':True})
+    cfg,train=WheelLeggedCfg(),WheelLeggedCfgPPO()
+    apply_turn_lean_long(cfg,train,spec=s)
+    assert cfg.commands.height_slots==(0,2,4,6,8,10)
+    assert cfg.commands.mid_slots==(12,14,16)
+    assert cfg.commands.high_slots==(18,)
+    assert cfg.commands.turn_slots==(12,14,16,18)
+
+
 def test_height_skill_public_command_and_recovery():
     scheduler = HeightSkill(20,'cpu',.01,(0,2,4,6),
         entry_range=(1.,1.),hold_range=(2.,2.),ramp_seconds=2.)
@@ -230,6 +267,16 @@ def test_cornering_probe_separates_retention_height_mid_high():
     assert heights[5:11] == ['0.38']*3+['0.36']*3
     assert heights[11:19] == ['0.38']*8
     assert heights[19:] == ['0.36']*4
+
+
+def test_height_stagnation_requires_three_probe_windows_and_no_gain():
+    def probe(error,passed=0):
+        return {'height_skill_passed':passed,
+                'height_rows':[{'command':[0.,0.,.38],'height_mae':error}]}
+    assert not height_skill_stagnant([probe(.019),probe(.019)])
+    assert height_skill_stagnant([probe(.019),probe(.0188),probe(.0185)])
+    assert not height_skill_stagnant([probe(.019),probe(.017),probe(.015)])
+    assert not height_skill_stagnant([probe(.019),probe(.019),probe(.019,1)])
 
 
 def test_cornering_sampler_assigns_only_nonretained_cohorts():

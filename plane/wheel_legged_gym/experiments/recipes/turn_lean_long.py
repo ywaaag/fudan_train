@@ -64,8 +64,12 @@ def validate_spec(spec):
         raise ValueError('Turn pairs must be distinct, finite magnitudes in the reviewed range')
     cohort = stage.get('cohort_plan')
     if cohort is not None:
+        reviewed_fractions = (
+            {'retention':.5,'height':.2,'mid_turn':.25,'high_turn':.05},
+            {'retention':.5,'height':.3,'mid_turn':.15,'high_turn':.05},
+        )
         if (set(cohort) != {'fractions','height_bank','mid_pairs','high_pairs','unclip_base_height'}
-                or cohort['fractions'] != {'retention':.5,'height':.2,'mid_turn':.25,'high_turn':.05}
+                or cohort['fractions'] not in reviewed_fractions
                 or cohort['unclip_base_height'] is not True
                 or not cohort['height_bank']
                 or any(len(row) != 2 or abs(row[0]) > .5 or row[1] not in (.38,.36)
@@ -91,9 +95,12 @@ def apply_turn_lean_long(cfg, train, *, spec):
     if cohort is not None:
         cfg.commands.sampling_strategy = 'cornering_height_skill'
         cfg.commands.cohort_cycle = 20
-        cfg.commands.height_slots = (0,2,4,6)
-        cfg.commands.mid_slots = (8,10,12,14,16)
-        cfg.commands.high_slots = (18,)
+        dynamic_slots = tuple(range(0,20,2))
+        height_count = round(cohort['fractions']['height'] * 20)
+        mid_count = round(cohort['fractions']['mid_turn'] * 20)
+        cfg.commands.height_slots = dynamic_slots[:height_count]
+        cfg.commands.mid_slots = dynamic_slots[height_count:height_count+mid_count]
+        cfg.commands.high_slots = dynamic_slots[height_count+mid_count:]
         cfg.commands.turn_slots = cfg.commands.mid_slots + cfg.commands.high_slots
         cfg.commands.height_skill_bank = cohort['height_bank']
         cfg.commands.turn_bank = [(sv*v,sw*w) for v,w in cohort['mid_pairs']

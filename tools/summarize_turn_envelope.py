@@ -1,5 +1,6 @@
 """Summarize measured turn points without interpolating untested commands."""
 import argparse
+import hashlib
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -46,15 +47,34 @@ def lean_aware_checks(row):
             'historical_strict_turn':turn_checks(row)}
 
 
+def height_skill_checks(row):
+    per_env = row['per_env_metrics']
+    checks = {
+        'original_gate': gate(row)['passed'],
+        'all_envs_survive': row['survival_fraction'] == 1 and row['timeout_count'] == 0,
+        'all_envs_height_mae': max(per_env['height_mae']) <= .015,
+        'all_envs_vx_mae': max(per_env['vx_mae']) <=
+            (.05 if row['command'][0] == 0 else .10),
+        'all_envs_yaw_mae': max(per_env['yaw_mae']) <= .05,
+        'all_envs_contact': (min(per_env['left_contact']) >= .99 and
+                             min(per_env['right_contact']) >= .99),
+        'all_envs_slip': max(per_env['slip_rms']) <= .10,
+        'all_envs_pitch': max(per_env['abs_pitch']) <= .10,
+        'all_envs_joint_margin': min(per_env['soft_joint_limit_margin']) >= 0.,
+    }
+    return {'passed': all(checks.values()), 'checks': checks}
+
+
 def collect_long(job):
     rows = []
     for path in sorted((job / 'acceptance').glob('*/seed*/*.json')):
-        if path.stem not in ('retention', 'turn_train', 'turn_holdout'):
+        if path.stem not in ('retention', 'turn_train', 'turn_holdout', 'height_skill'):
             continue
         data = json.loads(path.read_text())
         model, seed = path.parent.parent.name, int(path.parent.name[4:])
         for row in data['results']:
-            verdict = (lean_aware_checks(row) if path.stem != 'retention'
+            verdict = (height_skill_checks(row) if path.stem == 'height_skill'
+                       else lean_aware_checks(row) if path.stem != 'retention'
                        else {'passed':gate(row)['passed'] and
                              max(row['metrics']['knee_mirror_m'],
                                  row['metrics']['wheel_mirror_m']) <= .03,
@@ -97,13 +117,13 @@ def grouped_long(rows):
 def transitions_long(job):
     summaries=[]
     for path in sorted((job/'acceptance').glob('*/seed*/*.json')):
-        if path.stem not in ('entry_exit','slow_reverse'):
+        if path.stem not in ('entry_exit','slow_reverse','height_entry_exit'):
             continue
         data=json.loads(path.read_text())
         n=data['envs_per_command']
         windows=({'entry':(1.,8.),'turn':(8.,11.9),
                   'exit_ramp':(12.,14.),'recovery':(16.,18.)}
-                 if path.stem=='entry_exit' else
+                 if path.stem in ('entry_exit','height_entry_exit') else
                  {'entry':(1.,8.),'turn':(8.,10.9),
                   'reverse_ramp':(11.,15.),'reverse_hold':(16.,19.)})
         for index,row in enumerate(data['results']):
@@ -117,23 +137,31 @@ def transitions_long(job):
                 def average(fn):
                     return sum(fn(frame,env) for frame in frames
                                for env in range(lo,hi))/count
+                def worst_env(fn):
+                    return max(sum(fn(frame,env) for frame in frames)/len(frames)
+                               for env in range(lo,hi))
                 phases[name]={
                     'vx_mae':average(lambda f,e:abs(f['vx'][e]-f['applied_command'][e][0])),
                     'yaw_mae':average(lambda f,e:abs(f['yaw'][e]-f['applied_command'][e][1])),
                     'height_mae':average(lambda f,e:abs(f['height'][e]-f['applied_command'][e][2])),
+                    'worst_env_height_mae':worst_env(lambda f,e:abs(f['height'][e]-f['applied_command'][e][2])),
                     'root_height':average(lambda f,e:f['height'][e]),
                     'com_height':average(lambda f,e:f['com_height'][e]),
                     'height_target':average(lambda f,e:f['applied_command'][e][2]),
                     'roll_target_mae':average(lambda f,e:abs(f['roll'][e]-f['roll_target'][e])),
                     'wheel_contact':average(lambda f,e:float(all(f['wheel_contacts'][e]))),
                 }
-            final=phases['recovery' if path.stem=='entry_exit' else 'reverse_hold']
+            final=phases['recovery' if path.stem in ('entry_exit','height_entry_exit') else 'reverse_hold']
             passed=(row['failure_count']==0 and row['timeout_count']==0 and
                     row['metrics']['nonwheel_contact']==0 and
                     row['metrics']['torque_saturation']<=.01 and
                     final['vx_mae']<=.10 and final['yaw_mae']<=.10 and
                     final['height_mae']<=.03 and final['wheel_contact']>=.99 and
                     final['roll_target_mae']<=.035)
+            if path.stem == 'height_entry_exit':
+                passed = (passed and phases['turn']['worst_env_height_mae']<=.015
+                          and final['worst_env_height_mae']<=.03
+                          and phases['turn']['wheel_contact']>=.99)
             summaries.append({'model':path.parent.parent.name,
                 'seed':int(path.parent.name[4:]),'protocol':path.stem,
                 'command':row['command'],'environments':n,
@@ -350,7 +378,11 @@ def main():
     parser.add_argument('--job', type=Path, required=True)
     parser.add_argument('--extract-failures-only', action='store_true')
     parser.add_argument('--long', action='store_true', help='Summarize the new variable-height exploration')
+    parser.add_argument('--summary-out', type=Path,
+                        help='With --long, write a new versioned summary without altering historical artifacts')
     args = parser.parse_args()
+    if args.summary_out is not None and not args.long:
+        parser.error('--summary-out requires --long')
     job = args.job.resolve(strict=True)
     if args.extract_failures_only:
         print(extract_failures(job))
@@ -359,18 +391,24 @@ def main():
         rows = collect_long(job)
         points = grouped_long(rows)
         dynamic = transitions_long(job)
-        summary = job / 'long_evaluation_summary.json'
-        figure = job / 'long_turn_heatmap.png'
-        if summary.exists() or figure.exists():
+        summary = args.summary_out or job / 'long_evaluation_summary.json'
+        figure = None if args.summary_out is not None else job / 'long_turn_heatmap.png'
+        if summary.exists() or (figure is not None and figure.exists()):
             raise FileExistsError('Long exploration summary already exists')
+        metric_sha = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+        gate_sha = hashlib.sha256(Path(gate.__code__.co_filename).read_bytes()).hexdigest()
+        summary.parent.mkdir(parents=True,exist_ok=True)
         with summary.open('x') as output:
-            json.dump({'schema':'turn_lean_long_review_v1',
+            json.dump({'schema':'turn_lean_long_review_v2',
+                       'metric_definition_sha256':metric_sha,
+                       'gate_sha256':gate_sha,
                        'individual_rows':rows,'points':points,
                        'transitions':dynamic},output,indent=2)
             output.write('\n')
-        heatmap_long(figure,points)
+        if figure is not None:
+            heatmap_long(figure,points)
         print(json.dumps({'rows':len(rows),'points':len(points),
-                          'summary':str(summary),'heatmap':str(figure)}))
+                          'summary':str(summary),'heatmap':str(figure) if figure else None}))
         return
     rows = collect(job)
     points = grouped(rows)

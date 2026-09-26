@@ -59,4 +59,8 @@ iteration/SHA 和每组失败分类；probe 是单 seed 筛查，不是最终三
 候选 `turn_lean_review` 对包含 `height_schedule` 的 spec 按每个目标命令
 `abs(vx*yaw)` 选择转弯高度，原25命令始终0.40m；旧无 schedule 的 spec
 沿用固定 `turn_height`。含 schedule 的 `entry_exit` 从训练bank分别选择0.38和0.36目标
-转弯，以公开命令检查出弯回到0.40；独立高度技能与回高仍须另做专项评估。
+转弯，以公开命令检查出弯回到0.40。含 `cohort_plan` 的 review 另生成
+`height_skill`（0.38/0.36m、零速及正反0.5m/s）与 `height_entry_exit`；
+`summarize_turn_envelope.py --long` 为其分别计算逐环境高度门槛和回高阶段指标。
+`screen_turn_lean_candidates.py` 只有在这些组与原25/转弯/holdout均三seed完整、
+checkpoint及协议同一时才允许比较候选；单seed probe不进入接受名单。
