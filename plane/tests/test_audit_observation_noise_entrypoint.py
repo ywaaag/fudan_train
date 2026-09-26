@@ -11,13 +11,18 @@ from wheel_legged_gym.app.audit_observation_noise import main
 @pytest.mark.parametrize('mode', ['sampled', 'sampled_noisy'])
 def test_noise_mode_and_literal_arguments(tmp_path, monkeypatch, mode):
     calls=[]
-    monkeypatch.setattr(subprocess, 'run', lambda command, cwd: calls.append((command,cwd)) or type('R',(),{'returncode':7})())
-    assert main(tmp_path, [mode, 'literal$(unchanged)', '--seed', '19']) == 7
+    root=tmp_path/'repository'
+    root.mkdir()
+    caller=tmp_path/'caller'
+    caller.mkdir()
+    monkeypatch.chdir(caller)
+    monkeypatch.setattr(subprocess, 'run', lambda command, **kwargs: calls.append((command,kwargs,Path.cwd())) or type('R',(),{'returncode':7})())
+    assert main(root, [mode, 'relative/model.pt', '--out', 'relative/result.json']) == 7
     assert calls == [([
         __import__('sys').executable,
-        str(tmp_path/'plane/wheel_legged_gym/scripts/evaluate_policy_comparison.py'),
-        '--diagnostic-mode', mode, 'literal$(unchanged)', '--seed', '19',
-    ], tmp_path)]
+        str(root/'plane/wheel_legged_gym/scripts/evaluate_policy_comparison.py'),
+        '--diagnostic-mode', mode, 'relative/model.pt', '--out', 'relative/result.json',
+    ], {}, caller)]
 
 
 def test_invalid_mode_is_rejected_before_process():

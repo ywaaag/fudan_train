@@ -11,9 +11,6 @@ import sys
 import time
 from datetime import datetime
 
-ROOT = Path(__file__).resolve().parents[1]
-PLANE = ROOT / 'plane'
-EVALUATOR = PLANE / 'wheel_legged_gym/scripts/evaluate_policy_comparison.py'
 CANDIDATES = {
     'legacy_h3': ('Sep05_17-41-43_H3_from_H2_best_v1', 15800),
     'legacy_h7_fixed': ('Sep06_16-54-55_H7_fixed_3ms_stable_v1', 16200),
@@ -40,6 +37,9 @@ from wheel_legged_gym.evaluation.gates import gate
 
 
 def main(root):
+    ROOT = Path(root).resolve()
+    PLANE = ROOT / 'plane'
+    EVALUATOR = PLANE / 'wheel_legged_gym/scripts/evaluate_policy_comparison.py'
     p = argparse.ArgumentParser(__doc__)
     p.add_argument('--job', type=Path, help='Resume this exact job without repeating completed grids')
     p.add_argument('--candidates', nargs='+', choices=list(CANDIDATES), default=list(CANDIDATES))
@@ -149,4 +149,3 @@ def main(root):
         raise
     finally:
         write(job/'status.json',state)
-

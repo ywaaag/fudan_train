@@ -1268,3 +1268,141 @@ cycles、层级违规、仿真导入、缺失本地模块均为空。剩余仅�
 - 剩余外部边界是第三方Isaac/PyTorch运行时开关、pynput/GUI交互、历史job文件格式和HAPI通知，
   已由AGENTS、模块指南、process_interfaces和测试记录；不属于自有模块循环或向上依赖。
   未运行历史长任务，不以GUI/均值/reward宣称运动能力。
+
+## 2026-09-25 Codex 入口与 review 收口
+
+- 现场分支均为 `refactor/codex-readable-20260923_100634`。训练 HEAD `59396eb`，sim2sim HEAD
+  `ee84200`；原有 README dirty changes、未跟踪快速入口和 `.deep-copilot/` 均保留。
+- 完成两个 `CODEX_QUICKSTART.md`：目录职责、最小阅读、准确测试/审计/1 iteration smoke/
+  34000步 MuJoCo 命令、启动副作用、保护目录、故障日志及25D/125D/6D契约。
+- 新增 `process_review.md`，按25个 app 入口列出 import/main、job、lock、原子 status、STOP、
+  child_pid、wait、恢复、hash、覆盖和通知；更新 supervisor_inventory 为当前入口索引。
+- 重写 `completion_audit.md` 的12项状态、证据、验证命令、剩余边界与 Goal 影响；
+  同步训练 ARCHITECTURE/README 和 sim2sim ARCHITECTURE/MODEL_MEASUREMENTS/README 的现状描述。
+- 本轮未改 Python 源码，依赖图无变化，故 `dependencies.json` 保持原内容。
+  `python3 tools/check_architecture.py`：249模块/1045边，cycles、layer、simulator import、
+  missing local imports 全空；robot Python 审计 sim2sim：39模块/78边，cycles/layer 全空。
+- 完整测试：fudan_leg Python `-m pytest plane/tests -q --disable-warnings --maxfail=1`：
+  664 passed、2 warnings；robot Python `-m pytest tests -q`：24 passed。
+  沿用阶段100的 final_smoke.log、final_onnx_equivalence.json 和
+  closed_success_rejection_equivalence.json；文档修改无需重启 Isaac 或覆盖旧结果。
+- 架构等价目标的自有模块项已关闭；第三方运行时、历史 job 文件格式、HAPI 通知
+  仍是明确外部边界。新策略运动能力 gate 需要独立授权和完整验收，不能由架构测试推出。
+
+## 2026-09-25 定向缺陷复核与纠偏
+
+- 上一节“架构等价目标的自有模块项已关闭”结论过强：源码复核发现实际 CLI/root
+  缺陷，故以 `completion_audit.md` 当前“明确边界/未完成”为准，不把这些缺口归为第三方。
+- `app.compare_policy_versions.main(root)` 现在从显式 root 组装 PLANE/EVALUATOR、
+  checkpoint、asset、cwd。`runner_sha256` 保持校验 app 源码；迁移前 manifest hash
+  不匹配时拒绝恢复，不改旧 job。临时目录加 fake Popen 测试验证新 job 路径/hash，
+  另用旧 hash manifest 验证拒绝恢复。
+- `tools/export_model_registry.py` 现在传入 ROOT；`runpy` 加 fake main 验证 CLI 绑定，
+  未触碰固定 `docs/data`。`app.audit_observation_noise` 不再改变子进程 cwd；
+  不同调用目录的 fake subprocess 测试验证相对参数仍按调用者 cwd 解释。
+- 三处生产代码依赖方向未变，依赖 JSON 无需重写。定向 11 项测试通过；
+  完整训练测试 667 passed、2 warnings，sim2sim 测试 24 passed。
+  训练依赖审计 249 模块/1045 边，sim2sim 39 模块/78 边，均无循环或受管层级违规。
+  `git diff --check` 两仓库均通过。
+  旧 manifest、logs、outputs、资产和 `.deep-copilot/` 均未清理或覆盖。
+- 后续最小验收是历史 job 格式/恢复拒绝的隔离读写、其余重要 CLI/root 绑定、
+  GUI 交互受控验证；未在本阶段自动启动长训练。
+# 2026-09-25 fixed-height turn-envelope experiment (behavior change)
+
+This is a separately authorized training experiment, not behavior-equivalent
+refactoring. `TURN_ENVELOPE` adds a pure recipe, exact R10200 source validation,
+an open-loop 25% turn command cohort, and an optional command-derived roll
+reference. A retains the original orientation formula and B uses the bounded
+reference; all other training settings are matched. The evaluation CLI adds
+staggered yaw/exit timing and additive turn diagnostics. See
+`docs/modules/turn_envelope.md` and the frozen run protocol under
+`plane/outputs/turn_envelope_20260925_162526/` for responsibilities and
+thresholds. Final `python3 tools/check_architecture.py` reports zero cycles and
+layer violations (254 modules, 1083 edges); 671 training tests pass. A/B each
+ran 64-env 1-iteration smoke and 4096-env 500 additional iterations. Three-seed
+Isaac review retained all original 25 commands, but B did not produce a
+meaningful active lean or expand the strict turn envelope. Read the run
+`README.md` then `completion_report.md`; do not infer closed-chain acceptance.
+
+# 2026-09-25 TURN_LEAN_LONG authorized ability exploration
+
+This phase is a new, bounded training objective, not behavior-equivalent
+refactoring and not a continuation of the 500-iteration A/B. The old
+`TURN_ENVELOPE` recipe and its outputs remain intact. A new explicit spec
+selects turn height/lean/cohort/LR; app validates exact source and the frozen
+R10200 teacher, while the existing command scheduler now supports public
+height ramps only when configured. The evaluator adds measured whole-body
+COM, posture error and failure diagnostics without changing the old gate.
+`docs/modules/turn_lean_long.md` maps entry points; live stage status and
+bounded milestone summaries are under
+`plane/outputs/turn_lean_long_20260925_175224/`. The phase is ongoing;
+training scalars alone are not acceptance evidence.
+
+# 2026-09-26 cornering height skill (authorized training behavior change)
+
+This is not architecture equivalence. The exact model_35250 source and R10200
+teacher are frozen by SHA in `plane/outputs/cornering_height_skill_20260926_122332/spec_stage1.json`.
+The optional cohort plan adds a 20-slot 50/20/25/5 retention/height/mid/high
+split and a public independent height scheduler; old recipes are unchanged.
+The only reward change exempts `base_height` from per-term clipping because
+the old 8x height term is flat at a 0.04m error. Stage 1 uses 0.38m practice,
+1e-5 fixed actor LR, frozen encoder, exact full model/two-Adam restoration,
+and at most 5000 new iterations; stage 2 is conditional, with total budget
+<=20000 and at most two runs. Its status and milestone evidence are under
+`plane/outputs/cornering_height_skill_20260926_122332/stage1_job/`.
+The 64-env smoke restored all model/optimizer tensors exactly; its summary
+showed reference fraction .5, encoder delta 0 and LR 1e-5. Architecture
+audit: 261 modules, 1138 edges, no cycles/layer/missing imports. Training
+tests: 682 passed, 2 warnings before the final sampler test was added;
+the targeted turn tests subsequently passed 10/10. Source-tree motion
+acceptance is pending and cannot be inferred from these code checks.
+
+## 2026-09-26 turn-lean review height fix
+
+The existing `app.turn_lean_review` previously sent `stage.turn_height` for
+every turn command. In the cornering-height spec this value is 0.40m, so it
+silently evaluated the wrong target for mid/high loads. Review now validates
+the spec and derives each turn target from the ordered `height_schedule`
+thresholds and `abs(vx*yaw)`; retention remains 0.40m and old fixed-height
+specs keep their former target. A temporary-job fake evaluator test checks
+actual CLI arguments without launching Isaac. Independent height-skill and
+return-to-0.40m evaluation remains separate. No running trainer/monitor code
+was changed by this fix. Full training tests: 684 passed, 2 warnings.
+Architecture: 261 modules, 1142 edges, no cycles or layer violations.
+
+## 2026-09-26 candidate evidence chain correction
+
+The old untracked `screen_turn_lean_candidates.py` read one seed's
+`turn_train.json` and looked for a nonexistent top-level `passed` field,
+thereby counting every real retention/turn row as failure. It also treated
+three neighboring files as a complete three-seed review without checking
+checkpoint or protocol identity. The corrected entry consumes the existing
+long summary, verifies raw metadata for all required group/seed files,
+binds checkpoint SHA and actual iteration, and compares only identical
+protocol/evaluator/gate/metric signatures and command sets. Missing, empty,
+skipped, fixed-height and legacy-identity results are not accepted. New
+summaries carry metric/gate source SHA; historical raw results can be
+re-summarized to a separate v2 sidecar without rewriting them. The current
+height-skill review adds independent 0.38/0.36m steady and exit/recovery
+groups. Its outputs remain Isaac tree evidence, not closed-chain acceptance.
+
+## 2026-09-26 bounded height-stage result and continuation
+
+Stage 1 completed its 5000 added iterations at actual checkpoint40250. Five
+1000-iteration probes retained the five basic commands but reported 0/6
+independent height passes throughout; 0.38m mean root-height error stayed
+about 0.019m and mid-turn passes fell from 2/8 to 1/8. The actor changed
+8/8 tensors while frozen encoder changed 0/6; command0.38 appeared in both
+current and latest-history policy channels. The old source35250 remains the
+reviewed initialization; model40250 is not accepted.
+
+The second and last authorized run restarts source35250 with 50% retention,
+30% independent 0.38m practice, 15% mid turns and 5% existing high boundary.
+The encoder is trainable at 3e-6 with actor LR1e-5. Its 64-env smoke verified
+exact full model/two-Adam restore, reference fraction .5, actor and encoder
+parameter changes, and unchanged policy contract. The formal run is bounded
+at 15000 additional iterations; stage1+2 total cannot exceed 20000.
+The monitor pauses after three consecutive 1000-iteration probes without a
+height pass or at least 3mm height-MAE improvement, then uses the existing
+completion hook. Runtime identity and status are in the current experiment
+`source_identity.md` and `stage2_job/status.json`; no stage3 run is authorized.

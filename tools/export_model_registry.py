@@ -11,4 +11,4 @@ from wheel_legged_gym.app.export_model_registry import main
 
 
 if __name__ == '__main__':
-    main()
+    main(ROOT)

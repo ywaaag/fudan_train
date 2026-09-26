@@ -11,5 +11,4 @@ def main(root, argv=None):
     entry = Path(root) / 'plane/wheel_legged_gym/scripts/evaluate_policy_comparison.py'
     return subprocess.run(
         [sys.executable, str(entry), '--diagnostic-mode', arguments[0], *arguments[1:]],
-        cwd=Path(root),
     ).returncode

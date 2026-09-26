@@ -4,10 +4,24 @@
 
 先读根ARCHITECTURE.md与目标模块指南，任务缺口见docs/architecture/completion_audit.md。
 Codex可读性第一；不依赖历史聊天、模型编号或旧快照判断当前状态。
+实现或运行前先查 [`docs/CODEX_TOOL_INDEX.md`](docs/CODEX_TOOL_INDEX.md)；优先复用已有
+工具和公开 app 入口，先用只读摘要/`--help`定位，确认副作用后才启动仿真或写输出。
+工具索引记录解释器、工作目录、输入输出、适用范围和失败后的下一步；不要为同一任务
+新建重复目录或脚本。训练或评估任务继续沿
+[`docs/CODEX_WORKFLOW.md`](docs/CODEX_WORKFLOW.md) 执行：现场、最小阅读、spec/smoke、
+监控、候选筛选、ONNX和终态报告按固定顺序完成。
+转弯训练的人工接管、逐问题修改入口和安全命令见
+[`docs/CORNERING_SELF_SERVICE.md`](docs/CORNERING_SELF_SERVICE.md)；额度或会话中断时
+先读它和当前 job 状态，不靠历史聊天恢复任务。
 
-本轮为严格行为等价架构重构：保留现有dirty changes、资产、logs、outputs、checkpoint；
-不改变奖励/课程/物理参数/策略契约/验收阈值，不自动恢复长训练。必要1iteration smoke
-用于等价验证，不能代替独立验收。短训500iteration规则属于后续明确授权的训练任务。
+2026-09-23 的严格行为等价架构重构是历史阶段；其等价证据见架构台账。
+当前训练任务以对应输出目录的显式 spec/protocol 为准，仅在用户授权预算内改变训练
+课程或奖励。始终保留 dirty changes、资产、logs、outputs、checkpoint；不自动恢复长训练，
+不改变固定策略/物理契约或验收阈值。1iteration smoke 不能代替独立运动验收。
+
+处理监控、日志、评估、候选筛选或导出前，先查 `docs/CODEX_TOOL_INDEX.md` 和
+`docs/CODEX_WORKFLOW.md`，优先复用已有入口；新增工具必须说明现有入口的具体缺口，
+并保留协议身份、缺测和失败状态，不把最后 checkpoint 默认当成最好。
 
 修改前现场核对Git状态；新增代码优先通过公开模块入口；函数内import也纳入依赖审计。
 完成每阶段后更新架构/依赖图与refactor_progress，说明模块、依赖变化和验证证据。

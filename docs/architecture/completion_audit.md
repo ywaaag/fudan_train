@@ -1,24 +1,42 @@
-# 架构目标验收台账
+# 架构目标验收台账（2026-09-25）
 
-本页按原目标记录证据与缺口，不替代源码核查，也不把阶段测试通过等同于goal完成。
-2026-09-24用户已取消旧用法兼容硬约束：完成调用方迁移后删除冗余旧入口，记录新API；
-物理/训练/验收行为等价及成果保留要求不变。下表兼容项按这一最新要求验收。
-阶段改动详情和确切文件见refactor_progress.md；所有模型/资产/旧结果保留。
+本表只验收架构重构的行为等价，不宣称某个 policy 已通过新的运动能力 gate。
+`已完成` 指此项的当前架构目标有源码、测试或代表性运行证据；
+`明确边界` 指外部运行时或历史格式仍需具体任务验证；`未完成` 指尚缺当前目标所需证据。
+本表记录的 2026-09-25 架构阶段没有改奖励、课程、物理、模型、策略 contract
+或验收阈值，也没有恢复长训练；其后授权的运动训练是独立行为变更，不属于本表等价结论。
+现场依赖审计输出和实际测试结果在 `refactor_progress.md` 最末阶段；
+逐入口动态审查见 `process_review.md`。命令均从对应仓库根目录执行。
 
-| 原目标 | 已有证据 | 尚需完成 |
-|---|---|---|
-| 仓库自描述、最小阅读上下文 | 两仓库ARCHITECTURE、模块指南、静态依赖JSON；根README/AGENTS分离历史快照；本轮本地链接已核对 | 最终目录树和边界核对，确保指南与最终实现一致 |
-| 自有代码循环清零 | 2026-09-24最终静态检查：训练243模块/1027边、sim2sim39模块/78边，均cycles=[] | 动态进程依赖仍需最终汇总；不再有静态循环缺口 |
-| 单向分层 | 受管层级检查通过；envs不依赖utils；所有tools入口均无subprocess调用，旧job工具及历史诊断均归app；未反向导入其他tools或核心入口 | 仅保留旧job文件协议的外部历史格式边界 |
-| 环境模块化 | 奖励、观测、控制、终止、物理reset、资产/actor/索引/随机化、Gym张量、课程窗口、命令重采样、DOF/PD初始随机化及原点布局已分离；environment_lifecycle指南记录调度与状态所有权 | 最终入口与代表性运行验收；调度本身归环境，不机械拆成代理 |
-| 工作流模块化 | motion评估、完成报告、状态存储、进程执行、验证调度、实验配置构造、轮次推进及恢复检查分离；高度附加门槛归evaluation；监督器入口及旧job入口已归app | 旧job协议依赖外部历史文件格式，边界已在supervisor_inventory记录 |
-| 消除隐式全局状态 | registry由app工厂创建；配方不读环境/文件；具名指标buffer无重复别名；类配置容器按实例隔离；Torch JIT显式app调用；MuJoCo guide配置显式输入；FUDAN_SCALES/TERMINAL只读；未使用的135D导出脚本归档；GUI命令状态归PlayCommandState | 仅保留第三方运行时开关和历史job文件作为明确外部边界 |
-| 跨仓库公开接口 | 三个CLI的process_interfaces.json；closed/tree冻结快照；训练导入边界和probe快照测试；旧after_step已删除 | 最终验收再扫描调用方与文档 |
-| 单一公开入口 | 已迁移调用方并删除rsl_rl、旧env配置/配方及utils兼容包装；16个监督器归app；MuJoCo测量统一公开模块调用；tools入口扫描无旧监督器互导 | 最终核对公开入口清单；不要求旧用法兼容 |
-| 训练行为等价 | 多次64env/seed11/1iteration checkpoint与两组optimizer精确一致 | 最终代码完成后的统一smoke和有代表性分支核查 |
-| ONNX契约等价 | 当前final_reexport_10200.onnx与历史文件SHA256完全相同；batch1/8/256输出精确相同；PyTorch batch256误差7.63e-6通过；证据final_onnx_equivalence.json | 此后若改learning/导出路径需重验；最终汇总引用hash，不能以此证明所有模型运动能力 |
-| sim2sim等价 | tree34000步；当前closed正常2000步与历史保护拒绝2489步全字段精确对照（仅排除耗时及源码hash），证据closed_success_rejection_equivalence.json；外部24项测试通过 | 此后若改验证路径需重验；最终汇总引用证据，不能将拒绝复现说成模型能力通过 |
-| 版本可追溯 | 独立refactor分支、修改前备份、run完整源码快照；原dirty源码独立归档（git_preservation.md）；阶段89提交当前源码状态，提交日志可追溯 | 当前工作区仅保留未跟踪.deep-copilot，不纳入源码 |
+| 项目 | 当前状态 | 证据文件 | 验证命令 | 剩余边界 | 影响架构 Goal 完成？ |
+|---|---|---|---|---|---|
+| 1 仓库自描述 | 已完成 | `README.md`、`ARCHITECTURE.md`、`docs/CODEX_QUICKSTART.md`；sim2sim 同名入口 | 两仓库 `git status --short`，按快速入口核对目标文件 | 文档须随入口变化更新 | 否 |
+| 2 循环依赖 | 已完成 | `dependencies.json`；sim2sim `dependencies.json` | 两仓库 `tools/check_architecture.py` | AST 不涵盖反射和第三方内部 import | 否 |
+| 3 单向分层 | 已完成 | `ARCHITECTURE.md`、`dependencies.json`、`plane/tests/test_architecture.py` | 训练 `python3 tools/check_architecture.py`；sim2sim 用 robot Python 运行同名脚本 | sim2sim legacy CLI 仅审计循环，允许边白名单只覆盖核心模块 | 否，已明示范围 |
+| 4 环境模块化 | 已完成 | `docs/modules/environment_lifecycle.md`、`simulation_tensors.md`、`plane/outputs/architecture_refactor_20260923/final_smoke.log` | 训练全套 pytest；必要时 64 env/seed11/1 iteration smoke（命令见快速入口） | Isaac Gym 与 GPU 运行时属第三方 | 否 |
+| 5 工作流模块化 | 明确边界 | `docs/architecture/process_review.md`、`supervisor_inventory.md`、`plane/tests/test_compare_policy_entrypoint.py`、`test_job_tool_entrypoints.py` | 训练全套 pytest；临时目录/fake subprocess 验证定向入口 | 比较、registry、噪声诊断缺陷已修；其余历史 job 的真实文件协议和 GUI/CLI 运行路径尚未逐项证实 | 是，完整行为等价结论暂缓 |
+| 6 隐式全局状态 | 已完成 | `docs/modules/configuration.md`、`compatibility.md`、`plane/tests/test_config_instance_isolation.py` | 训练全套 pytest | 第三方 Torch/Isaac 开关、GUI 输入与历史 job 格式 | 否 |
+| 7 跨仓库公开接口 | 已完成 | `docs/architecture/process_interfaces.json`、sim2sim `VALIDATION_API.md`、`plane/tests/test_cross_repository_boundary.py` | 两仓库全套 pytest；两仓库依赖审计 | 子进程环境、PID 与文件系统故障是外部边界 | 否 |
+| 8 单一公开入口 | 明确边界 | `docs/modules/compatibility.md`、`docs/architecture/process_review.md`、sim2sim `policy_measurements.py` | 两仓库全套 pytest；定向 CLI 参数绑定测试 | 旧 Python import 不再承诺；其余实际 CLI/root 路径尚需按用途核对 | 是，不能从 import 成功推断 CLI 可用 |
+| 9 训练行为等价 | 已完成（代表性 smoke） | `plane/outputs/architecture_refactor_20260923/final_smoke.log`、`config_isolation_smoke_equivalence.json`、`docs/architecture/refactor_progress.md` | 快速入口的 1 iteration smoke；训练全套 pytest | 不覆盖全部运行分支、GUI 或完整课程；不等于 command-grid 能力验收 | 是，对“全仓库等价”仍缺证据 |
+| 10 ONNX 等价 | 已完成 | `plane/outputs/architecture_refactor_20260923/final_onnx_equivalence.json` | 读取该 JSON 的输入/输出 shape、hash、batch1/8/256 `outputs_exact`；导出命令见 `COMMANDS.md` | 只覆盖记录的 checkpoint，不能推广到任意模型 | 否 |
+| 11 sim2sim 等价 | 已完成（固定步长路径） | `plane/outputs/architecture_refactor_20260923/closed_success_rejection_equivalence.json`、tree 固定步长对照见 `refactor_progress.md` | robot Python 测试；公开 34000 步命令见 sim2sim `CODEX_QUICKSTART.md`，本轮不重跑 | 正常 2000 步与保护拒绝 2489 步分别解释；拒绝不算能力通过 | 否，能力验收另案 |
+| 12 Git 可追溯 | 已完成 | `plane/outputs/architecture_refactor_20260923/preexisting_git_snapshots.json`、`docs/architecture/refactor_progress.md` | 两仓库 `git branch --show-current`、`git log -5 --oneline`、`git status --short` | 当前工作区状态以现场 Git 输出为准；训练 logs/outputs 不随源码提交 | 否 |
 
-完成条件是上表剩余项逐项有证据关闭。未解决事项不能用新增例外掩盖；确属第三方兼容
-边界的例外须写原因、调用边界和移除计划。不得启动长训练代替架构验证。
+## 明确边界
+
+- **第三方运行时**：Isaac Gym Preview 4、PyTorch/CUDA、MuJoCo、操作系统进程/PID、
+  GUI/pynput 和 HAPI 通知不由本仓库静态审计证明；失败应读对应新 job 的 status/log。
+- **历史 job**：`process_review.md` 逐项说明 lock、STOP、PID、hash 和恢复能力。
+  无显式恢复的入口不能自动续训；历史文件格式只在实际需要恢复时核对。
+- **模型能力**：zero、forward/backward、yaw±、高速样本、survival、
+  `curriculum_window_passed`、torque saturation 与双轮接触必须通过独立 command-grid
+  和闭链验收。已有等价证据只证明重构未改变记录路径，不授予新模型通过结论。
+
+## 未完成
+
+上一版“自有模块项全部关闭”过度概括。静态分层、单元测试和代表性 smoke 有证据；
+本轮又通过定向测试修复三个真实 CLI 缺陷。仍需：用隔离的历史 job 样本验证读写与
+恢复拒绝路径；核对其余高价值 CLI 的 root/参数和输出位置；对 GUI 交互做受控验证。
+完成这些定向验收前，不建议宣布“全仓库运行路径严格行为等价”或完成整个架构 Goal。
+新 policy 的完整运动能力 gate 还需要独立授权和评估，不能用本表替代。

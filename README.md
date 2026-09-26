@@ -11,6 +11,7 @@
 - 模型证据：[动态启停记录](docs/dynamic_start_stop.md)、[模型分支](docs/model_branches.md)。
   文档是对应日期的实验记录，模型编号或reward上涨不等于当前验收通过。
 - 运行命令：[COMMANDS](COMMANDS.md)；当前CLI路径保留，已删除的Python旧入口见[迁移表](docs/modules/compatibility.md)。历史续训示例不是新训练授权。
+- 给新 Codex 的最小入口：[CODEX_QUICKSTART](docs/CODEX_QUICKSTART.md)。
 
 ## 目录与责任
 
@@ -32,11 +33,11 @@ plane/export_onnx/ 原ONNX导出/核验入口
 assets/            固定机器人资产
 plane/logs/        原checkpoint与训练日志，禁止整体清理
 plane/outputs/     验收结果与重构证据，保留旧结果
-tools/            仓库CLI与尚待迁移的历史监督器
+tools/            架构审计与历史监督器薄CLI，实现在app
 docs/             模块指南、实验记录、架构图及历史归档
 ```
 
-目录迁移尚未全部结束；剩余职责以验收台账为准。依赖箭头和允许方向见ARCHITECTURE，
+目录职责和外部边界以验收台账为准。依赖箭头和允许方向见ARCHITECTURE，
 静态边及源码行号见[dependencies.json](docs/architecture/dependencies.json)。
 跨仓库进程接口见[process_interfaces.json](docs/architecture/process_interfaces.json)。
 

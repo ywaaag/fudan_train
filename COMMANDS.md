@@ -287,3 +287,41 @@ LD_LIBRARY_PATH=/home/kellen/anaconda3/envs/fudan_leg/lib \
 /home/kellen/anaconda3/envs/fudan_leg/bin/python \
 tools/summarize_turn_envelope.py --help
 ```
+
+## TURN_LEAN_LONG（本轮有界训练；原 run_name 禁止重用）
+
+先读 `docs/modules/turn_lean_long.md` 与
+`plane/outputs/turn_lean_long_20260925_175224/README.md`。以下是 2026-09-25
+历史 stage1 的实际命令形状；该 run 已结束，不能再次执行相同名称或套用旧预算。
+当前 2026-09-26 高度技能实验以其独立 `spec_stage*.json`、`protocol*.md`
+和 job `status.json` 为准；新阶段须使用新 run_name 与精确来源 checkpoint/SHA。
+
+```bash
+cd /home/kellen/fudan_train/plane
+env PYTHONPATH=/home/kellen/fudan_train/plane \
+LD_LIBRARY_PATH=/home/kellen/anaconda3/envs/fudan_leg/lib \
+CUDA_VISIBLE_DEVICES=0 \
+FUDAN_TURN_LONG_SPEC=/home/kellen/fudan_train/plane/outputs/turn_lean_long_20260925_175224/spec_stage1.json \
+/home/kellen/anaconda3/envs/fudan_leg/bin/python wheel_legged_gym/scripts/train.py \
+--task=wheel_legged --headless --num_envs=4096 --max_iterations=10000 \
+--seed=23 --policy_experiment=TURN_LEAN_LONG --resume --resume_mode=full \
+--load_run=Sep22_11-19-04_motion_goal_20260922_111611_r01_basic_motion \
+--checkpoint=10200 --run_name=turn_lean_long_20260925_stage1
+```
+
+只读训练摘要（不要先打开完整 stdout）：
+
+```bash
+cd /home/kellen/fudan_train
+env PYTHONPATH=/home/kellen/fudan_train/plane \
+LD_LIBRARY_PATH=/home/kellen/anaconda3/envs/fudan_leg/lib \
+/home/kellen/anaconda3/envs/fudan_leg/bin/python \
+tools/summarize_training.py \
+/home/kellen/fudan_train/plane/logs/wheel_legged/Sep25_18-00-59_turn_lean_long_20260925_stage1 \
+--window 50
+```
+
+`status.json`、`summaries/`、`probes/` 在本轮输出目录；阶段/最终评估
+入口为 `tools/review_turn_lean_long.py --help`，汇总入口为
+`tools/summarize_turn_envelope.py --long --job <phase_review目录>`。这些
+命令会启动Isaac评估或写新文件，架构审查不要执行。

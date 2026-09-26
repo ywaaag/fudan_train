@@ -12,3 +12,4 @@ plane/outputs/
 .DS_Store
 .idea/
 .vscode/
+.deep-copilot/

@@ -1,6 +1,7 @@
 """Old job-file tools are thin CLI leaves with explicit app implementations."""
 import ast
 import importlib
+import runpy
 import subprocess
 from pathlib import Path
 
@@ -22,3 +23,11 @@ def test_job_tool_imports_are_side_effect_free(name, monkeypatch):
     module=importlib.import_module('wheel_legged_gym.app.'+name)
     importlib.reload(module)
     assert callable(module.main)
+
+
+def test_registry_cli_passes_repository_root_without_export(monkeypatch):
+    module=importlib.import_module('wheel_legged_gym.app.export_model_registry')
+    roots=[]
+    monkeypatch.setattr(module,'main',lambda root: roots.append(root))
+    runpy.run_path(str(ROOT/'tools/export_model_registry.py'),run_name='__main__')
+    assert roots==[ROOT]

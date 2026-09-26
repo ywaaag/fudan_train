@@ -1,10 +1,10 @@
 # 架构入口：先读边界，再读目标模块
 
-本文件记录当前源码结构，不依赖聊天记录。重构正在分阶段进行，不能把目标目录已创建
-理解为全部迁移完成。机器人训练保持停止，架构验证仅允许必要 smoke。
+本文件记录当前源码结构，不依赖聊天记录。架构审查不自动启动长训练；
+已授权实验的运行状态与预算以各自 job 的 status/spec 为准。
 
-完整目标的证据和剩余缺口见[验收台账](docs/architecture/completion_audit.md)，不能只凭测试数量判断完成。
-剩余监督器的具体文件及处理顺序见[监督器清单](docs/architecture/supervisor_inventory.md)。
+完整目标的证据和边界见[验收台账](docs/architecture/completion_audit.md)，不能只凭测试数量判断模型能力通过。
+监督器入口及动态进程差异见[进程审查](docs/architecture/process_review.md)。
 
 ## 已落地的模块
 
@@ -80,6 +80,8 @@ MuJoCo 初始化和逐步测量已经归属于 sim2sim 仓库，未更改求解�
 - 排查reset原因：读 [终止判定](docs/modules/termination.md)，分开检查fail、timeout、edge与实际reset。
 - 修改奖励：读 [奖励模块指南](docs/modules/rewards.md)、`domain/rewards/api.py` 和目标公式；不必读仿真生命周期。
 - 修改实验：读 `experiments/selection.py`、目标 recipe 及其引用的 primitives；不要从 recipe 导入 selection。
+- 修改固定0.40m转弯实验：读[转弯包络指南](docs/modules/turn_envelope.md)，再读显式spec、转弯命令调度和姿态参照；A/B只有orientation目标不同。
+- 修改本轮降高/内倾长训：读[TURN_LEAN_LONG指南](docs/modules/turn_lean_long.md)和本轮输出目录README；它是联合能力探索，不沿用旧A/B单变量结论。
 - 修改motion/height的外部spec或来源校验：读 [实验输入指南](docs/modules/experiment_inputs.md)；文件输入归app，配方接收显式spec。
 - 修改 PPO：读 `learning/algorithms/ppo.py`、所用 modules/storage；不读环境 CLI。
 - 修改闭链验证入口：读 `adapters/mujoco/api.py` 及 sim2sim 的 `VALIDATION_API.md`。
@@ -110,7 +112,8 @@ python tools/check_architecture.py --write docs/architecture/dependencies.json
 missing_local_imports检查wheel_legged_gym绝对/相对导入的目标模块是否存在，包含函数内部。
 无__init__.py的namespace package合法；from模块导入的具体属性是否存在仍由运行测试验证。
 对已迁移的contracts/domain/experiments/evaluation/learning/ports/workflows/adapters同时执行允许层级检查，
-并禁止核心计算/工作流导入Isaac和MuJoCo。导入无环不能证明运行时没有隐式依赖，迁移清单仍需逐项完成。
+并禁止核心计算/工作流导入Isaac和MuJoCo。导入无环不能证明运行时没有隐式依赖，
+进程与恢复语义须逐项对照 `docs/architecture/process_review.md`。
 
 envs、utils和app也纳入层级约束：envs作为环境协调层可依赖domain/contracts/Isaac适配器，
 不得导入app、实验选择或训练器；utils为叶子层，不能导入环境；app负责组装上述层，
@@ -121,21 +124,20 @@ tools、export_onnx与wheel_legged_gym.scripts作为可执行入口，禁止被�
 架构测试还禁止生产模块直接调用eval/exec/__import__；地形生成通过显式函数表选择。
 这不是完整动态Python分析，别名调用与第三方内部行为仍需审查，不能据此宣称绝无动态依赖。
 
-## 未完成迁移及兼容边界
+## 当前边界及兼容说明
 
-1. `envs/base/legged_robot.py` 已将独立计算、控制初始化和原点布局交给domain，资产/actor/索引/随机化/共享张量与物理reset交给Isaac适配器。生命周期与buffer所有权指南已核对；最终仍需代表性运行验收，不能只用静态图宣称等价。
+1. `envs/base/legged_robot.py` 已将独立计算、控制初始化和原点布局交给domain，资产/actor/索引/随机化/共享张量与物理reset交给Isaac适配器。生命周期与buffer所有权指南已核对；代表性运行验收见`plane/outputs/architecture_refactor_20260923/final_smoke.log`。
 2. `utils/helpers.py`、`utils/task_registry.py`、`utils/terrain.py`转发已删除：配置转换归contracts，CLI/种子/registry归app，仿真/地形归Isaac适配器，checkpoint/JIT归artifacts；只从责任模块导入。
-3. 完成hook、验收指标、命令序列、并行调度已迁入正式模块；motion CLI已薄化，参数/状态/进程、训练计划及候选轮次推进边界已拆分。启动恢复与其他tools监督器仍待核对和整理。
-   清单中的16个监督器入口已全部归app，tools保留薄CLI；内部进程/artifact协议的核对
-   与必要职责提取仍按监督器清单执行，不以入口迁移替代完整验收。
+3. 完成hook、验收指标、命令序列、并行调度已迁入正式模块；tools监督器保留薄CLI，
+   进程与状态归app/adapters。各入口并不都具备lock、STOP、hash或恢复，逐项见process_review.md。
 4. 实验目录不再读取环境变量或来源文件；环境输入归app/experiment_inputs，来源校验和checkpoint迁移归artifacts。legacy_sources保留历史证据路径与原门槛，新配方应采用显式spec。
 5. mapping audit、closed probe、tree probe均改为公开MuJoCo进程接口；tree/closed测量使用冻结快照回调，已移除这些入口的monkey patch。MuJoCo库直接使用，不修改物理引擎；后续仅在验证接口确有缺口时修改外部runner，不继续全面拆分sim2sim内部。
-6. 自有代码静态循环目前为零；包内允许层级及禁止反向导入tools/scripts/export规则已生效。仍须复核动态导入、进程接口和旧监督器内部职责；静态允许边不代表接口粒度已经充分清晰。
+6. 自有代码静态循环目前为零；包内允许层级及禁止反向导入tools/scripts/export规则已生效。进程接口和旧监督器职责见process_review.md；AST无法证明反射或第三方内部行为。
 7. scripts/play.py的GUI命令状态已收进每次play会话的PlayCommandState；键盘/panel/循环
    通过显式绑定回调访问。无人调用的135D export_encoder_jit.py已归档；当前125D策略ONNX入口不变。
    FUDAN_SCALES奖励表及TERMINAL状态集合已冻结，原值与顺序不变。
 
-这些是过渡任务，不是永久例外。架构 goal 不因本阶段测试通过就完成。
+这些边界须随接口变化重新审查；架构等价与新策略能力验收是不同结论。
 
 ## 等价与成果边界
 

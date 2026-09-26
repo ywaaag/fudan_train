@@ -31,6 +31,12 @@
 代码、模型或资产改变应建立新任务，不混用旧结果。强制杀死 supervisor 时可能留下子进程，
 必须先核查，不能仅凭 `status.json` 判断其存活。
 
+2026-09-25 入口修复后，`main(root)` 使用 CLI 传入的仓库根目录。新 manifest 的
+`runner_sha256` 是 `plane/wheel_legged_gym/app/compare_policy_versions.py` 的源码 hash，
+不是薄包装 `tools/compare_policy_versions.py` 的 hash。迁移前 job 即使 JSON 仍在，
+其 runner/evaluator hash 与当前源码不一致时也会明确拒绝恢复；不要修改旧 manifest
+或跳过校验，应创建全新 job。运行前确认 `plane/outputs/` 中没有同名目录。
+
 汇总（允许在运行途中执行，此时报告明确标记未完成）：
 
 ```bash
