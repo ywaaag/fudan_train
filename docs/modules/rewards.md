@@ -23,3 +23,15 @@ reset、轮接触和几何；逐项精确比较并断言输入张量未修改。
 `domain/rewards/turn_lean.py` 为 orientation 提供命令驱动的有界 roll 目标；
 A 和其他配方继续走冻结旧公式。权重仍为 -100，pitch 项未删。
 源码入口、spec、验证和树模型/闭链边界见 `docs/modules/turn_envelope.md`。
+
+`TURN_LEAN_LONG` 是单独授权的联合能力探索：仍用上述 signed-roll 目标公式，
+由显式spec决定上限；高度奖励继续比较 `base_height` 与公开 `commands[:,2]`。
+0.40m保留任务不会被转弯高度覆盖。不要把 reward 增长写成实际COM下降或
+转弯通过；测量与验收入口见 `docs/modules/turn_lean_long.md`。
+
+`cornering_height_skill_v1` 不改变 `_reward_base_height` 公式或其他奖励系数，
+只将 `base_height` 从 `compute_reward` 的单项裁剪中排除。原因是目标 0.36m、
+实际 0.40m 时 `8*exp(-.04^2/.001)=1.615`，已超过单项裁剪上限1；
+原实现此处对高度误差的梯度为零。新配置的 0.40m 保留环境仍用原系数1，
+reference 仅作用奇数 ID 保留 cohort。实际有效量级须读本轮 TensorBoard
+`Episode/rew_base_height` 与 probe，不得从公式直接推断已学会降高。

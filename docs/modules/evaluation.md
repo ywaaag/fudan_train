@@ -25,3 +25,9 @@
 `tools/summarize_turn_envelope.py` 使用，并在本轮 `protocol.md` 先冻结；
 动态恢复须读 `response_trace` 的独立时间窗，不能用整段平均值代替。
 证据入口见 `docs/modules/turn_envelope.md`。
+
+长训评估为新增字段：各环境实际刚体质量及局部COM旋转后的整体COM高度、
+roll目标误差/过冲、关节软限位余量、100Hz采样功率及reset分类；原
+`gates.gate`未改。`tools/summarize_turn_envelope.py --long` 另列历史严格
+转弯标签和训练前冻结的lean-aware标签。复现和解释见
+`docs/modules/turn_lean_long.md`、本轮 `protocol.md`。

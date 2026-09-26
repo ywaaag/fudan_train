@@ -27,3 +27,14 @@ flowchart LR
 转弯 cohort 使用 `domain/commands/turn_envelope.py` 开放命令调度，其他
 75% 环境仍用原 `basic_motion` bank。其 callback 只在该策略执行；旧五种
 策略的重采样顺序不变。验证和命令表见 `docs/modules/turn_envelope.md`。
+
+`TURN_LEAN_LONG` 复用相同 cohort 调度，按显式spec配置转弯占比、速度/yaw
+斜坡、随机进入/保持时长；仅转弯cohort在yaw进入/退出期间将公开高度命令
+从0.40平滑下发到目标并升回0.40。旧 `TURN_ENVELOPE` 默认0.40不变。
+入口及运行状态见 `docs/modules/turn_lean_long.md`。
+
+`cornering_height_skill_v1` 是另一项明确授权的训练行为变更：20-slot 静态 cohort
+在 domain 中分配，奇数槽为保留任务，偶数槽分高度技能、低中负荷和高负荷；
+`height_skill.py` 与 `turn_envelope.py` 各自只更新所属命令行。
+旧策略的 RNG 顺序和采样分支不改。分配和公开高度回高行为由
+`plane/tests/test_turn_lean_long.py` 定向验证。

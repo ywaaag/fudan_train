@@ -41,6 +41,11 @@ experiments导入app/adapters/learning。
 `--turn-curriculum` 的 6900 起点替代。schema、运行命令和证据入口见
 `docs/modules/turn_envelope.md` 及本轮输出目录 `README.md`。
 
+长训 `TURN_LEAN_LONG` 使用 `FUDAN_TURN_LONG_SPEC`，由app读取一次后将
+显式spec传入纯recipe；adapter按source路径/SHA/reward及固定R10200 teacher
+SHA校验。每阶段的LR、encoder状态、高度、内倾上限和命令表留在spec与run
+manifest，不能把下一阶段的来源默认为上阶段最后checkpoint。
+
 历史来源门槛集中在`adapters/artifacts/legacy_sources.py`，每个`validate_<recipe>_source`
 保留各自的证据文件、profile、SHA、reward和resume模式检查，不能用宽松通用门槛替代。
 这些历史证据仍定位于仓库docs/data，路径深度已核对；未来增加新来源时应使用显式spec
