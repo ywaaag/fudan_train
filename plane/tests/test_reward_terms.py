@@ -8,6 +8,11 @@ from wheel_legged_gym.domain.rewards.terms import (
     capped_tracking_terms,
     wheel_rolling_terms,
 )
+from wheel_legged_gym.domain.rewards.equations import (
+    _reward_turn_contact_loss,
+    _reward_turn_wheel_slip,
+)
+from wheel_legged_gym.domain.rewards.inputs import RewardInputs
 from wheel_legged_gym.envs.base.legged_robot import LeggedRobot
 
 
@@ -90,3 +95,95 @@ def test_turning_rolling_residual_is_per_environment_and_not_legal_yaw_different
         torch.ones((2,2),dtype=torch.bool))
     assert terms['contact_slip'][0] < 1e-4
     assert terms['contact_slip'][1] > .01
+
+
+def test_turning_rewards_mask_load_and_preserve_per_wheel_differential():
+    state = RewardInputs(
+        _method_v1=True, actions=None, base_ang_vel=torch.tensor([[0., 0., 2.], [0., 0., 2.]]),
+        base_height=None, base_lin_vel=torch.tensor([[1.0], [1.0]]), base_quat=torch.tensor([[0.,0.,0.,1.]] * 2),
+        bilateral_body_indices=None, cfg=SimpleNamespace(rewards=SimpleNamespace(wheel_radius=.06, wheel_slip_scale=.5, wheel_air_spin_scale=1.)),
+        commands=torch.tensor([[2.0, .5, .4], [1.0, .2, .4]]), contact_forces=None,
+        default_dof_pos=None, device='cpu', dof_acc=None, dof_pos=None, dof_pos_limits=None,
+        dof_vel=torch.tensor([[-23.333333, -10.0], [-23.333333, -10.0]]), dof_vel_limits=None,
+        feet_indices=None, fudan_leg_landmarks=None, last_actions=None, num_envs=2,
+        penalised_contact_indices=None, projected_gravity=None, reset_buf=None, reward_scales=None,
+        rigid_body_states=torch.zeros((2, 2, 13)), root_states=torch.zeros((2, 13)),
+        rwd_angVelTrackPrev=None, rwd_linVelTrackPrev=None, termination_contact_indices=torch.tensor([], dtype=torch.long),
+        theta0=None, time_out_buf=None, torque_limits=None, torques=None,
+        wheel_body_indices=torch.tensor([0, 1]), wheel_contact_history=torch.ones((2, 1, 2)),
+        wheel_dof_indices=torch.tensor([0, 1]),
+    )
+    state = state.__class__(**{**state.__dict__, 'rigid_body_states': torch.tensor([[[0.,-.2,0.,0,0,0,0,0,0,0,0,0,0],[0.,.2,0.,0,0,0,0,0,0,0,0,0,0]]]*2)})
+    slip = _reward_turn_wheel_slip(state)
+    contact = _reward_turn_contact_loss(state)
+    assert float(slip[0]) < 1e-4
+    assert float(slip[1]) == 0.0
+    assert torch.equal(contact, torch.zeros(2))
+
+    lost = state.__class__(**{**state.__dict__, 'wheel_contact_history':
+        torch.tensor([[[1., 0.]], [[1., 0.]]])})
+    torch.testing.assert_close(_reward_turn_contact_loss(lost), torch.tensor([.5, 0.]))
+
+
+def test_legacy_turn_reward_contact_history_rolls_and_resets_selected_rows():
+    fake = SimpleNamespace(
+        _method_v1=False,
+        cfg=SimpleNamespace(rewards=SimpleNamespace(
+            scales=SimpleNamespace(turn_wheel_slip=-2., turn_contact_loss=-.5),
+            contact_force_threshold=1.)),
+        feet_indices=torch.tensor([0, 1]),
+        contact_forces=torch.zeros((3, 2, 3)),
+        wheel_contact_history=torch.zeros((3, 3, 2), dtype=torch.bool),
+        wheel_contact_seen=torch.zeros(3, dtype=torch.bool),
+    )
+    fake._turn_contact_history_enabled = lambda: LeggedRobot._turn_contact_history_enabled(fake)
+    fake.contact_forces[0, :, 2] = 2.
+    fake.contact_forces[1, 0, 2] = 2.
+    LeggedRobot._update_wheel_contact_history(fake)
+    torch.testing.assert_close(fake.wheel_contact_history[:, 0],
+                               torch.tensor([[True, True], [True, False], [False, False]]))
+    fake.contact_forces.zero_()
+    LeggedRobot._update_wheel_contact_history(fake)
+    assert fake.wheel_contact_history[0, 1].all()
+    assert not fake.wheel_contact_history[:, 0].any()
+    LeggedRobot._reset_wheel_contact_history(fake, torch.tensor([0, 2]))
+    assert not fake.wheel_contact_history[[0, 2]].any()
+    assert fake.wheel_contact_history[1, 1, 0]
+    assert not fake.wheel_contact_seen[[0, 2]].any()
+
+    fake.cfg.rewards.scales.turn_wheel_slip = 0.
+    fake.cfg.rewards.scales.turn_contact_loss = 0.
+    fake.wheel_contact_history.zero_()
+    fake.contact_forces[0, :, 2] = 2.
+    LeggedRobot._update_wheel_contact_history(fake)
+    assert not fake.wheel_contact_history.any()
+
+
+def test_turn_slip_mask_requires_both_independent_thresholds():
+    state = RewardInputs(
+        _method_v1=False, actions=None,
+        base_ang_vel=torch.tensor([[0., 0., 2.]] * 2),
+        base_height=None, base_lin_vel=torch.tensor([[1.]] * 2),
+        base_quat=torch.tensor([[0., 0., 0., 1.]] * 2),
+        bilateral_body_indices=None,
+        cfg=SimpleNamespace(rewards=SimpleNamespace(wheel_radius=.06,
+            wheel_slip_scale=.5, wheel_air_spin_scale=1.)),
+        commands=torch.tensor([[2., .30, .4], [2., .35, .4]]),
+        contact_forces=None, default_dof_pos=None, device='cpu',
+        dof_acc=None, dof_pos=None, dof_pos_limits=None,
+        dof_vel=torch.tensor([[-23., 0.]] * 2), dof_vel_limits=None,
+        feet_indices=None, fudan_leg_landmarks=None, last_actions=None,
+        num_envs=2, penalised_contact_indices=None, projected_gravity=None,
+        reset_buf=torch.zeros(2), reward_scales=None,
+        rigid_body_states=torch.tensor([[[0., -.2] + [0.] * 11,
+                                         [0., .2] + [0.] * 11]] * 2),
+        root_states=torch.zeros(2, 13), rwd_angVelTrackPrev=None,
+        rwd_linVelTrackPrev=None,
+        termination_contact_indices=torch.tensor([], dtype=torch.long),
+        theta0=None, time_out_buf=None, torque_limits=None, torques=None,
+        wheel_body_indices=torch.tensor([0, 1]),
+        wheel_contact_history=torch.ones((2, 1, 2)),
+        wheel_dof_indices=torch.tensor([0, 1]))
+    result = _reward_turn_wheel_slip(state)
+    assert result[0] == 0.
+    assert result[1] > 0.

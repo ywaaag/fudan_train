@@ -144,6 +144,7 @@ def apply_turn_lean_long(cfg, train, *, spec, historical=False):
         cfg.commands.aggressive_sampling_version = version
         if version == 2:
             cfg.commands.cohort_cycle = 40
+            cfg.commands.turn_slots = tuple(range(0, 40, 2))
             cfg.commands.anchor_slots = tuple(range(0,12,2))
             cfg.commands.regional_slots = tuple(range(12,30,2))
             cfg.commands.mid_slots = tuple(range(30,38,2))
@@ -235,7 +236,16 @@ def apply_turn_lean_long(cfg, train, *, spec, historical=False):
                 if cfg.commands.aggressive_sampling_version == 2 else None),
             reference_scope='R10200 mean action/source std on odd env IDs only (50% retention)')
         if cfg.commands.aggressive_sampling_version == 2:
+            cfg.rewards.scales.turn_wheel_slip = -2.0
+            cfg.rewards.scales.turn_contact_loss = -0.5
             manifest.update(
-                ablation_variable='Exact cohort allocation and continuous regional commands',
-                training_change='Sampling v2 only; reward, LR, lean target and policy contract unchanged')
+                ablation_variable='Explicit turning slip/contact penalty with fixed sampling v2',
+                training_change='Sampling v2 plus explicit turning slip/contact reward; LR, lean target and policy contract unchanged',
+                turning_reward={'turn_wheel_slip': {'raw_scale': -2.0,
+                    'mask': 'abs(command_vx)>=1.5 and abs(command_yaw)>=0.35',
+                    'formula': 'contact-conditioned normalized Huber of per-wheel rolling residual'},
+                    'turn_contact_loss': {'raw_scale': -0.5,
+                    'mask': 'abs(command_vx*command_yaw)>=1.0',
+                    'formula': '1 - mean(two-wheel contact history)'}},
+                turning_reward_unclipped=False)
     return manifest

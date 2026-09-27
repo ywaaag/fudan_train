@@ -4,6 +4,7 @@ import json
 import math
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import isaacgym
 import torch
@@ -12,6 +13,7 @@ from wheel_legged_gym.contracts.wheel_legged_config import WheelLeggedCfg, Wheel
 from wheel_legged_gym.domain.commands.turn_envelope import TurnEnvelope
 from wheel_legged_gym.domain.commands.height_skill import HeightSkill
 from wheel_legged_gym.domain.commands.resampling import CommandBuffers, resample
+from wheel_legged_gym.envs.base.legged_robot import LeggedRobot
 from wheel_legged_gym.learning.modules.policy_retention import reference_loss
 from wheel_legged_gym.experiments.recipes.turn_lean_long import (
     R10200, R10200_SHA, apply_turn_lean_long, validate_spec,
@@ -360,8 +362,23 @@ def test_aggressive_v2_matches_declared_fractions_and_continuous_quadrants():
     manifest = apply_turn_lean_long(cfg,train,spec=proposal)
     assert manifest['effective_command_fractions'] == plan['fractions']
     assert manifest['aggressive_sampling_version'] == 2
-    assert manifest['ablation_variable'].startswith('Exact cohort allocation')
+    assert manifest['ablation_variable'].startswith('Explicit turning slip/contact')
+    assert cfg.rewards.scales.turn_wheel_slip == -2.0
+    assert cfg.rewards.scales.turn_contact_loss == -0.5
+    assert manifest['turning_reward']['turn_wheel_slip']['raw_scale'] == -2.0
     assert cfg.commands.cohort_cycle == 40
+    assert cfg.commands.turn_slots == tuple(range(0, 40, 2))
+    scheduler = TurnEnvelope(40, 'cpu', .01, cfg.commands.turn_stride,
+        slots=cfg.commands.turn_slots, cycle=cfg.commands.cohort_cycle,
+        entry_range=(.5,.5), hold_range=(3.,3.),
+        speed_ramp_seconds=2., yaw_ramp_seconds=2.)
+    assert scheduler.ids.tolist() == list(range(0, 40, 2))
+    ramp_commands = torch.zeros(40, 3)
+    scheduler.reset(ramp_commands, torch.tensor([0]), torch.tensor([[2., .5]]))
+    for _ in range(400):
+        scheduler.advance(ramp_commands)
+    assert ramp_commands[0, 0] > 1.9
+    assert ramp_commands[0, 1] > .35
     ids = torch.arange(400)
     commands = torch.zeros(400,3)
     buffers = CommandBuffers(commands,torch.zeros(400,dtype=torch.long),
@@ -450,6 +467,70 @@ def test_aggressive_v2_cohorts_survive_noncontiguous_resets():
                     (False,False),(False,True),(True,False),(True,True)}
     assert counters[ids].eq(2).all()
     assert counters[2] == 0
+
+
+def test_aggressive_callback_advances_all_turn_slots_after_real_resample():
+    proposal = spec()
+    proposal['experiment_id'] = 'inward_cornering_r10200_v1'
+    proposal['course_plan'] = [{'phase': 1, 'budget_max': 10000},
+                               {'phase': 2, 'budget_max': 15000}]
+    plan = {'sampling_version': 2,
+        'fractions': {'anchor': .15, 'regional': .225, 'mid': .10, 'high': .025},
+        'anchor_pairs': [[1., .5]], 'regional_pairs': [[1.6, .4], [2.2, .6]],
+        'mid_pairs': [[2.5, .6]], 'high_pairs': [[3., 1.]]}
+    proposal['stage'].update(phase=2, turn_height=.4, lean_max_deg=3.,
+        pairs=sum((plan[key] for key in ('anchor_pairs', 'regional_pairs',
+                                         'mid_pairs', 'high_pairs')), []),
+        aggressive_plan=plan)
+    cfg, train = WheelLeggedCfg(), WheelLeggedCfgPPO()
+    apply_turn_lean_long(cfg, train, spec=proposal)
+    cfg.commands.turn_entry_range = (.01, .01)
+    cfg.commands.turn_hold_range = (.04, .04)
+    cfg.commands.turn_speed_ramp_seconds = .02
+    cfg.commands.turn_yaw_ramp_seconds = .02
+    cfg.commands.resampling_time = 100.
+    ids = torch.tensor([0, 1, 12, 14, 16, 18, 30, 38, 40, 41])
+    commands = torch.zeros(80, 4)
+    commands[:, 2] = .4
+    scheduler = TurnEnvelope(80, 'cpu', .01, slots=cfg.commands.turn_slots,
+        cycle=cfg.commands.cohort_cycle, entry_range=(.01, .01),
+        hold_range=(.04, .04), speed_ramp_seconds=.02,
+        yaw_ramp_seconds=.02)
+    state = CommandBuffers(commands, torch.zeros(80, dtype=torch.long),
+                           torch.zeros(80, dtype=torch.long))
+    ranges = {key: torch.tensor([[lo, hi]] * 80)
+              for key, lo, hi in (('lin_vel_x', -4., 4.),
+                                  ('ang_vel_yaw', -4., 4.), ('height', .4, .4))}
+    resample(ids, state=state, ranges=ranges, config=cfg.commands,
+        device='cpu', reset_start_stop=lambda *_: None, sample_heading=None,
+        reset_turn=scheduler.reset)
+    turn_ids = ids[ids.remainder(2) == 0]
+    assert set(scheduler.ids.tolist()) == set(range(0, 80, 2))
+    assert commands[turn_ids, :2].eq(0).all()
+    retained_before = commands[ids[ids.remainder(2) == 1]].clone()
+    fake = SimpleNamespace(cfg=SimpleNamespace(commands=cfg.commands,
+        terrain=SimpleNamespace(measure_heights=False)),
+        episode_length_buf=torch.ones(80, dtype=torch.long), dt=.01,
+        commands=commands, root_states=torch.zeros(80, 13),
+        measured_heights=torch.zeros(80, 1),
+        _get_turn_scheduler=lambda: scheduler)
+    for step in range(1, 12):
+        LeggedRobot._post_physics_step_callback(fake)
+        if step == 3:
+            assert commands[turn_ids, 0].abs().min() > 0.
+            assert commands[turn_ids, 1].eq(0).all()
+        if step == 5:
+            assert commands[turn_ids, 1].abs().min() > 0.
+        if step == 11:
+            assert commands[turn_ids, 1].abs().max() < 1e-5
+    torch.testing.assert_close(commands[ids[ids.remainder(2) == 1]], retained_before)
+    prior = scheduler.target.clone()
+    resample(torch.tensor([12]), state=state, ranges=ranges, config=cfg.commands,
+        device='cpu', reset_start_stop=lambda *_: None, sample_heading=None,
+        reset_turn=scheduler.reset)
+    assert scheduler.age[12] == 0.
+    torch.testing.assert_close(scheduler.target[turn_ids[turn_ids != 12]],
+                               prior[turn_ids[turn_ids != 12]])
 
 
 def test_height_probe_uses_spec_bank_and_does_not_invent_036():

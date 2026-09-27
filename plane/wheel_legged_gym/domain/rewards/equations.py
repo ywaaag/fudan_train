@@ -149,6 +149,25 @@ def _reward_wheel_contact_loss(state: RewardInputs):
     return 1.0 - state.wheel_contact_history[:, 0].to(torch.float).mean(dim=1)
 
 
+def _turning_mask(state: RewardInputs, threshold: float):
+    """Select commanded turning environments without coupling rows together."""
+    load = torch.abs(state.commands[:, CMD_VX] * state.commands[:, CMD_YAW])
+    return load >= float(threshold)
+
+
+def _reward_turn_wheel_slip(state: RewardInputs):
+    """Contact-conditioned per-wheel slip cost for explicit turning recipes."""
+    mask = (torch.abs(state.commands[:, CMD_VX]) >= 1.5) & (
+        torch.abs(state.commands[:, CMD_YAW]) >= 0.35)
+    return _method_wheel_terms(state)["contact_slip"] * mask.to(torch.float)
+
+
+def _reward_turn_contact_loss(state: RewardInputs):
+    """Two-wheel contact loss for high lateral-load turning commands."""
+    loss = 1.0 - state.wheel_contact_history[:, 0].to(torch.float).mean(dim=1)
+    return loss * _turning_mask(state, 1.0).to(torch.float)
+
+
 def _reward_forbidden_contact(state: RewardInputs):
     if state.termination_contact_indices.numel() == 0:
         return torch.zeros(state.num_envs, device=state.device)

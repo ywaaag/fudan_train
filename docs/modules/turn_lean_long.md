@@ -117,7 +117,7 @@ checkpoint及协议同一时才允许比较候选；单seed probe不进入接受
 
 新 spec 显式设置 `aggressive_plan.sampling_version=2` 后，40 槽分配才精确达到声明的 15/22.5/10/2.5%，其余 50% 为奇数 ID 的 basic-motion reference cohort。regional 在 spec bank 的最小/最大 magnitude 范围内连续采样，符号由 env 槽位覆盖四象限；其它 bank 以 env 周期偏移错开首个目标。`policy_experiment.json` 记录 `aggressive_sampling_version`、`aggressive_slots`、`effective_command_fractions` 和准确的 `ablation_variable`。本轮仅做过 64env×1 iteration smoke，尚未用 v2 训练出可接受候选。
 
-历史有效 reward 的 `wheel_slip`、`wheel_contact_loss` 和 `high_speed_slip` 均为 0；高负荷旧 gate 数量不能单独证明安全包络扩大。候选比较同时看逐环境 slip/contact 的 lean-aware gate、同协议 evaluator SHA、命令表和 seed。剩余正式训练预算须先冻结明确的奖励/采样变更再使用。
+历史有效 reward 的 `wheel_slip`、`wheel_contact_loss` 和 `high_speed_slip` 均为 0；高负荷旧 gate 数量不能单独证明安全包络扩大。候选比较同时看逐环境 slip/contact 的 lean-aware gate、同协议 evaluator SHA、命令表和 seed。
 
 ## 2026-09-27 bug-fix-only 接线验收
 
@@ -126,3 +126,11 @@ checkpoint及协议同一时才允许比较候选；单seed probe不进入接受
 `tools/generate_turn_readiness.py` 现在是薄 CLI，`app.turn_readiness` 根据 `protocol_id` 选择必需 group：固定高度 stage1/aggressive v2 不要求 height group，variable-height 要求。单 seed probe、缺 geometry 或逐环境接触/滑移失败不能成为最终接受证据。结束报告、通知送达和人工 reviewed 使用 `app.completion.completion_facts` 分开读取。
 
 `wheel_rolling_terms` 用每轮 `base_vx-yaw_rate*wheel_y` 的 contact-conditioned 残差；旧 `high_speed_slip` 只看平均轮速，不作为转弯 penalty 自动启用。本轮没有定新 slip scale、没有正式长训。旁路证据见 `plane/outputs/cornering_bug_fix_20260927_101156/`。
+
+## 2026-09-27 high-load v3 接线固化
+
+`aggressive_cornering` 必须在每步推进 `TurnEnvelope`；legacy_v0 只有在新 turn reward 非零时才维护 `wheel_contact_history`，并在 reset 清零。v2 的 `turn_wheel_slip=-2.0` 使用独立 `|vx|>=1.5`、`|yaw|>=0.35` mask；`turn_contact_loss=-0.5` 使用 `|vx*yaw|>=1.0` mask。旧 recipe 默认两项为零。
+
+`plane/outputs/high_load_cornering_v3_runtime_verification_20260927_205927/` 是只读运行时证据：model_16250、seed23、8 env、1200 policy step，三个 mask 内环境的 slip reward 非零，mask 外 `(2,.30)` 为零，接触历史在真实 Isaac 环境中更新并在显式 reset 后清零。有效窗口没有自然单轮失触，故 `turn_contact_loss` 的非零值和合法差速放行仅由纯 Torch fixture 证明；不能写成真实运行时均通过。该 probe 没有 PPO 更新，不能当作转弯能力验收。
+
+错误接线的 `model_20226` 仅为失败证据，下一次训练起点仍是精确 SHA 的 `model_16250`。正式训练累计 25080/25000 iteration，剩余预算为 0；未经新授权不得续训。新训练必须使用含 `sampling_version=2` 的显式 spec，并核对新的源码 commit 或 SHA。

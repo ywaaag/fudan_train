@@ -29,7 +29,12 @@ def build_asset_indices(*, gym, environment, actor, body_names, dof_names,
             environment, actor, feet_names[i]
         )
 
-    if getattr(rewards, "reward_pipeline", "legacy_v0") == "normalized_v1":
+    turning_wheel_reward = (
+        getattr(getattr(rewards, "scales", None), "turn_wheel_slip", 0.0) != 0.0
+        or getattr(getattr(rewards, "scales", None), "turn_contact_loss", 0.0) != 0.0
+    )
+    if (getattr(rewards, "reward_pipeline", "legacy_v0") == "normalized_v1"
+            or turning_wheel_reward):
         expected_dofs = (
             "left_leg_0",
             "left_leg_1",

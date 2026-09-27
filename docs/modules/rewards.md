@@ -35,3 +35,13 @@ A 和其他配方继续走冻结旧公式。权重仍为 -100，pitch 项未删�
 原实现此处对高度误差的梯度为零。新配置的 0.40m 保留环境仍用原系数1，
 reference 仅作用奇数 ID 保留 cohort。实际有效量级须读本轮 TensorBoard
 `Episode/rew_base_height` 与 probe，不得从公式直接推断已学会降高。
+
+`aggressive_cornering` v2 显式启用 `turn_wheel_slip=-2.0` 和
+`turn_contact_loss=-0.5`，legacy 默认均为零。前者复用
+`wheel_rolling_terms` 的接触轮残差 `-wheel_omega*radius-(base_vx-yaw_rate*wheel_y)`，
+独立要求 `|command_vx|>=1.5` 且 `|command_yaw|>=0.35`；后者在
+`|command_vx*command_yaw|>=1.0` 时计算 `1-两轮接触比例`。
+两项逐环境计算，经 policy dt 缩放和既有单项裁剪。真实运行时非零滑移与
+reset 清零证据见 `plane/outputs/high_load_cornering_v3_runtime_verification_20260927_205927/`；
+该窗口未自然失触，contact-loss 非零只在独立 fixture 中验证，不能当作
+Isaac 失触案例已验收。

@@ -212,16 +212,7 @@ class LeggedRobot(BaseTask):
         self.gym.refresh_net_contact_force_tensor(self.sim)
         self.gym.refresh_rigid_body_state_tensor(self.sim)
 
-        if self._method_v1 and self.feet_indices.numel() == 2:
-            contact_now = torch.norm(
-                self.contact_forces[:, self.feet_indices, :], dim=-1
-            ) > float(self.cfg.rewards.contact_force_threshold)
-            # Clone the source because the slices overlap in storage.  CUDA
-            # often tolerates this for large batches, while the exact
-            # single-env playback path raises an aliasing error.
-            self.wheel_contact_history[:, 1:] = self.wheel_contact_history[:, :-1].clone()
-            self.wheel_contact_history[:, 0] = contact_now
-            self.wheel_contact_seen |= contact_now.any(dim=1)
+        self._update_wheel_contact_history()
 
         self.episode_length_buf += 1
         self.common_step_counter += 1
@@ -299,6 +290,27 @@ class LeggedRobot(BaseTask):
         if self.viewer and self.enable_viewer_sync and self.debug_viz:
             self._draw_debug_vis()
 
+    def _turn_contact_history_enabled(self):
+        return self._method_v1 or any(
+            getattr(self.cfg.rewards.scales, name, 0.) != 0.
+            for name in ('turn_wheel_slip', 'turn_contact_loss')
+        )
+
+    def _update_wheel_contact_history(self):
+        if self._turn_contact_history_enabled() and self.feet_indices.numel() == 2:
+            contact_now = torch.norm(
+                self.contact_forces[:, self.feet_indices, :], dim=-1
+            ) > float(self.cfg.rewards.contact_force_threshold)
+            # The history slices overlap in storage.
+            self.wheel_contact_history[:, 1:] = self.wheel_contact_history[:, :-1].clone()
+            self.wheel_contact_history[:, 0] = contact_now
+            self.wheel_contact_seen |= contact_now.any(dim=1)
+
+    def _reset_wheel_contact_history(self, env_ids):
+        if self._turn_contact_history_enabled():
+            self.wheel_contact_history[env_ids] = False
+            self.wheel_contact_seen[env_ids] = False
+
     def check_termination(self):
         state = TerminationState(
             getattr(self, 'forbidden_contact_streak', None),
@@ -375,8 +387,7 @@ class LeggedRobot(BaseTask):
             self.forbidden_contact_streak[env_ids] = 0.0
             self.upright_streak[env_ids] = 0.0
             self.wheel_loss_streak[env_ids] = 0.0
-            self.wheel_contact_history[env_ids] = False
-            self.wheel_contact_seen[env_ids] = False
+        self._reset_wheel_contact_history(env_ids)
         self.envs_steps_buf[env_ids] = 0
         self.last_dof_pos[env_ids] = self.dof_pos[env_ids]
         self.last_base_position[env_ids] = self.base_position[env_ids]
@@ -597,7 +608,7 @@ class LeggedRobot(BaseTask):
             self._resample_commands(env_ids)
         if getattr(self.cfg.commands,'start_stop_ramp_seconds',0.)>0:
             self._get_start_stop_scheduler().advance(self.commands)
-        if getattr(self.cfg.commands,'sampling_strategy',None) in ('turn_envelope','cornering_height_skill'):
+        if getattr(self.cfg.commands,'sampling_strategy',None) in ('turn_envelope','cornering_height_skill','aggressive_cornering'):
             self._get_turn_scheduler().advance(self.commands)
         if getattr(self.cfg.commands,'sampling_strategy',None)=='cornering_height_skill':
             self._get_height_skill_scheduler().advance(self.commands)
@@ -1550,6 +1561,12 @@ class LeggedRobot(BaseTask):
 
     def _reward_wheel_contact_loss(self):
         return evaluate_reward("_reward_wheel_contact_loss", self._reward_inputs())
+
+    def _reward_turn_wheel_slip(self):
+        return evaluate_reward("_reward_turn_wheel_slip", self._reward_inputs())
+
+    def _reward_turn_contact_loss(self):
+        return evaluate_reward("_reward_turn_contact_loss", self._reward_inputs())
 
     def _reward_forbidden_contact(self):
         return evaluate_reward("_reward_forbidden_contact", self._reward_inputs())

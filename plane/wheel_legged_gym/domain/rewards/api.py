@@ -17,6 +17,8 @@ EQUATIONS = MappingProxyType({
     "_reward_wheel_slip": equations._reward_wheel_slip,
     "_reward_airborne_wheel_spin": equations._reward_airborne_wheel_spin,
     "_reward_wheel_contact_loss": equations._reward_wheel_contact_loss,
+    "_reward_turn_wheel_slip": equations._reward_turn_wheel_slip,
+    "_reward_turn_contact_loss": equations._reward_turn_contact_loss,
     "_reward_forbidden_contact": equations._reward_forbidden_contact,
     "_reward_torque_cost": equations._reward_torque_cost,
     "_reward_power_cost": equations._reward_power_cost,

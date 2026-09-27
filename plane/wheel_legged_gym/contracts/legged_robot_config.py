@@ -202,6 +202,8 @@ class LeggedRobotCfg(BaseConfig):
 
             collision = -1.0
             dof_pos_limits = -1.0
+            turn_wheel_slip = 0.0
+            turn_contact_loss = 0.0
 
         only_positive_rewards = False  # if true negative total rewards are clipped at zero (avoids early termination problems)
         clip_single_reward = 1
