@@ -5,6 +5,10 @@
 `README.md`、`protocol.md` 和 `spec_stage1.json`。不要靠聊天记录判断模型好坏。
 当前 Stage 1 从 `model_35250.pt` 起步，最多新增 5000 iteration；它是训练初始化，
 不是已经通过的高速转弯模型。原始 checkpoint 和 accepted 模型不得覆盖。
+任何转弯训练、GUI 观察或评估前，先读
+`docs/modules/turn_lean_long.md` 的“坐标系与内倾符号协议”。当前 `roll_reference`
+负号由四象限几何诊断支持，但历史 checkpoint 没有重训，不能当作符号修复后的模型；
+证据入口见 `plane/outputs/turn_geometry_sign_20260926/README.md`。
 
 ## 1. 先看有没有结束
 
@@ -70,6 +74,7 @@ event 混进较早 checkpoint。奖励和 mean reward 不能替代 Isaac 行为�
 | 0.38m 仍降不下去 | **先复制新 spec**，增加独立高度样本或调整下一阶段高度目标；诊断奖励量级后才考虑系数 | `spec_stage1.json`、`docs/modules/turn_lean_long.md`、`domain/rewards/equations.py` |
 | 能在低速降高，转弯时不能 | 新 spec 的 `mid_pairs`/高度课程；检查接触、腿几何和同命令三高度对照 | `domain/commands/turn_envelope.py`、`app/turn_lean_review.py` |
 | 某一转向 yaw 差或滑移大 | 新 spec 的命令 bank/占比，逐方向评估；不要直接增大倾角 | `domain/commands/resampling.py`、`domain/rewards/turn_lean.py` |
+| GUI 看起来向外倾 | 先做四象限短窗 world 速度/曲率法向与 body 上轴投影点积，分别记录 COM 和轮心；不靠轮载荷或整圈位移判方向 | `docs/modules/turn_lean_long.md`、`tools/summarize_turn_envelope.py --geometry-json` |
 | 高度斜坡/回高时序错误 | `domain/commands/height_skill.py`；改后加测试和 1-iteration smoke | `plane/tests/test_turn_lean_long.py` |
 | probe 未覆盖真实目标 | `app/turn_lean_monitor.py` 的新实验 probe；当前运行的监控器不会加载后续源码改动 | `tools/monitor_turn_lean_long.py`、`protocol.md` |
 | 指标计算有问题 | `scripts/evaluate_policy_comparison.py`；另建协议版本，不改旧 JSON | `docs/modules/evaluation.md` |

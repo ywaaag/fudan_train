@@ -21,12 +21,14 @@ export CUDA_VISIBLE_DEVICES=0
 | 等待终态 | `tools/wait_for_completion.py JOB --timeout 1800` | 只读轮询；不启动子进程、不发通知；终态通知由监控器/完成 hook 负责 | `status.json`、`completion_hook.json` |
 | 长训阶段监控 | `tools/monitor_turn_lean_long.py --help` | `--help` 安全；实际运行会轮询 checkpoint、写摘要/探针、必要时 STOP 当前 child | 本轮 `README.md`、`status.json`、`summaries/`、`probes/` |
 | 汇总固定高度/长训转弯 | `tools/summarize_turn_envelope.py --help`；长训加 `--long` | `--help` 安全；实际汇总读取原始 JSON 并写新 summary/heatmap，不启动仿真 | `protocol.md`、原始 JSON、失败轨迹 |
+| 复核主动内倾方向 | `tools/summarize_turn_envelope.py --geometry-json RAW.json --geometry-out NEW.json`；完整评审加 `--long --inward-protocol inward_stage1_v1` | 只读已有 Isaac trace，写新 JSON/坐标图；重复里程碑可加 `--geometry-no-plot`；不训练 | 原始评估的 `geometry_trace`、quaternion、接触和逐环境拒绝原因 |
 | 生成状态轨迹视频 | `tools/render_turn_trace.py --help` | `--help` 安全；实际读取 JSON 写 MP4，不启动仿真 | 输入 JSON 是否完整、ffmpeg 错误 |
 | 运行候选评估 | `tools/review_turn_lean_long.py --help` | `--help` 安全；实际启动 Isaac 子进程并写评估 JSON；变高度转弯按 spec 的 `height_schedule` 逐点下发，新 `cohort_plan` 另测独立高度与回高 | checkpoint SHA、评估 log、原始 JSON |
 | 降高/内倾候选筛选 | `python3 tools/screen_turn_lean_candidates.py REVIEW_DIR --out NEW_RESULT.json`；`--help` 安全 | 读取 `long_evaluation_summary.json` 与少量原始 JSON 元数据；只写全新结果，不启动仿真、不覆盖历史；单 seed probe 不能输入为完整 review | 协议/评估器/gate/hash、缺测、固定高度、保留回归和逐组失败原因 |
 | 导出 ONNX | `cd plane && python export_onnx/export_onnx.py --help` | `--help` 安全；实际加载 checkpoint 并写 ONNX | checkpoint 路径/SHA、导出 stderr |
 | 验证 ONNX | `cd plane && python export_onnx/verify_onnx.py --help` | `--help` 安全；实际加载 ONNX/运行 CPU 推理，只写 stdout | checkpoint、ONNX、batch 和误差 |
 | 完成报告 | `tools/training_completion_hook.py --help` | `--help` 安全；`--report-only` 写本地报告；普通模式可启动独立 Codex 复盘 | job 的 `completion_hook.json`、`completion_review.json` |
+| 转弯阶段 readiness 旁路报告 | `tools/generate_turn_readiness.py --job JOB --out-dir NEW_DIR` | `--help` 安全；实际命令只读既有摘要并写全新目录，不启动训练、不通知；业务规则归 `app.turn_readiness` | `status.json`、probe、protocol、缺失的 seed/group |
 | 架构审计 | `python3 tools/check_architecture.py` | 只读 AST；不导入 Isaac；`--write` 才写依赖图 | 输出中的 cycles/layer/missing imports |
 
 ## 精确命令
@@ -65,6 +67,9 @@ tools/summarize_turn_envelope.py --long \
 新高度技能 spec 还要求 `height_skill` 和 `height_entry_exit` 两组。
 旧摘要缺 metric/gate SHA 时标记 `legacy_metric_unknown`，不能与新结果直接比较；
 用旁路摘要重新汇总原始 JSON 后才恢复可比性。
+固定0.40m的 `inward_cornering_r10200_v1` 阶段1是明确例外：
+只有 spec、几何 trace 与 `--inward-protocol inward_stage1_v1` 汇总同时匹配时，
+候选筛选器才允许固定高度 review；历史固定高度结果仍不可误输入为降高候选。
 `pareto_candidates` 只是同协议比较，`recommendation=null` 表示没有唯一的已接受候选，
 不应改用最新 checkpoint 填空。
 

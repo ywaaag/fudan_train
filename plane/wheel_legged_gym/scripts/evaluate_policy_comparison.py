@@ -52,6 +52,8 @@ def main(argv=None):
                    help='Restore initial height during the explicit yaw exit ramp')
     p.add_argument('--lean-reference-max-deg', type=float, default=0.)
     p.add_argument('--trace-stride', type=int, default=10)
+    p.add_argument('--geometry-trace', action='store_true',
+                   help='Record world-frame body axes, wheel positions, COM and velocity in response trace')
     p.add_argument('--envs-per-command', type=int, default=16)
     p.add_argument('--seed', type=int, default=19)
     p.add_argument('--randomization-level', type=int, choices=[0, 1], default=1)
@@ -237,7 +239,7 @@ def main(argv=None):
             if transition and step>=round(a.switch_at/env.dt):
                 travelled+=(env.root_states[:,:2]-before_xy).norm(dim=-1)
             if transition and step % a.trace_stride == 0:
-                response_trace.append({'time': (step+1)*env.dt,
+                frame = {'time': (step+1)*env.dt,
                     'applied_command':target.detach().cpu().tolist(),
                     'policy_command_scaled':obs[:, 6:9].detach().cpu().tolist(),
                     'history_latest_command_scaled':history[:, -19:-16].detach().cpu().tolist(),
@@ -254,7 +256,21 @@ def main(argv=None):
                     'vx': env.base_lin_vel[:, 0].detach().cpu().tolist(),
                     'vy': env.base_lin_vel[:, 1].detach().cpu().tolist(),
                     'yaw': env.base_ang_vel[:, 2].detach().cpu().tolist(),
-                    'base_xy':env.root_states[:, :2].detach().cpu().tolist()})
+                    'base_xy':env.root_states[:, :2].detach().cpu().tolist()}
+                if a.geometry_trace:
+                    basis = torch.eye(3, device=env.device).repeat(env.num_envs, 1, 1)
+                    axes = quat_rotate(env.base_quat[:, None, :].expand(-1, 3, -1).reshape(-1, 4),
+                                       basis.reshape(-1, 3)).reshape(env.num_envs, 3, 3)
+                    body_com = ((env.rigid_body_states[:, :, :3] + com_offset) *
+                                body_masses[:, :, None]).sum(dim=1) / total_mass[:, None]
+                    frame.update(root_quaternion_xyzw=env.base_quat.detach().cpu().tolist(),
+                        root_position_world=env.root_states[:, :3].detach().cpu().tolist(),
+                        velocity_world=env.root_states[:, 7:10].detach().cpu().tolist(),
+                        body_axes_world=axes.detach().cpu().tolist(),
+                        projected_gravity=env.projected_gravity.detach().cpu().tolist(),
+                        wheel_positions_world=env.rigid_body_states[:, env.feet_indices, :3].detach().cpu().tolist(),
+                        com_position_world=body_com.detach().cpu().tolist())
+                response_trace.append(frame)
             # Counters reset with episodes; post-reset samples are not valid
             # torque observations. Any reset independently fails acceptance.
             sat = (env.command_metrics.preclip_torque_saturation_sum - before_saturation).clamp(min=0)
@@ -333,6 +349,7 @@ def main(argv=None):
             'seed': a.seed, 'randomization_level': a.randomization_level,
             'envs_per_command': a.envs_per_command, 'seconds': a.seconds, 'warmup': a.warmup,
             'measurement_samples': count, 'deterministic': True, 'noise': False,
+            'geometry_trace': a.geometry_trace,
             'policy_dt': env.dt, 'physics_dt': env.sim_params.dt, 'dof_names': env.dof_names,
             'torque_limits': env.torque_limits.cpu().tolist(), 'configuration': configuration,
             'body_names':body_names, 'total_mass_kg':total_mass.cpu().tolist(),

@@ -28,7 +28,8 @@ def review_location(path):
         model = path.parent.parent.name
         return path.parent.parent.parent.parent, model
     if path.is_file() and path.name in ('long_evaluation_summary.json',
-                                       'long_evaluation_summary_v2.json'):
+                                       'long_evaluation_summary_v2.json',
+                                       'long_evaluation_summary_v3.json'):
         return path.parent, None
     if path.is_dir() and path.parent.name == 'acceptance':
         return path.parent.parent, path.name
@@ -49,7 +50,7 @@ def protocol_identity(review):
 def raw_identity(data):
     identity = {key: data.get(key) for key in ('schema', 'evaluator_sha256',
         'randomization_level', 'envs_per_command', 'seconds', 'warmup',
-        'deterministic', 'noise', *TRANSITION_FIELDS)}
+        'deterministic', 'noise', 'geometry_trace', *TRANSITION_FIELDS)}
     identity.update(commands=[row.get('command') for row in data.get('results', [])],
                     initial_commands=data.get('initial_commands'))
     return identity
@@ -59,15 +60,18 @@ def load_candidate(path):
     review, label = review_location(path)
     result = {'path': str(Path(path).resolve()), 'status': 'incomplete',
               'eligible': False, 'reviewable': False, 'reasons': []}
-    summary_path = (review / 'long_evaluation_summary_v2.json'
-                    if (review / 'long_evaluation_summary_v2.json').is_file()
-                    else review / 'long_evaluation_summary.json')
+    summary_path = next((review / name for name in (
+        'long_evaluation_summary_v3.json',
+        'long_evaluation_summary_v2.json',
+        'long_evaluation_summary.json') if (review / name).is_file()),
+        review / 'long_evaluation_summary.json')
     if not summary_path.is_file():
         result['reasons'].append('long_evaluation_summary.json missing; run the existing --long summarizer first')
         return result
     summary = json.loads(summary_path.read_text())
     if summary.get('schema') not in ('turn_lean_long_review_v1',
-                                    'turn_lean_long_review_v2'):
+                                    'turn_lean_long_review_v2',
+                                    'turn_lean_long_review_v3'):
         result['reasons'].append('unknown metric summary schema')
         return result
     labels = sorted({point['model'] for point in summary.get('points', [])})
@@ -83,6 +87,12 @@ def load_candidate(path):
         result['reasons'].append('review command manifest missing')
         return result
     manifest = json.loads(manifest_path.read_text())
+    if summary.get('schema') == 'turn_lean_long_review_v3':
+        if (summary.get('checkpoint_sha256') != manifest.get('checkpoint_sha256') or
+                summary.get('missing_files') or not summary.get('evaluation_records') or
+                summary.get('protocol_id') in (None,'legacy_unknown')):
+            result['reasons'].append('v3 summary identity, protocol or required files incomplete')
+            return result
     protocol = protocol_identity(review)
     result['protocol'] = protocol
     if protocol is None:
@@ -103,6 +113,19 @@ def load_candidate(path):
         return result
     spec = json.loads(spec_path.read_text())
     stage = spec.get('stage', {})
+    inward_stage1 = spec.get('experiment_id') == 'inward_cornering_r10200_v1' and stage.get('phase') == 1
+    aggressive_v2 = stage.get('aggressive_plan', {}).get('sampling_version') == 2
+    active_inward = inward_stage1 or aggressive_v2
+    if inward_stage1 and summary.get('inward_protocol') != 'inward_stage1_v1':
+        result['reasons'].append('stage-1 inward review lacks frozen geometry protocol')
+        return result
+    if summary.get('schema') == 'turn_lean_long_review_v3':
+        expected_protocol = ('aggressive_cornering_v2' if aggressive_v2 else
+            'cornering_height_skill_v1' if stage.get('cohort_plan') else
+            'inward_stage1_v1' if inward_stage1 else 'legacy_unknown')
+        if summary.get('protocol_id') != expected_protocol:
+            result['reasons'].append('v3 protocol ID differs from review spec')
+            return result
     height_skill = bool(stage.get('cohort_plan'))
     required_groups = GROUPS + (('height_skill', 'height_entry_exit') if height_skill else ())
     result['required_groups'] = list(required_groups)
@@ -136,6 +159,31 @@ def load_candidate(path):
     if missing:
         result['reasons'].append('{} required group/seed files missing'.format(len(missing)))
         return result
+    if active_inward and any(not identities[group]['geometry_trace']
+                             for group in ('turn_train','turn_holdout')):
+        result['reasons'].append('inward review lacks independent geometry trace')
+        return result
+    strict_safety_failed = False
+    if summary.get('schema') == 'turn_lean_long_review_v3':
+        records = {str(Path(record['path']).resolve()):record
+                   for record in summary['evaluation_records']}
+        for group in required_groups:
+            for seed in SEEDS:
+                raw_path = model_dir / ('seed'+str(seed)) / (group+'.json')
+                record = records.get(str(raw_path.resolve()))
+                if (record is None or
+                        record.get('checkpoint_sha256') != result['checkpoint_sha256'] or
+                        record.get('evaluator_sha256') != identities[group]['evaluator_sha256'] or
+                        not record.get('completed')):
+                    result['reasons'].append('v3 record identity differs from raw result: '+str(raw_path))
+                    return result
+                if group in ('turn_train','turn_holdout','height_skill'):
+                    total = record.get('strict_contact_slip_total')
+                    passed = record.get('strict_contact_slip_passed')
+                    if total is None or passed is None or total < 1:
+                        result['reasons'].append('v3 strict contact/slip result missing: '+str(raw_path))
+                        return result
+                    strict_safety_failed |= passed != total
     if stage.get('pairs'):
         expected = [(sv*v, sw*w) for v, w in stage['pairs']
                     for sv in (-1., 1.) for sw in (-1., 1.)]
@@ -179,6 +227,7 @@ def load_candidate(path):
         result['reasons'].append('summary lacks metric/gate source identity; generate a new sidecar summary')
         return result
     identity = {'protocol_sha256': protocol['sha256'],
+                'protocol_id':summary.get('protocol_id', 'legacy_unknown'),
                 'gate_sha256': gate_sha,
                 'metric_definition_sha256': metric_sha,
                 'summary_schema': summary['schema'], 'groups': identities}
@@ -209,14 +258,15 @@ def load_candidate(path):
     result['worst_height_mae'] = max(point['max_height_mae'] for point in turns)
     result['height_targets'] = sorted({point['command'][2] for point in turns})
     result['reviewable'] = True
-    if not any(height < .4 for height in result['height_targets']):
+    if not active_inward and not any(height < .4 for height in result['height_targets']):
         result['status'] = 'incompatible_fixed_height'
         result['reasons'].append('no lowered-height turn target')
         result['reviewable'] = False
     elif result['retention_passed'] != 25:
         result['status'] = 'retention_regression'
         result['reasons'].append('original 25-command regression failed')
-    elif (result['turn_train_passed'] != result['turn_train_total'] or
+    elif (strict_safety_failed or
+          result['turn_train_passed'] != result['turn_train_total'] or
           result['turn_holdout_passed'] != result['turn_holdout_total'] or
           (height_skill and result['height_skill_passed'] != result['height_skill_total']) or
           result['transition_passed'] != result['transition_total']):

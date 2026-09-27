@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import math
 from collections import defaultdict
 from pathlib import Path
 
@@ -65,27 +66,126 @@ def height_skill_checks(row):
     return {'passed': all(checks.values()), 'checks': checks}
 
 
-def collect_long(job):
+def require_geometry_direction(verdict, case, row=None, protocol=None):
+    checks = {'independent_geometry_inward':case is not None and case['status']=='inward'}
+    if protocol == 'inward_stage1_v1':
+        environments = case['environments'] if case is not None else []
+        checks['geometry_coverage_0p80'] = bool(environments) and all(
+            env['valid_windows'] >= .8 * (env['valid_windows'] +
+                sum(env['rejected_windows'].values())) for env in environments)
+        checks['inward_projection_0p5deg'] = bool(environments) and all(
+            env['mean_up_dot_inward'] is not None and
+            env['mean_up_dot_inward'] >= math.sin(math.radians(.5))
+            for env in environments)
+        checks['roll_target_mae_0p02'] = (row is not None and
+            max(row['per_env_metrics']['roll_target_mae']) <= .02)
+    verdict['checks'].update(checks)
+    verdict['passed'] = verdict['passed'] and all(checks.values())
+    return verdict
+
+
+def collect_long(job, inward_protocol=None):
     rows = []
     for path in sorted((job / 'acceptance').glob('*/seed*/*.json')):
         if path.stem not in ('retention', 'turn_train', 'turn_holdout', 'height_skill'):
             continue
         data = json.loads(path.read_text())
         model, seed = path.parent.parent.name, int(path.parent.name[4:])
-        for row in data['results']:
+        geometry_cases = (geometry_sign_audit(data)['cases']
+                          if data.get('geometry_trace') and data.get('response_trace') else None)
+        for row_index, row in enumerate(data['results']):
             verdict = (height_skill_checks(row) if path.stem == 'height_skill'
                        else lean_aware_checks(row) if path.stem != 'retention'
                        else {'passed':gate(row)['passed'] and
                              max(row['metrics']['knee_mirror_m'],
                                  row['metrics']['wheel_mirror_m']) <= .03,
                              'original_gate':gate(row)})
+            active_lean = (geometry_cases is not None and
+                           path.stem in ('turn_train','turn_holdout') and
+                           abs(row['metrics']['roll_target']) >= math.radians(1.))
+            if active_lean or (inward_protocol and path.stem in ('turn_train','turn_holdout')
+                               and abs(row['metrics']['roll_target']) >= math.radians(1.)):
+                verdict = require_geometry_direction(verdict,
+                    geometry_cases[row_index] if geometry_cases is not None else None,
+                    row, inward_protocol)
             rows.append({'model':model, 'seed':seed, 'group':path.stem,
                          'command':row['command'], 'environments':data['envs_per_command'],
-                         'verdict':verdict, 'failure_count':row['failure_count'],
+                         'verdict':verdict,
+                         'worst_environment_yaw_mae':max(row['per_env_metrics']['yaw_mae']),
+                         'worst_environment_index':max(
+                             range(len(row['per_env_metrics']['yaw_mae'])),
+                             key=lambda index:row['per_env_metrics']['yaw_mae'][index]),
+                         'worst_environment_slip_rms':max(row['per_env_metrics']['slip_rms']),
+                         'worst_environment_contact':min(
+                             row['per_env_metrics']['left_contact']+
+                             row['per_env_metrics']['right_contact']),
+                         'geometry_direction_status':(
+                             geometry_cases[row_index]['status'] if active_lean else
+                             'neutral_not_required' if geometry_cases is not None else
+                             'legacy_unmeasured'),
+                         'failure_count':row['failure_count'],
                          'reset_reason_counts':row.get('reset_reason_counts'),
                          'metrics':row['metrics'], 'max_abs_metrics':row['max_abs_metrics'],
                          'raw_json':str(path)})
     return rows
+
+
+def long_evaluation_identity(job, inward_protocol, metric_sha, gate_sha):
+    manifests = sorted(job.glob('*_commands.json'))
+    manifest = json.loads(manifests[0].read_text()) if len(manifests) == 1 else {}
+    checkpoint = manifest.get('checkpoint')
+    spec_path = Path(manifest.get('spec', '')) if manifest.get('spec') else None
+    spec = json.loads(spec_path.read_text()) if spec_path and spec_path.is_file() else {}
+    stage = spec.get('stage', {})
+    protocol = ('aggressive_cornering_v2' if stage.get('aggressive_plan', {}).get(
+                    'sampling_version') == 2 else
+                'cornering_height_skill_v1' if stage.get('cohort_plan') else
+                inward_protocol or 'legacy_unknown')
+    requested = []
+    for argv in manifest.get('commands', []):
+        if '--out' in argv:
+            requested.append(str(Path(argv[argv.index('--out')+1])))
+    records = []
+    for path in sorted((job/'acceptance').glob('*/seed*/*.json')):
+        data = json.loads(path.read_text())
+        rows = data.get('results', [])
+        strict_safety = [
+            min(row['per_env_metrics']['left_contact']) >= .99 and
+            min(row['per_env_metrics']['right_contact']) >= .99 and
+            max(row['per_env_metrics']['slip_rms']) <= .10
+            for row in rows]
+        records.append({'path':str(path), 'checkpoint':data.get('checkpoint'),
+            'checkpoint_sha256':data.get('checkpoint_sha256'),
+            'evaluator_sha256':data.get('evaluator_sha256'),
+            'seed':data.get('seed'), 'envs_per_command':data.get('envs_per_command'),
+            'commands':[row.get('command') for row in rows],
+            'geometry_trace':data.get('geometry_trace',False),
+            'completed':bool(rows),
+            'old_gate_passed':sum(gate(row)['passed'] for row in rows),
+            'strict_contact_slip_passed':sum(strict_safety),
+            'strict_contact_slip_total':len(rows),
+            'failure_count':sum(row.get('failure_count',0) for row in rows),
+            'timeout_count':sum(row.get('timeout_count',0) for row in rows),
+            'reset_count':sum(row.get('failure_count',0)+row.get('timeout_count',0)
+                              for row in rows),
+            'skipped':False})
+    completed = {record['path'] for record in records if record['completed']}
+    if records and (len({record['checkpoint_sha256'] for record in records}) != 1 or
+                    len({record['evaluator_sha256'] for record in records}) != 1 or
+                    (manifest.get('checkpoint_sha256') and
+                     records[0]['checkpoint_sha256'] != manifest['checkpoint_sha256'])):
+        raise ValueError('Review mixes checkpoint or evaluator identities')
+    return {'protocol_id':protocol, 'gate_id':gate_sha,
+        'metric_definition_sha256':metric_sha,
+        'checkpoint':checkpoint,
+        'checkpoint_sha256':manifest.get('checkpoint_sha256'),
+        'actual_iteration':int(Path(checkpoint).stem.split('_')[-1])
+            if checkpoint and Path(checkpoint).stem.split('_')[-1].isdigit() else None,
+        'requested_files':requested if requested else None,
+        'completed_files':sorted(completed),
+        'missing_files':sorted(set(requested)-completed) if requested else None,
+        'skipped_files':[],
+        'evaluation_records':records}
 
 
 def grouped_long(rows):
@@ -110,6 +210,10 @@ def grouped_long(rows):
             'failures':sum(row['failure_count'] for row in members),
             'worst_seed':max(members,key=lambda row:(row['failure_count'],
                 row['metrics']['yaw_mae']))['seed'],
+            'worst_environment_seed':max(members,
+                key=lambda row:row['worst_environment_yaw_mae'])['seed'],
+            'worst_environment_index':max(members,
+                key=lambda row:row['worst_environment_yaw_mae'])['worst_environment_index'],
             'raw_json':[row['raw_json'] for row in members]})
     return points
 
@@ -373,22 +477,181 @@ def extract_failures(job):
     return out
 
 
+def geometry_sign_audit(data):
+    """Infer inward direction from adjacent world velocities, independently of roll targets."""
+    frames = data['response_trace']
+    width = data['envs_per_command']
+    cases = []
+    for index, row in enumerate(data['results']):
+      environments = []
+      for env in range(index * width, (index + 1) * width):
+        valid = []
+        rejected = {'speed':0,'curvature':0,'contact':0,'slip':0,'reset':0}
+        for previous, current in zip(frames, frames[1:]):
+            if current['time'] < data['warmup']:
+                continue
+            velocity = previous['velocity_world'][env][:2]
+            next_velocity = current['velocity_world'][env][:2]
+            speed = math.hypot(*velocity)
+            if speed < .3:
+                rejected['speed'] += 1
+                continue
+            delta = [next_velocity[k]-velocity[k] for k in (0,1)]
+            cross = velocity[0]*delta[1]-velocity[1]*delta[0]
+            curvature = cross / max(speed**3*(current['time']-previous['time']),1e-9)
+            if abs(curvature) < .03:
+                rejected['curvature'] += 1
+                continue
+            if not all(current['wheel_contacts'][env]):
+                rejected['contact'] += 1
+                continue
+            if row['per_env_metrics']['slip_rms'][env-index*width] > .10:
+                rejected['slip'] += 1
+                continue
+            if current['resets'][env]:
+                rejected['reset'] += 1
+                continue
+            sign = 1 if cross > 0 else -1
+            inward = [-sign*velocity[1]/speed, sign*velocity[0]/speed]
+            up = current['body_axes_world'][env][2][:2]
+            support = [sum(w[k] for w in current['wheel_positions_world'][env])/2
+                       for k in (0,1)]
+            com = current['com_position_world'][env][:2]
+            valid.append({'time':current['time'],'curvature':curvature,
+                'inward_world_xy':inward,'body_up_horizontal_world_xy':up,
+                'up_dot_inward':sum(up[k]*inward[k] for k in (0,1)),
+                'com_support_inward_m':sum((com[k]-support[k])*inward[k] for k in (0,1)),
+                'velocity_world_xy':next_velocity,'body_axes_world':current['body_axes_world'][env],
+                'root_world_xy':current['root_position_world'][env][:2],
+                'wheel_center_world_xy':[wheel[:2] for wheel in current['wheel_positions_world'][env]],
+                'com_world_xy':com,'projected_gravity':current['projected_gravity'][env],
+                'root_quaternion_xyzw':current['root_quaternion_xyzw'][env]})
+        dot = sum(item['up_dot_inward'] for item in valid)/len(valid) if valid else None
+        com_dot = sum(item['com_support_inward_m'] for item in valid)/len(valid) if valid else None
+        inward_fraction = (sum(item['up_dot_inward'] > 0 for item in valid)/len(valid)
+                           if valid else None)
+        midpoint = len(valid)//2
+        environments.append({'environment_index':env,
+            'status':('unreliable' if not valid else 'inward' if inward_fraction >= .9
+                      else 'outward' if inward_fraction <= .1 else 'mixed'),
+            'valid_windows':len(valid),'rejected_windows':rejected,
+            'inward_window_fraction':inward_fraction,
+            'mean_up_dot_inward':dot,'mean_com_support_inward_m':com_dot,
+            'mean_roll_rad':row['per_env_metrics']['roll'][env-index*width],
+            'mean_slip_rms_m_s':row['per_env_metrics']['slip_rms'][env-index*width],
+            'example':valid[midpoint] if valid else None,
+            'short_trajectory_world_xy':[item['root_world_xy'] for item in
+                valid[max(0,midpoint-5):midpoint+6]]})
+      reliable = [item for item in environments if item['valid_windows']]
+      cases.append({'command':row['command'],
+          'status':('unreliable' if len(reliable)!=width else
+              'inward' if all(item['status']=='inward' for item in reliable) else
+              'outward' if all(item['status']=='outward' for item in reliable) else 'mixed'),
+          'valid_windows':sum(item['valid_windows'] for item in environments),
+          'environment_count':width,'reliable_environment_count':len(reliable),
+          'mean_up_dot_inward':(sum(item['mean_up_dot_inward'] for item in reliable)/len(reliable)
+                                  if reliable else None),
+          'worst_environment_up_dot_inward':(min(item['mean_up_dot_inward'] for item in reliable)
+                                              if reliable else None),
+          'mean_com_support_inward_m':(sum(item['mean_com_support_inward_m'] for item in reliable)/len(reliable)
+                                        if reliable else None),
+          'mean_roll_rad':row['metrics']['roll'],
+          'mean_slip_rms_m_s':row['metrics']['slip_rms'],
+          'failure_count':row['failure_count'],'environments':environments,
+          'example':reliable[0]['example'] if reliable else None,
+          'short_trajectory_world_xy':reliable[0]['short_trajectory_world_xy'] if reliable else []})
+    return {'schema':'turn_geometry_sign_v1','checkpoint':data['checkpoint'],
+        'checkpoint_sha256':data['checkpoint_sha256'],'evaluator_sha256':data['evaluator_sha256'],
+        'seed':data['seed'],'method':'world velocity finite-difference curvature; all environments per command',
+        'wheel_marker':'rigid-body wheel center projected to world XY; not measured contact patch',
+        'acceptance_scope':'independent direction diagnostic; historical roll-target gate unchanged',
+        'cases':cases}
+
+
+def geometry_plot(path, audit):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(1, len(audit['cases']), figsize=(5*len(audit['cases']),5))
+    if len(audit['cases']) == 1:
+        axes = [axes]
+    for ax, case in zip(axes, audit['cases']):
+        sample = case['example']
+        if sample is None:
+            ax.set_title('{}: unreliable'.format(case['command'][:2]))
+            continue
+        root = sample['root_world_xy']
+        trajectory = case['short_trajectory_world_xy']
+        if trajectory:
+            ax.plot([point[0] for point in trajectory],
+                    [point[1] for point in trajectory],color='#555555',
+                    linewidth=1.5,label='short-window trajectory')
+        for label, vector, color in (
+                ('velocity',sample['velocity_world_xy'],'#1767a6'),
+                ('inward',sample['inward_world_xy'],'#198754'),
+                ('body +X',sample['body_axes_world'][0][:2],'#a56410'),
+                ('body +Y',sample['body_axes_world'][1][:2],'#7941a1'),
+                ('body +Z XY',sample['body_up_horizontal_world_xy'],'#c5233e')):
+            length = math.hypot(*vector)
+            if length:
+                ax.arrow(root[0],root[1],.35*vector[0]/length,.35*vector[1]/length,
+                         color=color,head_width=.035,length_includes_head=True,label=label)
+        for name, point in zip(('left wheel center','right wheel center'),sample['wheel_center_world_xy']):
+            ax.scatter(*point,s=40,label=name)
+        ax.scatter(*sample['com_world_xy'],marker='x',s=65,color='black',label='COM')
+        ax.set_title('{}: {} (t={:.1f}s)'.format(case['command'][:2],case['status'],sample['time']))
+        ax.set_xlabel('world X (m)'); ax.set_ylabel('world Y (m)')
+        ax.set_aspect('equal'); ax.grid(True); ax.legend(fontsize=7,loc='best')
+    fig.suptitle('World XY, +Z toward viewer; arrows normalized for direction, not magnitude')
+    fig.tight_layout(); fig.savefig(path,dpi=150); plt.close(fig)
+
+
 def main():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('--job', type=Path, required=True)
+    parser.add_argument('--job', type=Path)
     parser.add_argument('--extract-failures-only', action='store_true')
     parser.add_argument('--long', action='store_true', help='Summarize the new variable-height exploration')
+    parser.add_argument('--inward-protocol', choices=['inward_stage1_v1'],
+                        help='Apply the frozen independent direction/coverage/amplitude gate')
     parser.add_argument('--summary-out', type=Path,
                         help='With --long, write a new versioned summary without altering historical artifacts')
+    parser.add_argument('--geometry-json', type=Path,
+                        help='Analyze one evaluator JSON containing --geometry-trace')
+    parser.add_argument('--geometry-out', type=Path,
+                        help='New JSON summary path; also writes a PNG at the same stem')
+    parser.add_argument('--geometry-no-plot', action='store_true',
+                        help='For repeated milestone probes, write only the geometry JSON')
     args = parser.parse_args()
+    if args.geometry_json is not None:
+        if args.geometry_out is None:
+            parser.error('--geometry-json requires --geometry-out')
+        data = json.loads(args.geometry_json.read_text())
+        if not data.get('geometry_trace') or not data.get('response_trace'):
+            raise ValueError('Input lacks geometry response trace')
+        audit = geometry_sign_audit(data)
+        if args.geometry_out.exists() or (not args.geometry_no_plot and
+                                          args.geometry_out.with_suffix('.png').exists()):
+            raise FileExistsError(args.geometry_out)
+        with args.geometry_out.open('x') as output:
+            json.dump(audit,output,indent=2)
+            output.write('\n')
+        if not args.geometry_no_plot:
+            geometry_plot(args.geometry_out.with_suffix('.png'),audit)
+        print(json.dumps({'summary':str(args.geometry_out),
+                          'figure':str(args.geometry_out.with_suffix('.png'))}))
+        return
+    if args.job is None:
+        parser.error('--job is required unless --geometry-json is used')
     if args.summary_out is not None and not args.long:
         parser.error('--summary-out requires --long')
+    if args.inward_protocol is not None and not args.long:
+        parser.error('--inward-protocol requires --long')
     job = args.job.resolve(strict=True)
     if args.extract_failures_only:
         print(extract_failures(job))
         return
     if args.long:
-        rows = collect_long(job)
+        rows = collect_long(job,args.inward_protocol)
         points = grouped_long(rows)
         dynamic = transitions_long(job)
         summary = args.summary_out or job / 'long_evaluation_summary.json'
@@ -397,11 +660,14 @@ def main():
             raise FileExistsError('Long exploration summary already exists')
         metric_sha = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
         gate_sha = hashlib.sha256(Path(gate.__code__.co_filename).read_bytes()).hexdigest()
+        identity = long_evaluation_identity(job,args.inward_protocol,metric_sha,gate_sha)
         summary.parent.mkdir(parents=True,exist_ok=True)
         with summary.open('x') as output:
-            json.dump({'schema':'turn_lean_long_review_v2',
+            json.dump({'schema':'turn_lean_long_review_v3',
                        'metric_definition_sha256':metric_sha,
                        'gate_sha256':gate_sha,
+                       'inward_protocol':args.inward_protocol,
+                       **identity,
                        'individual_rows':rows,'points':points,
                        'transitions':dynamic},output,indent=2)
             output.write('\n')

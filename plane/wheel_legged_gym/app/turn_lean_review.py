@@ -48,10 +48,14 @@ def command(root, checkpoint, out, speeds, yaws, heights, seed, envs, *,
                '--height-commands', *map(str,heights),
                '--profile', 'method_v1', '--randomization-level', '1',
                '--envs-per-command', str(envs), '--seed', str(seed),
-               '--trace-stride', '10' if exit_at is not None else '50']
+               '--trace-stride', '10' if exit_at is not None or
+               (spec is not None and spec.get('experiment_id') == 'inward_cornering_r10200_v1')
+               else '50']
     if spec is None:
         return options + ['--seconds','25','--warmup','5']
     stage = spec['stage']
+    if spec.get('experiment_id') == 'inward_cornering_r10200_v1':
+        options += ['--geometry-trace']
     options += ['--initial-commands', *(['0']*len(speeds)),
                 '--initial-height-commands', *(['0.4']*len(speeds)),
                 '--switch-at','1', '--transition-ramp-seconds',
@@ -107,7 +111,8 @@ def main(root):
         'slow_reverse':([(sv*2.,sw*.5) for sv in (-1.,1.) for sw in (-1.,1.)],spec,11),
     }
     if spec['stage'].get('cohort_plan') is not None:
-        height_pairs = [(vx,0.) for height in (.38,.36) for vx in (0.,-.5,.5)]
+        height_bank = spec['stage']['cohort_plan']['height_bank']
+        height_pairs = [(vx,0.) for vx, _ in height_bank]
         configurations['height_skill'] = (height_pairs,spec,None)
         configurations['height_entry_exit'] = (height_pairs,spec,12)
     commands = []
@@ -116,7 +121,7 @@ def main(root):
         folder.mkdir(parents=True, exist_ok=True)
         for group,(pairs,turn_spec,exit_at) in configurations.items():
             speeds,yaws=zip(*pairs)
-            heights=([height for height in (.38,.36) for _ in (0.,-.5,.5)]
+            heights=([height for _, height in height_bank]
                      if group in ('height_skill','height_entry_exit')
                      else target_heights(pairs,turn_spec))
             out = folder / (group+'.json')

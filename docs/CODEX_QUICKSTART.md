@@ -11,6 +11,9 @@
 授权训练或评估时继续读 [`docs/CODEX_WORKFLOW.md`](CODEX_WORKFLOW.md)，沿固定阶段调用工具。
 当前转弯/降高实验需要人工接管时，直接读
 [`CORNERING_SELF_SERVICE.md`](CORNERING_SELF_SERVICE.md) 和其中指向的 `status.json`。
+涉及转弯方向、roll、内倾或 GUI 画面时，再读
+`docs/modules/turn_lean_long.md` 的“坐标系与内倾符号协议”；先做四象限量化诊断，
+再决定是否修改训练或奖励。
 
 ## 现场与只读审计
 

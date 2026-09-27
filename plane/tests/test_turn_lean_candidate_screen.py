@@ -9,20 +9,24 @@ SEEDS = (19, 37, 53)
 
 
 def review(tmp_path, label, iteration, *, protocol='frozen protocol',
-           train_pass=True, retention_pass=True, turn_height=.38, skill=False):
+           train_pass=True, retention_pass=True, turn_height=.38, skill=False,
+           inward=False):
     root = tmp_path / label
     root.mkdir()
     (root / 'protocol.md').write_text(protocol)
     checkpoint = root / ('model_{}.pt'.format(iteration))
     checkpoint.write_bytes(label.encode())
     sha = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
-    (root / 'spec.json').write_text(json.dumps({'stage':{
-        'cohort_plan':{'height':.2}} if skill else {}}))
+    (root / 'spec.json').write_text(json.dumps(
+        {'experiment_id':'inward_cornering_r10200_v1',
+         'stage':{'phase':1,'pairs':[[1.,.5]]}} if inward else
+        {'stage':{'cohort_plan':{'height':.2}} if skill else {}}))
     (root / (label+'_commands.json')).write_text(json.dumps({
         'checkpoint':str(checkpoint),'checkpoint_sha256':sha,
         'spec':str(root/'spec.json')}))
     commands = {'retention':[[float(i),0.,.4] for i in range(25)],
-                'turn_train':[[2.5,.6,turn_height]],
+                'turn_train':[[sv*1.,sw*.5,turn_height] for sv in (-1.,1.)
+                              for sw in (-1.,1.)] if inward else [[2.5,.6,turn_height]],
                 'turn_holdout':[[2.7,.55,turn_height]],
                 'entry_exit':[[2.5,.6,turn_height]],
                 'slow_reverse':[[2.,.5,turn_height]]}
@@ -51,6 +55,7 @@ def review(tmp_path, label, iteration, *, protocol='frozen protocol',
                 'evaluator_sha256':'frozen-evaluator','randomization_level':1,
                 'envs_per_command':16,'seconds':18.,'warmup':8.,
                 'deterministic':True,'noise':False,
+                'geometry_trace':inward and group in ('turn_train','turn_holdout'),
                 'results':[{'command':command,'metrics':{'vx_mae':.01}}
                            for command in group_commands]}))
         dynamic_groups = ('entry_exit','slow_reverse') + (('height_entry_exit',) if skill else ())
@@ -63,6 +68,7 @@ def review(tmp_path, label, iteration, *, protocol='frozen protocol',
         'schema':'turn_lean_long_review_v2',
         'metric_definition_sha256':'fixture-metric-hash',
         'gate_sha256':'fixture-gate-hash',
+        'inward_protocol':'inward_stage1_v1' if inward else None,
         'points':points,
         'transitions':transitions}))
     return root
@@ -113,6 +119,48 @@ def test_fixed_height_or_different_protocol_cannot_be_compared(tmp_path):
     assert ranking['comparable_count']==0
     assert ranking['recommendation'] is None
     assert ranking['candidates'][0]['evaluation_signature'] != ranking['candidates'][1]['evaluation_signature']
+
+
+def test_inward_stage_one_accepts_fixed_height_only_with_geometry_protocol(tmp_path):
+    root=review(tmp_path,'inward',100,turn_height=.4,inward=True)
+    row=load_candidate(root)
+    assert row['status']=='accepted_review' and row['turn_train_passed']==4
+    raw=root/'acceptance/inward/seed19/turn_train.json'
+    data=json.loads(raw.read_text())
+    data['geometry_trace']=False
+    raw.write_text(json.dumps(data))
+    assert not load_candidate(root)['eligible']
+
+
+def test_aggressive_v2_fixed_height_requires_v3_identity_and_strict_safety(tmp_path):
+    root = review(tmp_path,'aggressive',16250,turn_height=.4,inward=True)
+    spec_path = root/'spec.json'
+    spec = json.loads(spec_path.read_text())
+    spec['stage'].update(phase=2,aggressive_plan={'sampling_version':2})
+    spec_path.write_text(json.dumps(spec))
+    summary_path = root/'long_evaluation_summary.json'
+    summary = json.loads(summary_path.read_text())
+    manifest = json.loads((root/'aggressive_commands.json').read_text())
+    records = []
+    for path in sorted((root/'acceptance/aggressive').glob('seed*/*.json')):
+        data = json.loads(path.read_text())
+        records.append({'path':str(path),'checkpoint_sha256':manifest['checkpoint_sha256'],
+            'evaluator_sha256':'frozen-evaluator','completed':True,
+            'strict_contact_slip_total':len(data['results']),
+            'strict_contact_slip_passed':len(data['results'])})
+    summary.update(schema='turn_lean_long_review_v3',
+        protocol_id='aggressive_cornering_v2',
+        checkpoint_sha256=manifest['checkpoint_sha256'],
+        missing_files=[],evaluation_records=records)
+    (root/'long_evaluation_summary_v3.json').write_text(json.dumps(summary))
+    assert load_candidate(root)['status']=='accepted_review'
+    next(row for row in records if row['path'].endswith('/turn_train.json'))[
+        'strict_contact_slip_passed']=0
+    (root/'long_evaluation_summary_v3.json').write_text(json.dumps(summary))
+    row=load_candidate(root)
+    assert row['status']=='task_gate_failed' and not row['eligible']
+    (root/'acceptance/aggressive/seed19/turn_train.json').unlink()
+    assert load_candidate(root)['status']=='incomplete'
 
 
 def test_retention_regression_and_conflicting_summary_are_rejected(tmp_path):

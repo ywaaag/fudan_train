@@ -70,7 +70,9 @@ def validate_turn_long_source(path, resume, mode, cfg, *, spec):
     if spec['source_iteration'] == 10200:
         if old.get('profile') != 'motion_goal_v1':
             raise ValueError('Initial turn source is not R10200')
-    elif (old.get('profile') not in {'turn_lean_long_v1','cornering_height_skill_v1'} or
+    elif (old.get('profile') not in {'turn_lean_long_v1','cornering_height_skill_v1',
+                                   'aggressive_cornering_v1',
+                                   'inward_cornering_r10200_v1'} or
           old.get('turn_long_spec', {}).get('stage', {}).get('phase', 99) > spec['stage']['phase']):
         raise ValueError('Unreviewed exploration continuation source')
     for key, value in old['reward_scales'].items():

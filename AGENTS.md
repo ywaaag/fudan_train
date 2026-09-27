@@ -13,6 +13,8 @@ Codex可读性第一；不依赖历史聊天、模型编号或旧快照判断当
 转弯训练的人工接管、逐问题修改入口和安全命令见
 [`docs/CORNERING_SELF_SERVICE.md`](docs/CORNERING_SELF_SERVICE.md)；额度或会话中断时
 先读它和当前 job 状态，不靠历史聊天恢复任务。
+转弯/内倾任务还必须先读 `docs/modules/turn_lean_long.md` 的坐标系与内倾符号协议；
+不要从 GUI 画面猜 roll 符号，不要用旧 checkpoint 验证新符号修复。
 
 2026-09-23 的严格行为等价架构重构是历史阶段；其等价证据见架构台账。
 当前训练任务以对应输出目录的显式 spec/protocol 为准，仅在用户授权预算内改变训练

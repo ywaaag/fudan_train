@@ -6,6 +6,36 @@ from wheel_legged_gym.workflows.completion import write_report as generate_repor
 from wheel_legged_gym.adapters.notifications.hapi import event_id, acknowledge_review, wake_session, notify
 
 
+def completion_facts(job):
+    """Normalize independent report, delivery and human-review records."""
+    job = Path(job)
+    def read(name):
+        path = job / name
+        return json.loads(path.read_text()) if path.is_file() else {}
+    marker = read('completion_hook.json')
+    delivery = read('hapi_notification.json')
+    review = read('completion_review.json')
+    event = delivery.get('event_id') or review.get('event_id')
+    reviewed = (review.get('status') == 'reviewed' and
+                bool(event) and review.get('event_id') == event)
+    report_path = Path(marker.get('report', job / 'completion_report.md'))
+    if not report_path.is_absolute():
+        report_path = job / report_path
+    report_generated = marker.get('status') == 'reported' and report_path.is_file()
+    delivery_session = delivery.get('session_id')
+    review_session = review.get('session_id')
+    session = (delivery_session or review_session) if not (
+        delivery_session and review_session and delivery_session != review_session) else None
+    return {'event_id': event or 'unknown',
+            'status': marker.get('status', 'unknown'),
+            'session_id': session or 'unknown',
+            'report_path': str(report_path) if report_generated else 'unknown',
+            'report_generated': report_generated,
+            'notification_status': delivery.get('status', 'unknown'),
+            'review_status': 'reviewed' if reviewed else 'unknown',
+            'reviewed_at': review.get('acknowledged_at', 'unknown') if reviewed else 'unknown'}
+
+
 def write_report(job,state):
     return generate_report(job,state,notify=notify)
 

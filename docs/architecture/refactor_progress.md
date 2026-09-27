@@ -1406,3 +1406,56 @@ The monitor pauses after three consecutive 1000-iteration probes without a
 height pass or at least 3mm height-MAE improvement, then uses the existing
 completion hook. Runtime identity and status are in the current experiment
 `source_identity.md` and `stage2_job/status.json`; no stage3 run is authorized.
+
+## 2026-09-26 inward-lean sign correction
+
+The initial sign argument based on whole-loop displacement and wheel load
+was invalid. The later independent audit at
+`plane/outputs/turn_geometry_sign_20260926/README.md` used known quaternion
+rotations and local world-velocity curvature for `(±1,±0.5)`, seed19,
+four environments each. Model35250's body-up axis pointed outward in all
+1600 valid short windows. The verified inward roll reference is opposite
+`vx_command*yaw_command`; old checkpoint/review identities remain unchanged.
+The old `roll_target_mae` is a same-source check, so new geometry-trace
+reviews separately require world-frame inward evidence for active-lean points.
+
+## 2026-09-26 R10200 inward-cornering experiment
+
+New explicit spec `inward_cornering_r10200_v1` keeps the old turn-long recipe
+available, adds a two-phase 25000-iteration ceiling, and forces stage 1 to
+fixed 0.40m and at most 3 degrees. R10200 baseline, frozen protocol and
+independent holdout live in
+`plane/outputs/inward_cornering_from_r10200_20260926_174110/`.
+Stage-1 smoke restored the full model and both Adam states exactly; after
+one iteration actor/critic changed and encoder did not. The formal run and
+existing monitor are bounded at 10000 added iterations; the monitor now
+records a geometry trace for each 1000-iteration probe. No phase-2 run is
+authorized by a milestone alone: stage-1 upgrade requires the three-seed
+inward protocol and original-motion regression in `protocol.md`.
+
+## 2026-09-27 aggressive cornering bug audit
+
+Evidence: `plane/outputs/cornering_bug_audit_20260927_092941/`. Historical
+aggressive v1 manifest fractions and continuous-sampling description did not
+match the running 20-slot fixed-bank sampler. Explicit v2 now uses 40 slots,
+continuous regional magnitudes, four sign quadrants and effective-fraction
+metadata; old v1 behavior/results remain unchanged. The matched seed19,
+4-env/command comparison of models 16250/17250/24250 favored 16250 for
+regional yaw and strict high-load safety. Historical high-load slip/contact
+reward weights were zero, a training-design limitation rather than a changed
+acceptance gate. One 64-env/1-iteration smoke and 56 focused tests passed;
+no new formal long run was started. Full pytest is blocked by the pre-existing
+untracked `tools/generate_turn_readiness.py` job-journal ownership failure.
+
+## 2026-09-27 bug-fix-only follow-up
+
+Moved turn readiness business logic into `app/turn_readiness.py`; the existing
+`tools/generate_turn_readiness.py` is now a CLI leaf. Stage-dependent required
+groups and strict contact/slip checks remove false readiness paths. New
+aggressive specs require explicit sampling v2; historical v1 remains readable
+through an explicit historical validation path. Added reward activation and
+noncontiguous environment-ID fixtures without changing reward coefficients.
+New long-review sidecars carry checkpoint/evaluator/protocol/gate identities
+and requested/completed files. Final full pytest: 716 passed; one 64-env iteration
+smoke verified the runtime manifest. Evidence lives in
+`plane/outputs/cornering_bug_fix_20260927_101156/`; no formal training ran.
