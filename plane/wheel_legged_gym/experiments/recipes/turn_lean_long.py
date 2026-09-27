@@ -9,17 +9,21 @@ R10200 = '/home/kellen/fudan_train/plane/logs/wheel_legged/Sep22_11-19-04_motion
 R10200_SHA = 'a8b9dc01879ddba41c54289c0367c6a3c93325bc2982357173b1899be059b790'
 
 
-def validate_spec(spec):
+def validate_spec(spec, *, historical=False):
     required = {'source_checkpoint', 'source_sha256', 'source_iteration',
                 'teacher_checkpoint', 'teacher_sha256', 'stage', 'course_plan'}
-    if set(spec) != required or not isinstance(spec['course_plan'], list):
+    inward = spec.get('experiment_id') == 'inward_cornering_r10200_v1'
+    if (set(spec) != required | ({'experiment_id'} if inward else set())
+            or not isinstance(spec['course_plan'], list)):
         raise ValueError('Turn lean requires an explicit source, teacher, stage and course plan')
     plan = spec['course_plan']
-    if (len(plan) != 3 or [item.get('phase') for item in plan] != [1, 2, 3]
+    phases = [1, 2] if inward else [1, 2, 3]
+    limit = 25000 if inward else 30000
+    if (len(plan) != len(phases) or [item.get('phase') for item in plan] != phases
             or not all(isinstance(item.get('budget_max'), int) and
-                       0 < item['budget_max'] <= 30000 for item in plan)
-            or sum(item['budget_max'] for item in plan) > 30000):
-        raise ValueError('Course plan must contain three bounded phases within 30000 iterations')
+                       0 < item['budget_max'] <= limit for item in plan)
+            or sum(item['budget_max'] for item in plan) > limit):
+        raise ValueError('Course plan exceeds the experiment iteration limit')
     if (spec['teacher_checkpoint'], spec['teacher_sha256']) != (R10200, R10200_SHA):
         raise ValueError('Teacher must remain the reviewed R10200')
     if not isinstance(spec['source_iteration'], int) or spec['source_iteration'] < 10200:
@@ -31,7 +35,10 @@ def validate_spec(spec):
               'learning_rate', 'freeze_encoder', 'encoder_learning_rate',
               'entry_range', 'hold_range', 'speed_ramp_seconds', 'yaw_ramp_seconds',
               'hypothesis','turn_height_reward_scale'}
-    if not fields.issubset(stage) or set(stage) - fields - {'height_schedule','cohort_plan'} or stage['phase'] not in (1, 2, 3):
+    if (not fields.issubset(stage) or
+            set(stage) - fields - {'height_schedule','cohort_plan','aggressive_plan','inward_geometry_probe'} or
+            stage['phase'] not in phases or
+            (stage.get('inward_geometry_probe',False) and not inward)):
         raise ValueError('Unreviewed turn stage fields')
     if not (.34 <= stage['turn_height'] <= .40 and 0. <= stage['lean_max_deg'] <= 10.
             and stage['turn_fraction'] in (.25, .5)
@@ -44,6 +51,10 @@ def validate_spec(spec):
             raise ValueError('Frozen encoder must not have an override')
     elif not (0. < stage['encoder_learning_rate'] <= stage['learning_rate']):
         raise ValueError('Encoder LR must not exceed actor LR')
+    if (inward and stage['phase'] == 1 and
+            (stage['turn_height'] != .4 or stage['lean_max_deg'] > 3. or
+             stage.get('height_schedule') is not None or stage.get('cohort_plan') is not None)):
+        raise ValueError('Inward stage 1 must use fixed 0.40m and at most 3 degree lean')
     if (not .5 <= stage['entry_range'][0] <= stage['entry_range'][1] <= 2.
             or not 1. <= stage['hold_range'][0] <= stage['hold_range'][1] <= 6.
             or not 1. <= stage['speed_ramp_seconds'] <= 4.
@@ -63,6 +74,25 @@ def validate_spec(spec):
             and not (v == 4. and w == 4.) for v, w in pairs):
         raise ValueError('Turn pairs must be distinct, finite magnitudes in the reviewed range')
     cohort = stage.get('cohort_plan')
+    aggressive = stage.get('aggressive_plan')
+    if aggressive is not None:
+        if (set(aggressive) - {'fractions','anchor_pairs','regional_pairs','mid_pairs',
+                              'high_pairs','sampling_version'} or
+                not {'fractions','anchor_pairs','regional_pairs','mid_pairs',
+                     'high_pairs'}.issubset(aggressive) or
+                (aggressive.get('sampling_version') != 2 and not historical)):
+            raise ValueError('Unreviewed aggressive cornering plan')
+        if aggressive['fractions'] != {'anchor':.15,'regional':.225,'mid':.10,'high':.025}:
+            raise ValueError('Aggressive fractions must preserve 50 percent retention')
+        if historical and aggressive.get('sampling_version', 1) not in (1, 2):
+            raise ValueError('Unknown historical sampling version')
+        if stage['turn_fraction'] != .5 or any(
+                not aggressive[key] or any(tuple(pair) not in pairs
+                    for pair in aggressive[key])
+                for key in ('anchor_pairs','regional_pairs','mid_pairs','high_pairs')):
+            raise ValueError('Aggressive banks must be nonempty reviewed turn pairs at 50 percent retention')
+        if cohort is not None:
+            raise ValueError('Aggressive and height cohorts are mutually exclusive')
     if cohort is not None:
         reviewed_fractions = (
             {'retention':.5,'height':.2,'mid_turn':.25,'high_turn':.05},
@@ -80,8 +110,8 @@ def validate_spec(spec):
     return spec
 
 
-def apply_turn_lean_long(cfg, train, *, spec):
-    spec = validate_spec(spec)
+def apply_turn_lean_long(cfg, train, *, spec, historical=False):
+    spec = validate_spec(spec, historical=historical)
     stage = spec['stage']
     manifest = apply_legacy_speed2_stop(cfg, train)
     retention = stage_bank('basic_motion')
@@ -92,6 +122,7 @@ def apply_turn_lean_long(cfg, train, *, spec):
     cfg.commands.turn_bank = bank
     cfg.commands.turn_stride = round(1/stage['turn_fraction'])
     cohort = stage.get('cohort_plan')
+    aggressive = stage.get('aggressive_plan')
     if cohort is not None:
         cfg.commands.sampling_strategy = 'cornering_height_skill'
         cfg.commands.cohort_cycle = 20
@@ -107,6 +138,31 @@ def apply_turn_lean_long(cfg, train, *, spec):
                                   for sv in (-1.,1.) for sw in (-1.,1.)]
         cfg.commands.high_turn_bank = [(sv*v,sw*w) for v,w in cohort['high_pairs']
                                        for sv in (-1.,1.) for sw in (-1.,1.)]
+    if aggressive is not None:
+        cfg.commands.sampling_strategy = 'aggressive_cornering'
+        version = aggressive.get('sampling_version', 1)
+        cfg.commands.aggressive_sampling_version = version
+        if version == 2:
+            cfg.commands.cohort_cycle = 40
+            cfg.commands.anchor_slots = tuple(range(0,12,2))
+            cfg.commands.regional_slots = tuple(range(12,30,2))
+            cfg.commands.mid_slots = tuple(range(30,38,2))
+            cfg.commands.high_slots = (38,)
+            cfg.commands.regional_range = (
+                min(v for v, _ in aggressive['regional_pairs']),
+                max(v for v, _ in aggressive['regional_pairs']),
+                min(w for _, w in aggressive['regional_pairs']),
+                max(w for _, w in aggressive['regional_pairs']))
+        else:
+            cfg.commands.cohort_cycle = 20
+            cfg.commands.anchor_slots = (0,2,4)
+            cfg.commands.regional_slots = (6,8,10,12,14)
+            cfg.commands.mid_slots = (16,)
+            cfg.commands.high_slots = (18,)
+        cfg.commands.anchor_bank = [(sv*v,sw*w) for v,w in aggressive['anchor_pairs'] for sv in (-1.,1.) for sw in (-1.,1.)]
+        cfg.commands.regional_bank = [(sv*v,sw*w) for v,w in aggressive['regional_pairs'] for sv in (-1.,1.) for sw in (-1.,1.)]
+        cfg.commands.mid_bank = [(sv*v,sw*w) for v,w in aggressive['mid_pairs'] for sv in (-1.,1.) for sw in (-1.,1.)]
+        cfg.commands.high_bank = [(sv*v,sw*w) for v,w in aggressive['high_pairs'] for sv in (-1.,1.) for sw in (-1.,1.)]
     cfg.commands.turn_height = stage['turn_height']
     if stage.get('height_schedule') is not None:
         cfg.commands.turn_height_schedule = tuple(tuple(item) for item in stage['height_schedule'])
@@ -118,7 +174,8 @@ def apply_turn_lean_long(cfg, train, *, spec):
     cfg.commands.ranges.lin_vel_x = [-4., 4.]
     cfg.commands.ranges.ang_vel_yaw = [-4., 4.]
     cfg.commands.ranges.height = [.4, .4]
-    cfg.commands.training_profile = 'turn_lean_long_v1'
+    cfg.commands.training_profile = ('inward_cornering_r10200_v1' if spec.get('experiment_id')
+                                     == 'inward_cornering_r10200_v1' else 'turn_lean_long_v1')
     cfg.commands.training_phase = 'combined'
     cfg.rewards.scales.nominal_state = 0.
     cfg.rewards.scales.stand_bilateral_geometry = -.2
@@ -137,7 +194,9 @@ def apply_turn_lean_long(cfg, train, *, spec):
         train.algorithm.extra_learning_rate = stage['encoder_learning_rate']
     train.runner.save_interval = 250
     manifest.pop('exact_command_fractions', None)
-    manifest.update(name='TURN_LEAN_LONG', profile=('cornering_height_skill_v1' if cohort else 'turn_lean_long_v1'),
+    manifest.update(name='TURN_LEAN_LONG', profile=('inward_cornering_r10200_v1'
+        if spec.get('experiment_id') == 'inward_cornering_r10200_v1' else
+        'cornering_height_skill_v1' if cohort else 'aggressive_cornering_v1' if aggressive else 'turn_lean_long_v1'),
         turn_long_spec=spec, retention_bank=retention, turn_bank=cfg.commands.turn_bank,
         turn_fraction=stage['turn_fraction'], turn_height=stage['turn_height'],
         turn_lean_max_rad=cfg.rewards.turn_lean_max_rad,
@@ -157,4 +216,26 @@ def apply_turn_lean_long(cfg, train, *, spec):
             reward_clip_change='base_height only: exempt from single-term clipping; effective positive reward equals exp(-height_error^2/.001) times 8 when command <.4, times dt',
             unclipped_reward_names=cfg.rewards.unclipped_reward_names,
             reference_scope='R10200 mean action/source std on odd env IDs only (50% retention)')
+    if aggressive is not None:
+        manifest.update(aggressive_plan=aggressive,
+            sampling_version=cfg.commands.aggressive_sampling_version,
+            cohort_slots={'retention':'odd modulo '+str(cfg.commands.cohort_cycle),
+                'anchor':cfg.commands.anchor_slots,
+                'regional':cfg.commands.regional_slots,
+                'mid':cfg.commands.mid_slots,'high':cfg.commands.high_slots},
+            aggressive_slots={'anchor':cfg.commands.anchor_slots,
+                'regional':cfg.commands.regional_slots,'mid':cfg.commands.mid_slots,
+                'high':cfg.commands.high_slots},
+            aggressive_sampling_version=cfg.commands.aggressive_sampling_version,
+            effective_command_fractions={key:len(slots)/cfg.commands.cohort_cycle
+                for key,slots in (('anchor',cfg.commands.anchor_slots),
+                    ('regional',cfg.commands.regional_slots),
+                    ('mid',cfg.commands.mid_slots),('high',cfg.commands.high_slots))},
+            regional_command_range=(cfg.commands.regional_range
+                if cfg.commands.aggressive_sampling_version == 2 else None),
+            reference_scope='R10200 mean action/source std on odd env IDs only (50% retention)')
+        if cfg.commands.aggressive_sampling_version == 2:
+            manifest.update(
+                ablation_variable='Exact cohort allocation and continuous regional commands',
+                training_change='Sampling v2 only; reward, LR, lean target and policy contract unchanged')
     return manifest

@@ -54,6 +54,30 @@ def test_recipe_keeps_contract_and_retention():
     assert manifest['freeze_motion_encoder']
 
 
+def test_inward_stage_one_keeps_height_fixed_and_traces_geometry():
+    proposal = spec()
+    proposal['experiment_id'] = 'inward_cornering_r10200_v1'
+    proposal['course_plan'] = [{'phase':1,'budget_max':10000},
+                               {'phase':2,'budget_max':15000}]
+    proposal['stage'].update(turn_height=.4,lean_max_deg=3.,
+                             inward_geometry_probe=True)
+    cfg, train = WheelLeggedCfg(), WheelLeggedCfgPPO()
+    manifest = apply_turn_lean_long(cfg,train,spec=proposal)
+    assert manifest['profile']=='inward_cornering_r10200_v1'
+    assert cfg.commands.turn_height==.4 and cfg.commands.turn_stride==2
+    assert '--geometry-trace' in probe_command('/tmp/model.pt','/tmp/out.json',
+                                               proposal['stage'])
+    assert '--geometry-trace' in review_command('/tmp',R10200,'/tmp/out.json',
+        [1.],[.5],[.4],19,16,spec=proposal)
+    proposal['stage']['turn_height']=.38
+    try:
+        validate_spec(proposal)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('stage 1 lowering was accepted')
+
+
 def test_height_tracks_public_yaw_and_recovers():
     scheduler = TurnEnvelope(4, 'cpu', .01, stride=2, turn_height=.38)
     commands = torch.tensor([[0.,0.,.4],[1.,0.,.4],[0.,0.,.4],[-1.,0.,.4]])
@@ -118,6 +142,12 @@ def test_lean_gate_preserves_original_safety_but_allows_reviewed_roll():
     assert not lean_aware_checks(row)['passed']
 
 
+def test_roll_reference_points_toward_actual_positive_yaw_turn_center():
+    from wheel_legged_gym.domain.rewards.turn_lean import roll_reference
+    assert roll_reference(torch.tensor([1.]), torch.tensor([1.]), .14).item() < 0.
+    assert roll_reference(torch.tensor([1.]), torch.tensor([-1.]), .14).item() > 0.
+
+
 def test_review_entry_exit_restores_height_with_public_command():
     argv=review_command('/tmp',R10200,'/tmp/new.json',[1.], [.5],[.38],19,8,
                         spec=spec(),exit_at=12)
@@ -172,8 +202,8 @@ def test_review_cli_passes_scheduled_heights_to_evaluator(tmp_path,monkeypatch):
     assert heights('turn_train') == [.4]*4+[.38]*4+[.36]*4
     assert heights('turn_holdout') == [.36]*4
     assert heights('entry_exit') == [.38]*4+[.36]*4
-    assert heights('height_skill') == [.38]*3+[.36]*3
-    assert heights('height_entry_exit') == [.38]*3+[.36]*3
+    assert heights('height_skill') == [.38]*3
+    assert heights('height_entry_exit') == [.38]*3
     assert '--height-return-at-exit' in by_name['height_entry_exit']
 
 
@@ -259,14 +289,15 @@ def test_height_skill_public_command_and_recovery():
 
 def test_cornering_probe_separates_retention_height_mid_high():
     s = spec()['stage']
-    s['cohort_plan'] = {'height_bank':[[0.,.38]]}
+    s['cohort_plan'] = {'height_bank':[[0.,.38]],
+        'mid_pairs':[[1.,.5]], 'high_pairs':[[2.,.5]]}
     argv = probe_command('/tmp/source.pt','/tmp/probe.json',s)
     heights = argv[argv.index('--height-commands')+1:argv.index('--initial-commands')]
-    assert len(heights) == 23
+    assert len(heights) == 14
     assert heights[:5] == ['0.4']*5
-    assert heights[5:11] == ['0.38']*3+['0.36']*3
-    assert heights[11:19] == ['0.38']*8
-    assert heights[19:] == ['0.36']*4
+    assert heights[5:6] == ['0.38']
+    assert heights[6:10] == ['0.38']*4
+    assert heights[10:] == ['0.38']*4
 
 
 def test_height_stagnation_requires_three_probe_windows_and_no_gain():
@@ -308,3 +339,131 @@ def test_cornering_sampler_assigns_only_nonretained_cohorts():
     assert seen['turn']==[8,10,12,14,16,18]
     assert commands[1::2,2].eq(.4).all()
     assert commands[1::2,1].eq(0).all()
+
+
+def test_aggressive_v2_matches_declared_fractions_and_continuous_quadrants():
+    proposal = spec()
+    proposal['experiment_id'] = 'inward_cornering_r10200_v1'
+    proposal['course_plan'] = [{'phase':1,'budget_max':10000},
+                               {'phase':2,'budget_max':15000}]
+    plan = {'sampling_version':2,
+            'fractions':{'anchor':.15,'regional':.225,'mid':.10,'high':.025},
+            'anchor_pairs':[[1.,.5]],
+            'regional_pairs':[[1.6,.4],[2.2,.6]],
+            'mid_pairs':[[2.5,.6],[3.,.7]],
+            'high_pairs':[[3.,1.],[3.5,.8],[4.,1.]]}
+    proposal['stage'].update(phase=2,turn_height=.4,lean_max_deg=3.,
+                             pairs=plan['anchor_pairs']+plan['regional_pairs']+
+                                   plan['mid_pairs']+plan['high_pairs'],
+                             aggressive_plan=plan)
+    cfg, train = WheelLeggedCfg(), WheelLeggedCfgPPO()
+    manifest = apply_turn_lean_long(cfg,train,spec=proposal)
+    assert manifest['effective_command_fractions'] == plan['fractions']
+    assert manifest['aggressive_sampling_version'] == 2
+    assert manifest['ablation_variable'].startswith('Exact cohort allocation')
+    assert cfg.commands.cohort_cycle == 40
+    ids = torch.arange(400)
+    commands = torch.zeros(400,3)
+    buffers = CommandBuffers(commands,torch.zeros(400,dtype=torch.long),
+                             torch.zeros(400,dtype=torch.long))
+    ranges = {key:torch.tensor([[lo,hi]]*400,dtype=torch.float)
+              for key,lo,hi in (('lin_vel_x',-4.,4.),
+                                ('ang_vel_yaw',-4.,4.),('height',.4,.4))}
+    seen = {}
+    def reset_turn(out,selected,target):
+        seen.update(zip(selected.tolist(),target.tolist()))
+        out[selected,:2] = target
+    torch.manual_seed(23)
+    resample(ids,state=buffers,ranges=ranges,config=cfg.commands,device='cpu',
+             reset_start_stop=lambda *args:None,sample_heading=None,
+             reset_turn=reset_turn)
+    assert len(seen) == 200
+    assert commands[1::2,2].eq(.4).all()
+    assert commands[1::2,1].eq(0).all()
+    regional = [values for env_id,values in seen.items()
+                if env_id % 40 in cfg.commands.regional_slots]
+    assert len(regional) == 90
+    assert {(v > 0,w > 0) for v,w in regional} == {
+        (False,False),(False,True),(True,False),(True,True)}
+    assert all(1.6 <= abs(v) <= 2.2 and .4 <= abs(w) <= .6
+               for v,w in regional)
+    assert len({round(abs(v),3) for v,_ in regional}) > 10
+    proposal['stage']['turn_fraction'] = .25
+    try:
+        validate_spec(proposal)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('aggressive 50 percent cohort accepted a 25 percent spec')
+    proposal['stage']['turn_fraction'] = .5
+    del proposal['stage']['aggressive_plan']['sampling_version']
+    try:
+        validate_spec(proposal)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('new aggressive spec silently fell back to v1')
+    assert validate_spec(proposal,historical=True) is proposal
+    proposal['stage']['aggressive_plan']['sampling_version'] = 1
+    try:
+        validate_spec(proposal)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('new aggressive spec accepted v1 with v2 fractions')
+
+
+def test_aggressive_v2_cohorts_survive_noncontiguous_resets():
+    proposal = spec()
+    proposal['experiment_id'] = 'inward_cornering_r10200_v1'
+    proposal['course_plan'] = [{'phase':1,'budget_max':10000},
+                               {'phase':2,'budget_max':15000}]
+    plan = {'sampling_version':2,
+        'fractions':{'anchor':.15,'regional':.225,'mid':.10,'high':.025},
+        'anchor_pairs':[[1.,.5]],'regional_pairs':[[1.6,.4],[2.2,.6]],
+        'mid_pairs':[[2.5,.6]],'high_pairs':[[3.,1.]]}
+    proposal['stage'].update(phase=2,turn_height=.4,lean_max_deg=3.,
+        pairs=sum((plan[key] for key in ('anchor_pairs','regional_pairs',
+              'mid_pairs','high_pairs')),[]),aggressive_plan=plan)
+    cfg,train=WheelLeggedCfg(),WheelLeggedCfgPPO()
+    apply_turn_lean_long(cfg,train,spec=proposal)
+    ids=torch.tensor([0,1,12,13,14,15,16,17,18,19,30,31,38,39,
+                      40,41,52,53,54,55,56,57,58,59,70,71,78,79])
+    commands=torch.zeros(80,3)
+    counters=torch.zeros(80,dtype=torch.long)
+    buffers=CommandBuffers(commands,torch.zeros(80,dtype=torch.long),counters)
+    ranges={key:torch.tensor([[lo,hi]]*80,dtype=torch.float)
+            for key,lo,hi in (('lin_vel_x',-4.,4.),('ang_vel_yaw',-4.,4.),
+                              ('height',.4,.4))}
+    seen={}
+    def reset_turn(out,selected,target):
+        seen.update(zip(selected.tolist(),target.tolist()))
+        out[selected,:2]=target
+    for _ in range(2):
+        seen.clear()
+        resample(ids,state=buffers,ranges=ranges,config=cfg.commands,device='cpu',
+            reset_start_stop=lambda *args:None,sample_heading=None,reset_turn=reset_turn)
+        assert set(seen) == set(ids[ids.remainder(2)==0].tolist())
+        assert commands[ids[ids.remainder(2)==1],1].eq(0).all()
+        assert {(v>0,w>0) for env_id,(v,w) in seen.items()
+                if env_id%40 in cfg.commands.regional_slots} == {
+                    (False,False),(False,True),(True,False),(True,True)}
+    assert counters[ids].eq(2).all()
+    assert counters[2] == 0
+
+
+def test_height_probe_uses_spec_bank_and_does_not_invent_036():
+    stage = spec()['stage']
+    stage.update(cohort_plan={
+        'fractions': {'retention':.5,'height':.2,'mid_turn':.25,'high_turn':.05},
+        'height_bank': [[0.,.38],[-.5,.38],[.5,.38]],
+        'mid_pairs': [[1.,.5]], 'high_pairs': [[2.,.5]],
+        'unclip_base_height': True})
+    stage['inward_geometry_probe'] = False
+    command = probe_command('/tmp/model.pt','/tmp/probe.json',stage)
+    values = [float(value) for value in command[
+        command.index('--height-commands') + 1:command.index('--initial-commands')]]
+    assert values[:5] == [.4]*5
+    assert values[5:8] == [.38]*3
+    assert .36 not in values
+    assert '2.0' in command[command.index('--commands') + 1:command.index('--yaw-commands')]

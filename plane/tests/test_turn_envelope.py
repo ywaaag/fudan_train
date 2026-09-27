@@ -16,8 +16,8 @@ def test_lean_reference_sign_cap_mirror_and_zero():
     yaw = torch.tensor([1., 1., -1., 1., -1., 4.])
     cap = math.radians(2.)
     roll = roll_reference(vx, yaw, cap)
-    assert roll[0] == 0 and roll[1] > 0 and roll[2] < 0
-    assert roll[3] < 0 and roll[4] > 0 and roll.abs().max() <= cap
+    assert roll[0] == 0 and roll[1] < 0 and roll[2] > 0
+    assert roll[3] > 0 and roll[4] < 0 and roll.abs().max() <= cap
     torch.testing.assert_close(roll_reference(vx, -yaw, cap), -roll)
     gravity = torch.stack((torch.zeros_like(roll), -roll.sin(), -roll.cos()), dim=1)
     original = gravity.clone()

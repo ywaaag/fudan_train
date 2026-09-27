@@ -46,6 +46,45 @@ def resample(env_ids, *, state: CommandBuffers, ranges, config, device,
                 state.segment_counter[high_ids] + high_ids // config.cohort_cycle, config.high_turn_bank)
         state.sample_mode[env_ids] = -1
         state.segment_counter[env_ids] += 1
+    elif strategy == "aggressive_cornering":
+        from wheel_legged_gym.domain.commands.command_sampling import sample_fixed_bank
+        slots = env_ids.remainder(config.cohort_cycle)
+        retained_ids = env_ids[slots.remainder(2) == 1]
+        groups = ((config.anchor_slots, config.anchor_bank),
+                  (config.regional_slots, config.regional_bank),
+                  (config.mid_slots, config.mid_bank),
+                  (config.high_slots, config.high_bank))
+        if len(retained_ids):
+            state.commands[retained_ids, :2] = sample_fixed_bank(
+                ranges['lin_vel_x'][retained_ids], ranges['ang_vel_yaw'][retained_ids],
+                state.segment_counter[retained_ids], config.retention_bank)
+        version = getattr(config, 'aggressive_sampling_version', 1)
+        for group_index, (selected_slots, bank) in enumerate(groups):
+            selected = env_ids[torch.isin(slots, torch.as_tensor(selected_slots, device=device))]
+            if len(selected):
+                if version == 2 and group_index == 1:
+                    v_min, v_max, w_min, w_max = config.regional_range
+                    quadrant = (selected // 2) % 4
+                    vx = v_min + (v_max-v_min)*torch.rand(len(selected),device=device)
+                    yaw = w_min + (w_max-w_min)*torch.rand(len(selected),device=device)
+                    targets = torch.stack((
+                        vx * torch.where(quadrant < 2, -1., 1.),
+                        yaw * torch.where(quadrant.remainder(2) == 0, -1., 1.)),dim=1)
+                    lower = torch.stack((ranges['lin_vel_x'][selected,0],
+                        ranges['ang_vel_yaw'][selected,0]),dim=1)
+                    upper = torch.stack((ranges['lin_vel_x'][selected,1],
+                        ranges['ang_vel_yaw'][selected,1]),dim=1)
+                    if ((targets < lower) | (targets > upper)).any():
+                        raise ValueError('regional command exceeds configured ranges')
+                else:
+                    slot_ids = state.segment_counter[selected]
+                    if version == 2:
+                        slot_ids = slot_ids + selected // config.cohort_cycle
+                    targets = sample_fixed_bank(ranges['lin_vel_x'][selected],
+                        ranges['ang_vel_yaw'][selected], slot_ids, bank)
+                reset_turn(state.commands, selected, targets)
+        state.sample_mode[env_ids] = -1
+        state.segment_counter[env_ids] += 1
     elif strategy == "turn_envelope":
         from wheel_legged_gym.domain.commands.command_sampling import sample_fixed_bank
         turn = env_ids.remainder(config.turn_stride) == 0
