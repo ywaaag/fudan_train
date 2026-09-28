@@ -74,6 +74,62 @@ def command(root, checkpoint, out, speeds, yaws, heights, seed, envs, *,
     return options
 
 
+def reusable_result(path, argv, checkpoint_sha, evaluator_sha):
+    """A failed physical case is reusable when its evaluation is complete."""
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError) as exc:
+        raise ValueError('Existing review output is unreadable: {}'.format(path)) from exc
+    def values(name, until=None):
+        start = argv.index(name) + 1
+        end = argv.index(until, start) if until else next((i for i in range(start,len(argv))
+            if argv[i].startswith('--')),len(argv))
+        return [float(value) for value in argv[start:end]]
+    commands = list(zip(values('--commands','--yaw-commands'),
+                        values('--yaw-commands','--height-commands'),
+                        values('--height-commands')))
+    def number(name, default=None):
+        return float(argv[argv.index(name)+1]) if name in argv else default
+    expected = {'checkpoint':argv[argv.index('--checkpoint')+1],
+        'checkpoint_sha256':checkpoint_sha,'evaluator_sha256':evaluator_sha,
+        'seed':int(number('--seed')),'envs_per_command':int(number('--envs-per-command')),
+        'randomization_level':int(number('--randomization-level')),
+        'seconds':number('--seconds'),'warmup':number('--warmup'),
+        'geometry_trace':'--geometry-trace' in argv,
+        'switch_at':number('--switch-at'),
+        'transition_ramp_seconds':number('--transition-ramp-seconds'),
+        'yaw_delay_seconds':number('--yaw-delay-seconds'),
+        'height_delay_seconds':number('--height-delay-seconds'),
+        'lean_reference_max_deg':number('--lean-reference-max-deg'),
+        'yaw_exit_at':number('--yaw-exit-at'),
+        'yaw_exit_ramp_seconds':number('--yaw-exit-ramp-seconds'),
+        'yaw_exit_factor':number('--yaw-exit-factor',
+            0. if '--yaw-exit-at' in argv else None),
+        'height_return_at_exit':'--height-return-at-exit' in argv
+            if '--initial-commands' in argv else None}
+    for key,value in expected.items():
+        observed=data.get(key)
+        if (abs(observed-value)>1e-5 if isinstance(value,float) and observed is not None
+                else observed!=value):
+            raise ValueError('Existing review identity differs at {}: {}'.format(key,path))
+    schema = ('matched_policy_transition_v1' if '--switch-at' in argv
+              else 'matched_policy_grid_v1')
+    if (data.get('schema')!=schema or
+            len(data.get('results',[]))!=len(commands) or
+            [row.get('command') for row in data['results']]!=[list(cmd) for cmd in commands] or
+            any(not row.get('metrics') or not row.get('per_env_metrics')
+                for row in data['results']) or
+            (expected['geometry_trace'] and not data.get('response_trace')) or
+            ('--yaw-exit-at' in argv and not data.get('response_trace'))):
+        raise ValueError('Existing review is incomplete: {}'.format(path))
+    if '--initial-commands' in argv:
+        initial = [[value, 0., .4] for value in values('--initial-commands',
+            '--initial-height-commands')]
+        if data.get('initial_commands') != initial:
+            raise ValueError('Existing review initial commands differ: {}'.format(path))
+    return data
+
+
 def main(root):
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--job',type=Path,required=True)
@@ -83,6 +139,8 @@ def main(root):
     parser.add_argument('--model-label',required=True)
     parser.add_argument('--seeds',type=int,nargs='+',default=[19])
     parser.add_argument('--envs-per-command',type=int,default=8)
+    parser.add_argument('--resume',action='store_true',
+                        help='Reuse only complete outputs with matching checkpoint and protocol identity')
     args = parser.parse_args()
     if (not args.review_name.replace('_','').isalnum() or
             not args.model_label.replace('_','').isalnum() or
@@ -93,6 +151,8 @@ def main(root):
     checkpoint = args.checkpoint.resolve(strict=True)
     spec = validate_spec(json.loads(args.spec.read_text()))
     source_sha = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+    evaluator_sha = hashlib.sha256((Path(__file__).resolve().parents[1]/'scripts/'
+        'evaluate_policy_comparison.py').read_bytes()).hexdigest()
     review = job / 'phase_reviews' / args.review_name
     review.mkdir(parents=True, exist_ok=True)
     holdout = json.loads((job/'holdout_commands.json').read_text())['pairs']
@@ -125,20 +185,32 @@ def main(root):
                      if group in ('height_skill','height_entry_exit')
                      else target_heights(pairs,turn_spec))
             out = folder / (group+'.json')
-            if out.exists():
+            if out.exists() and not args.resume:
                 raise FileExistsError(out)
             argv = command(root,checkpoint,out,speeds,yaws,heights,seed,
                 args.envs_per_command,spec=turn_spec,exit_at=exit_at,
                 reverse=group=='slow_reverse')
             commands.append(argv)
-            with (folder/(group+'.log')).open('x') as log:
-                subprocess.run(argv,cwd=Path(root)/'plane',check=True,
-                               stdout=log,stderr=subprocess.STDOUT)
-            data=json.loads(out.read_text())
+            if out.exists():
+                data = reusable_result(out,argv,source_sha,evaluator_sha)
+            else:
+                with (folder/(group+'.log')).open('x') as log:
+                    subprocess.run(argv,cwd=Path(root)/'plane',check=True,
+                                   stdout=log,stderr=subprocess.STDOUT)
+                data=reusable_result(out,argv,source_sha,evaluator_sha)
             if data['checkpoint_sha256']!=source_sha:
                 raise ValueError('Review checkpoint hash changed')
-    (review/(args.model_label+'_commands.json')).write_text(json.dumps({
+    manifest=review/(args.model_label+'_commands.json')
+    content={
         'checkpoint':str(checkpoint),'checkpoint_sha256':source_sha,
-        'spec':str(args.spec.resolve()),'commands':commands},indent=2)+'\n')
+        'spec':str(args.spec.resolve()),'commands':commands,
+        'expected_files':[argv[argv.index('--out')+1] for argv in commands]}
+    if manifest.exists() and json.loads(manifest.read_text()) != content:
+        legacy=json.loads(manifest.read_text())
+        if not args.resume or any(legacy.get(key)!=content[key] for key in
+                                  ('checkpoint','checkpoint_sha256','spec','commands')):
+            raise ValueError('Existing review manifest differs')
+    else:
+        manifest.write_text(json.dumps(content,indent=2)+'\n')
     print(json.dumps({'review':str(review),'model':args.model_label,
                       'seeds':args.seeds,'groups':list(configurations)}))

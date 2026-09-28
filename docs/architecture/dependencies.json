@@ -20,6 +20,7 @@
     "tools.continue_height_course": "tools/continue_height_course.py",
     "tools.continue_stand_validated": "tools/continue_stand_validated.py",
     "tools.export_model_registry": "tools/export_model_registry.py",
+    "tools.generate_turn_readiness": "tools/generate_turn_readiness.py",
     "tools.monitor_turn_lean_long": "tools/monitor_turn_lean_long.py",
     "tools.probe_closed_initialization": "tools/probe_closed_initialization.py",
     "tools.probe_tree_ramp": "tools/probe_tree_ramp.py",
@@ -42,6 +43,7 @@
     "tools.screen_height_checkpoints": "tools/screen_height_checkpoints.py",
     "tools.screen_turn_lean_candidates": "tools/screen_turn_lean_candidates.py",
     "tools.stand_long_guard": "tools/stand_long_guard.py",
+    "tools.submit_turn_training": "tools/submit_turn_training.py",
     "tools.summarize_command_diagnostics": "tools/summarize_command_diagnostics.py",
     "tools.summarize_command_sequence": "tools/summarize_command_sequence.py",
     "tools.summarize_policy_comparison": "tools/summarize_policy_comparison.py",
@@ -124,13 +126,16 @@
     "wheel_legged_gym.app.run_stop_ramp_diagnostic": "plane/wheel_legged_gym/app/run_stop_ramp_diagnostic.py",
     "wheel_legged_gym.app.screen_height_checkpoints": "plane/wheel_legged_gym/app/screen_height_checkpoints.py",
     "wheel_legged_gym.app.stand_long_guard": "plane/wheel_legged_gym/app/stand_long_guard.py",
+    "wheel_legged_gym.app.submit_turn_training": "plane/wheel_legged_gym/app/submit_turn_training.py",
     "wheel_legged_gym.app.summarize_policy_comparison": "plane/wheel_legged_gym/app/summarize_policy_comparison.py",
     "wheel_legged_gym.app.task_registry": "plane/wheel_legged_gym/app/task_registry.py",
     "wheel_legged_gym.app.torch_runtime": "plane/wheel_legged_gym/app/torch_runtime.py",
     "wheel_legged_gym.app.train_stand_long": "plane/wheel_legged_gym/app/train_stand_long.py",
+    "wheel_legged_gym.app.training_budget": "plane/wheel_legged_gym/app/training_budget.py",
     "wheel_legged_gym.app.training_summary": "plane/wheel_legged_gym/app/training_summary.py",
     "wheel_legged_gym.app.turn_lean_monitor": "plane/wheel_legged_gym/app/turn_lean_monitor.py",
     "wheel_legged_gym.app.turn_lean_review": "plane/wheel_legged_gym/app/turn_lean_review.py",
+    "wheel_legged_gym.app.turn_readiness": "plane/wheel_legged_gym/app/turn_readiness.py",
     "wheel_legged_gym.app.validate_adaptation_candidates": "plane/wheel_legged_gym/app/validate_adaptation_candidates.py",
     "wheel_legged_gym.app.validate_basic_dynamics": "plane/wheel_legged_gym/app/validate_basic_dynamics.py",
     "wheel_legged_gym.app.validate_closed_ramp": "plane/wheel_legged_gym/app/validate_closed_ramp.py",
@@ -178,6 +183,7 @@
     "wheel_legged_gym.envs.base.legged_robot": "plane/wheel_legged_gym/envs/base/legged_robot.py",
     "wheel_legged_gym.evaluation": "plane/wheel_legged_gym/evaluation/__init__.py",
     "wheel_legged_gym.evaluation.closed_precheck": "plane/wheel_legged_gym/evaluation/closed_precheck.py",
+    "wheel_legged_gym.evaluation.cornering_task": "plane/wheel_legged_gym/evaluation/cornering_task.py",
     "wheel_legged_gym.evaluation.gates": "plane/wheel_legged_gym/evaluation/gates.py",
     "wheel_legged_gym.evaluation.height_acceptance": "plane/wheel_legged_gym/evaluation/height_acceptance.py",
     "wheel_legged_gym.evaluation.low_speed_relay": "plane/wheel_legged_gym/evaluation/low_speed_relay.py",
@@ -738,6 +744,24 @@
       "kind": "import"
     },
     {
+      "source": "tools.generate_turn_readiness",
+      "target": "wheel_legged_gym",
+      "line": 8,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.generate_turn_readiness",
+      "target": "wheel_legged_gym.app",
+      "line": 8,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.generate_turn_readiness",
+      "target": "wheel_legged_gym.app.turn_readiness",
+      "line": 8,
+      "kind": "import"
+    },
+    {
       "source": "tools.monitor_turn_lean_long",
       "target": "wheel_legged_gym",
       "line": 8,
@@ -1128,6 +1152,24 @@
       "kind": "import"
     },
     {
+      "source": "tools.submit_turn_training",
+      "target": "wheel_legged_gym",
+      "line": 5,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.submit_turn_training",
+      "target": "wheel_legged_gym.app",
+      "line": 5,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.submit_turn_training",
+      "target": "wheel_legged_gym.app.submit_turn_training",
+      "line": 5,
+      "kind": "import"
+    },
+    {
       "source": "tools.summarize_command_sequence",
       "target": "wheel_legged_gym",
       "line": 7,
@@ -1202,19 +1244,37 @@
     {
       "source": "tools.summarize_turn_envelope",
       "target": "wheel_legged_gym",
-      "line": 7,
+      "line": 9,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.summarize_turn_envelope",
+      "target": "wheel_legged_gym",
+      "line": 10,
       "kind": "package_init"
     },
     {
       "source": "tools.summarize_turn_envelope",
       "target": "wheel_legged_gym.evaluation",
-      "line": 7,
+      "line": 9,
       "kind": "package_init"
     },
     {
       "source": "tools.summarize_turn_envelope",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 10,
+      "kind": "package_init"
+    },
+    {
+      "source": "tools.summarize_turn_envelope",
+      "target": "wheel_legged_gym.evaluation.cornering_task",
+      "line": 10,
+      "kind": "import"
+    },
+    {
+      "source": "tools.summarize_turn_envelope",
       "target": "wheel_legged_gym.evaluation.gates",
-      "line": 7,
+      "line": 9,
       "kind": "import"
     },
     {
@@ -2484,6 +2544,42 @@
       "kind": "import"
     },
     {
+      "source": "wheel_legged_gym.app.submit_turn_training",
+      "target": "wheel_legged_gym",
+      "line": 13,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.submit_turn_training",
+      "target": "wheel_legged_gym",
+      "line": 14,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.submit_turn_training",
+      "target": "wheel_legged_gym.app",
+      "line": 13,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.submit_turn_training",
+      "target": "wheel_legged_gym.app.training_budget",
+      "line": 13,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.submit_turn_training",
+      "target": "wheel_legged_gym.workflows",
+      "line": 14,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.submit_turn_training",
+      "target": "wheel_legged_gym.workflows.completion",
+      "line": 14,
+      "kind": "import"
+    },
+    {
       "source": "wheel_legged_gym.app.summarize_policy_comparison",
       "target": "wheel_legged_gym",
       "line": 9,
@@ -2780,12 +2876,6 @@
     {
       "source": "wheel_legged_gym.app.turn_lean_monitor",
       "target": "wheel_legged_gym",
-      "line": 14,
-      "kind": "package_init"
-    },
-    {
-      "source": "wheel_legged_gym.app.turn_lean_monitor",
-      "target": "wheel_legged_gym",
       "line": 15,
       "kind": "package_init"
     },
@@ -2809,8 +2899,8 @@
     },
     {
       "source": "wheel_legged_gym.app.turn_lean_monitor",
-      "target": "wheel_legged_gym.adapters",
-      "line": 14,
+      "target": "wheel_legged_gym",
+      "line": 19,
       "kind": "package_init"
     },
     {
@@ -2821,62 +2911,68 @@
     },
     {
       "source": "wheel_legged_gym.app.turn_lean_monitor",
-      "target": "wheel_legged_gym.adapters.artifacts",
-      "line": 14,
+      "target": "wheel_legged_gym.adapters",
+      "line": 16,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.app.turn_lean_monitor",
       "target": "wheel_legged_gym.adapters.artifacts",
       "line": 15,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.app.turn_lean_monitor",
+      "target": "wheel_legged_gym.adapters.artifacts",
+      "line": 16,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.app.turn_lean_monitor",
       "target": "wheel_legged_gym.adapters.artifacts.job_files",
-      "line": 14,
-      "kind": "import"
-    },
-    {
-      "source": "wheel_legged_gym.app.turn_lean_monitor",
-      "target": "wheel_legged_gym.adapters.artifacts.tensorboard_scalars",
       "line": 15,
       "kind": "import"
     },
     {
       "source": "wheel_legged_gym.app.turn_lean_monitor",
-      "target": "wheel_legged_gym.app",
+      "target": "wheel_legged_gym.adapters.artifacts.tensorboard_scalars",
       "line": 16,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.app.turn_lean_monitor",
+      "target": "wheel_legged_gym.app",
+      "line": 17,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.app.turn_lean_monitor",
       "target": "wheel_legged_gym.app.completion",
-      "line": 16,
+      "line": 17,
       "kind": "import"
     },
     {
       "source": "wheel_legged_gym.app.turn_lean_monitor",
       "target": "wheel_legged_gym.evaluation",
-      "line": 17,
+      "line": 18,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.app.turn_lean_monitor",
       "target": "wheel_legged_gym.evaluation",
-      "line": 18,
+      "line": 19,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.app.turn_lean_monitor",
       "target": "wheel_legged_gym.evaluation.gates",
-      "line": 17,
+      "line": 18,
       "kind": "import"
     },
     {
       "source": "wheel_legged_gym.app.turn_lean_monitor",
       "target": "wheel_legged_gym.evaluation.training_summary",
-      "line": 18,
+      "line": 19,
       "kind": "import"
     },
     {
@@ -3038,13 +3134,19 @@
     {
       "source": "wheel_legged_gym.domain.commands.resampling",
       "target": "wheel_legged_gym",
-      "line": 64,
+      "line": 89,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.domain.commands.resampling",
       "target": "wheel_legged_gym",
-      "line": 72,
+      "line": 103,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.domain.commands.resampling",
+      "target": "wheel_legged_gym",
+      "line": 111,
       "kind": "package_init"
     },
     {
@@ -3068,13 +3170,19 @@
     {
       "source": "wheel_legged_gym.domain.commands.resampling",
       "target": "wheel_legged_gym.domain",
-      "line": 64,
+      "line": 89,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.domain.commands.resampling",
       "target": "wheel_legged_gym.domain",
-      "line": 72,
+      "line": 103,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.domain.commands.resampling",
+      "target": "wheel_legged_gym.domain",
+      "line": 111,
       "kind": "package_init"
     },
     {
@@ -3098,13 +3206,19 @@
     {
       "source": "wheel_legged_gym.domain.commands.resampling",
       "target": "wheel_legged_gym.domain.commands",
-      "line": 64,
+      "line": 89,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.domain.commands.resampling",
       "target": "wheel_legged_gym.domain.commands",
-      "line": 72,
+      "line": 103,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.domain.commands.resampling",
+      "target": "wheel_legged_gym.domain.commands",
+      "line": 111,
       "kind": "package_init"
     },
     {
@@ -3128,13 +3242,19 @@
     {
       "source": "wheel_legged_gym.domain.commands.resampling",
       "target": "wheel_legged_gym.domain.commands.command_sampling",
-      "line": 64,
+      "line": 89,
       "kind": "import"
     },
     {
       "source": "wheel_legged_gym.domain.commands.resampling",
       "target": "wheel_legged_gym.domain.commands.command_sampling",
-      "line": 72,
+      "line": 103,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.domain.commands.resampling",
+      "target": "wheel_legged_gym.domain.commands.command_sampling",
+      "line": 111,
       "kind": "import"
     },
     {
@@ -3236,7 +3356,7 @@
     {
       "source": "wheel_legged_gym.domain.rewards.equations",
       "target": "wheel_legged_gym",
-      "line": 199,
+      "line": 218,
       "kind": "package_init"
     },
     {
@@ -3260,7 +3380,7 @@
     {
       "source": "wheel_legged_gym.domain.rewards.equations",
       "target": "wheel_legged_gym.domain",
-      "line": 199,
+      "line": 218,
       "kind": "package_init"
     },
     {
@@ -3290,7 +3410,7 @@
     {
       "source": "wheel_legged_gym.domain.rewards.equations",
       "target": "wheel_legged_gym.domain.rewards",
-      "line": 199,
+      "line": 218,
       "kind": "package_init"
     },
     {
@@ -3308,7 +3428,7 @@
     {
       "source": "wheel_legged_gym.domain.rewards.equations",
       "target": "wheel_legged_gym.domain.rewards.turn_lean",
-      "line": 199,
+      "line": 218,
       "kind": "import"
     },
     {
@@ -3512,25 +3632,25 @@
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym",
-      "line": 605,
+      "line": 616,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym",
-      "line": 647,
+      "line": 658,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym",
-      "line": 655,
+      "line": 666,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym",
-      "line": 670,
+      "line": 681,
       "kind": "package_init"
     },
     {
@@ -3866,25 +3986,25 @@
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain",
-      "line": 605,
+      "line": 616,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain",
-      "line": 647,
+      "line": 658,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain",
-      "line": 655,
+      "line": 666,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain",
-      "line": 670,
+      "line": 681,
       "kind": "package_init"
     },
     {
@@ -3932,25 +4052,25 @@
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain.commands",
-      "line": 605,
+      "line": 616,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain.commands",
-      "line": 647,
+      "line": 658,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain.commands",
-      "line": 655,
+      "line": 666,
       "kind": "package_init"
     },
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain.commands",
-      "line": 670,
+      "line": 681,
       "kind": "package_init"
     },
     {
@@ -3974,13 +4094,13 @@
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain.commands.height_commands",
-      "line": 605,
+      "line": 616,
       "kind": "import"
     },
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain.commands.height_skill",
-      "line": 670,
+      "line": 681,
       "kind": "import"
     },
     {
@@ -4004,7 +4124,7 @@
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain.commands.start_stop_commands",
-      "line": 647,
+      "line": 658,
       "kind": "import"
     },
     {
@@ -4016,7 +4136,7 @@
     {
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain.commands.turn_envelope",
-      "line": 655,
+      "line": 666,
       "kind": "import"
     },
     {
@@ -4143,6 +4263,24 @@
       "source": "wheel_legged_gym.envs.base.legged_robot",
       "target": "wheel_legged_gym.domain.termination",
       "line": 88,
+      "kind": "import"
+    },
+    {
+      "source": "wheel_legged_gym.evaluation.cornering_task",
+      "target": "wheel_legged_gym",
+      "line": 2,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.evaluation.cornering_task",
+      "target": "wheel_legged_gym.evaluation",
+      "line": 2,
+      "kind": "package_init"
+    },
+    {
+      "source": "wheel_legged_gym.evaluation.cornering_task",
+      "target": "wheel_legged_gym.evaluation.gates",
+      "line": 2,
       "kind": "import"
     },
     {

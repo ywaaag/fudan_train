@@ -10,6 +10,7 @@ import signal
 import subprocess
 import sys
 import time
+import contextlib
 
 from wheel_legged_gym.adapters.artifacts.job_files import JobFiles
 from wheel_legged_gym.adapters.artifacts.tensorboard_scalars import read_scalars
@@ -35,6 +36,36 @@ def height_skill_stagnant(probes):
 
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def write_terminal_ledger(job, state):
+    """Atomically append this run's actual checkpoint accounting."""
+    ledger = Path(job).parent / 'budget_ledger.json'
+    if not ledger.is_file():
+        return
+    lock = ledger.with_suffix('.lock').open('a')
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        data = json.loads(ledger.read_text())
+        runs = data.setdefault('runs', [])
+        run_name = Path(state.get('run', 'unknown')).name
+        entry = {'run_name': run_name,
+            'source_iteration': state.get('source_iteration', 'unknown'),
+            'target_new_iterations': state.get('new_iteration_limit', 'unknown'),
+            'actual_update_count': state.get('actual_update_count', 'unknown'),
+            'last_tensorboard_step': state.get('actual_tensorboard_iteration', 'unknown'),
+            'last_checkpoint_iteration': state.get('checkpoint_iteration', 'unknown'),
+            'checkpoint_sha256': state.get('last_checkpoint_sha256', 'unknown'),
+            'trainer_returncode': state.get('trainer_returncode', 'unknown'),
+            'stop_reason': state.get('stop_reason', 'unknown'),
+            'finished_at': state.get('stop_triggered_at', time.time())}
+        runs[:] = [r for r in runs if r.get('run_name') != run_name]
+        runs.append(entry)
+        temporary = ledger.with_suffix('.tmp')
+        temporary.write_text(json.dumps(data, indent=2) + '\n')
+        temporary.replace(ledger)
+    finally:
+        lock.close()
 
 
 def screen(data, stage=None):
@@ -163,11 +194,15 @@ def probe_command(checkpoint, out, stage):
                 stage.get('cohort_plan') is None else [])
 
 
-def alive(pid):
+def alive(pid, start_ticks=None):
     try:
         os.kill(pid, 0)
+        if start_ticks is not None:
+            observed = int(Path('/proc/{}/stat'.format(pid)).read_text()
+                .rsplit(')', 1)[1].split()[19])
+            return observed == start_ticks
         return True
-    except ProcessLookupError:
+    except (ProcessLookupError, FileNotFoundError):
         return False
 
 
@@ -177,6 +212,8 @@ def main(root):
     parser.add_argument('--run', type=Path, required=True)
     parser.add_argument('--spec', type=Path, required=True)
     parser.add_argument('--trainer-pid', type=int, required=True)
+    parser.add_argument('--trainer-start-ticks', type=int)
+    parser.add_argument('--external-finalizer', action='store_true')
     parser.add_argument('--new-iterations', type=int, required=True)
     parser.add_argument('--poll-seconds', type=int, default=20)
     args = parser.parse_args()
@@ -194,6 +231,7 @@ def main(root):
     summaries.mkdir(exist_ok=True)
     state = {'status':'running', 'supervisor_pid':os.getpid(),
              'child_pid':args.trainer_pid, 'source':spec['source_checkpoint'],
+             'source_iteration':source, 'target_iteration':source + args.new_iterations,
              'stage':spec['stage']['phase'], 'run':str(run),
              'new_iteration_limit':args.new_iterations,
              'milestones':[], 'accepted':None, 'stop_reason':None}
@@ -225,13 +263,13 @@ def main(root):
             checkpoint = run / ('model_{}.pt'.format(iteration))
             while not checkpoint.is_file():
                 if (job / 'STOP').exists():
-                    state.update(stop_reason='unknown', stop_actor='external_STOP_file',
+                    state.update(status='stopped', stop_reason='user_stop', stop_actor='external_STOP_file',
                                  stop_triggered_at=time.time(),
                                  stop_checkpoint_iteration=state.get('latest_iteration'),
                                  stop_evidence=str(job / 'STOP'))
                     os.kill(args.trainer_pid, signal.SIGINT)
                     raise InterruptedError('STOP requested')
-                if not alive(args.trainer_pid):
+                if not alive(args.trainer_pid, args.trainer_start_ticks):
                     raise RuntimeError('Trainer exited before checkpoint {}'.format(iteration))
                 time.sleep(args.poll_seconds)
             # torch.save writes directly to the final path; wait for stable bytes.
@@ -324,6 +362,11 @@ def main(root):
                 'checkpoint_sha256':checkpoint_sha,
                 'summary':str(summary_path), 'probe':str(probe_summary_path)})
             state['latest_iteration'] = iteration
+            state['checkpoint_iteration'] = iteration
+            state['actual_tensorboard_iteration'] = scalar['metrics'].get(
+                'Train/mean_reward', {}).get('step', 'unknown')
+            state['actual_update_count'] = iteration - source
+            state['last_checkpoint_sha256'] = checkpoint_sha
             files.save_status(state)
             if collapsed >= 3:
                 state.update(stop_reason='retention_regression', stop_actor='monitor',
@@ -342,10 +385,22 @@ def main(root):
                                  stop_evidence=str(probe_summary_path))
                     os.kill(args.trainer_pid, signal.SIGINT)
                     raise NoHeightProgress('Three milestones without a 0.38m height pass or 3mm MAE improvement')
-        while alive(args.trainer_pid):
+        while alive(args.trainer_pid, args.trainer_start_ticks):
             time.sleep(args.poll_seconds)
-        state.update(status='finished_pending_review', child_pid=None,
-                     stop_reason='budget_exhausted', stop_actor='monitor',
+        exit_file = job / 'trainer_exit.json'
+        if args.external_finalizer:
+            for _ in range(100):
+                if exit_file.is_file():
+                    break
+                time.sleep(.1)
+        exit_data = json.loads(exit_file.read_text()) if exit_file.is_file() else {}
+        returncode = exit_data.get('returncode', 'unknown')
+        normal = ((returncode == 0 and state.get('actual_update_count') == args.new_iterations)
+                  if args.external_finalizer else True)
+        state.update(status='finished_pending_review' if normal else 'error', child_pid=None,
+                     stop_reason='budget_exhausted' if normal else
+                         'exit_status_unknown' if returncode == 'unknown' else 'runtime_error',
+                     stop_actor='monitor', trainer_returncode=returncode,
                      stop_triggered_at=time.time(),
                      stop_checkpoint_iteration=state.get('latest_iteration'),
                      stop_evidence=str(job / 'status.json'))
@@ -353,10 +408,10 @@ def main(root):
         state.update(status='stopped', error=str(exc), child_pid=None)
     except NoHeightProgress as exc:
         for _ in range(30):
-            if not alive(args.trainer_pid):
+            if not alive(args.trainer_pid, args.trainer_start_ticks):
                 break
             time.sleep(1)
-        if alive(args.trainer_pid):
+        if alive(args.trainer_pid, args.trainer_start_ticks):
             state.update(status='error', error=str(exc)+'; trainer did not exit after SIGINT',
                          child_pid=args.trainer_pid)
         else:
@@ -368,13 +423,15 @@ def main(root):
                          stop_triggered_at=time.time(),
                          stop_checkpoint_iteration=state.get('latest_iteration'),
                          stop_evidence=str(job / 'status.json'))
-        if alive(args.trainer_pid):
+        if alive(args.trainer_pid, args.trainer_start_ticks):
             os.kill(args.trainer_pid, signal.SIGINT)
         state.update(status='error', error=str(exc), child_pid=None)
     files.save_status(state)
-    write_report(job, state)
-    session_id = os.environ.get('HAPI_SESSION_ID')
-    if session_id:
-        wake_session(job, session_id)
+    if not args.external_finalizer:
+        write_terminal_ledger(job, state)
+        write_report(job, state)
+        session_id = os.environ.get('HAPI_SESSION_ID')
+        if session_id:
+            wake_session(job, session_id)
     print(json.dumps({'status':state['status'],'latest_iteration':state.get('latest_iteration'),
                       'error':state.get('error')}))

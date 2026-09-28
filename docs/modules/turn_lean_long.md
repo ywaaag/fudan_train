@@ -1,5 +1,13 @@
 # TURN_LEAN_LONG：Codex 最小入口
 
+2026-09-28 的 Stage B 新任务重评见
+`plane/outputs/cornering_protocol_automation_fix_20260928_100848/protocol.md`。
+`cornering_task_v2` 只改变既有 Isaac 结果的任务解释：普通转弯允许接近水平，
+主动内倾点要求独立几何朝内；3 度 roll 参考误差和相对参考的幅度超额只作诊断，
+0.25 rad 绝对评估边界及原运动/接触/滑移/恢复数值保持。旧 37/48 和旧 JSON 不改写。
+运行入口为 `tools/summarize_turn_envelope.py --cornering-task-v2-out NEW.json --job REVIEW`，
+只读原始评估，输出带新协议身份的旁路 JSON。
+
 本轮能力探索与 2026-09-25 的固定高度 `TURN_ENVELOPE` 是两个实验。
 先读本页，再读
 `plane/outputs/turn_lean_long_20260925_175224/README.md`、

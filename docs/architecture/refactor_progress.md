@@ -1459,3 +1459,12 @@ New long-review sidecars carry checkpoint/evaluator/protocol/gate identities
 and requested/completed files. Final full pytest: 716 passed; one 64-env iteration
 smoke verified the runtime manifest. Evidence lives in
 `plane/outputs/cornering_bug_fix_20260927_101156/`; no formal training ran.
+## 2026-09-28 自主内倾任务协议与后台终态修复
+
+新增纯 evaluation `cornering_task_v2`，仅重评现有 aggressive v2 三 seed JSON；
+旧 gate/metric 身份和训练奖励不变。38250 的训练转弯从旧 37/48 按修订任务定义
+重评为 39/48，40250 为 38/48；这不是本轮训练收益。本轮 PPO 更新 0。
+同一任务修正 detached submit 的进程所有权、PID 启动身份、启动握手、退出码 marker、
+显式 ledger 预留/结算、持久 event ID、非空终态报告和 review `--resume` 严格复用。
+Stage A/B 旧 ledger 以独立授权额度和现有 checkpoint/TensorBoard 证据做 reconciliation；
+历史通知和 reviewed 文件保留原样，冲突 ID 仅有旁路映射。

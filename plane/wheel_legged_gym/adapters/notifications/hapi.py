@@ -3,7 +3,13 @@ import hashlib,fcntl,json,os,shutil,subprocess,time
 from pathlib import Path
 
 def event_id(job,session_id):
-    return hashlib.sha256(('training-completion-v1:'+str(Path(job).resolve())+':'+session_id).encode()).hexdigest()[:24]
+    job = Path(job).resolve()
+    for path in (job.parent/'submit_snapshot.json', job/'terminal_summary.json'):
+        if path.is_file():
+            value = json.loads(path.read_text()).get('event_id')
+            if value:
+                return value
+    return hashlib.sha256(('training-completion-v1:'+str(job)+':'+session_id).encode()).hexdigest()[:24]
 
 
 def acknowledge_review(job,session_id):
@@ -34,6 +40,11 @@ def _wake_session_locked(job,session_id):
     if marker.exists():return
     report=job/'completion_report.md'
     if not report.exists():raise RuntimeError('Completion report missing')
+    if (job.parent/'submit_snapshot.json').is_file():
+        ready=job/'report_ready.json'
+        if (not ready.is_file() or
+                json.loads(ready.read_text()).get('event_id')!=identity):
+            raise RuntimeError('Finalization has not marked the report ready')
     message=(f'训练结束事件 ID：{identity}\n'
         f'请先检查 {ack}：若已记录此事件 reviewed，本次不重复复盘。\n'
         f'训练及验收任务已进入终态：{job}\n'
@@ -61,4 +72,3 @@ def notify(message):
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except (OSError, subprocess.TimeoutExpired):
             pass
-

@@ -15,9 +15,12 @@ flowchart LR
 HAPI适配器负责发送锁、event ID、复盘确认、超时及本机notify-send；不知道PPO或模型门槛。
 未指定HAPI session不能推测另一个聊天作为收件人。
 
-结果文件协议保持不变：`completion_report.md`、`completion_context.json`、
+新 detached turn job 还持久化 `submit_snapshot.json` 的 attempt/event ID、
+`trainer_exit.json` 和 `report_ready.json`；report ready 之前 hook 不通知。
+结果文件协议保持：`completion_report.md`、`completion_context.json`、
 `completion_hook.json`、`hapi_notification.json`、`completion_review.json`。
-发送失败/超时不得盲目重发；已复盘事件不再次分析。旧CLI参数与独立Codex复盘模式保留。
+发送失败/超时不得盲目重发；已复盘事件不再次分析。旧 job 的事件 ID 不回写，
+新 job 的 report/notification/review 引用同一持久 ID。新 turn job 不启动独立 Codex 复盘。
 本重构测试不实际发送消息，测试通过注入fake通知或替换transport的subprocess调用验证。
 
 验证：`PYTHONPATH=plane python -m pytest plane/tests/test_completion_report.py -q`。

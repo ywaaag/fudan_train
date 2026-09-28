@@ -23,13 +23,15 @@ export CUDA_VISIBLE_DEVICES=0
 | 汇总固定高度/长训转弯 | `tools/summarize_turn_envelope.py --help`；长训加 `--long` | `--help` 安全；实际汇总读取原始 JSON 并写新 summary/heatmap，不启动仿真 | `protocol.md`、原始 JSON、失败轨迹 |
 | 复核主动内倾方向 | `tools/summarize_turn_envelope.py --geometry-json RAW.json --geometry-out NEW.json`；完整评审加 `--long --inward-protocol inward_stage1_v1` | 只读已有 Isaac trace，写新 JSON/坐标图；重复里程碑可加 `--geometry-no-plot`；不训练 | 原始评估的 `geometry_trace`、quaternion、接触和逐环境拒绝原因 |
 | 生成状态轨迹视频 | `tools/render_turn_trace.py --help` | `--help` 安全；实际读取 JSON 写 MP4，不启动仿真 | 输入 JSON 是否完整、ffmpeg 错误 |
-| 运行候选评估 | `tools/review_turn_lean_long.py --help` | `--help` 安全；实际启动 Isaac 子进程并写评估 JSON；变高度转弯按 spec 的 `height_schedule` 逐点下发，新 `cohort_plan` 另测独立高度与回高 | checkpoint SHA、评估 log、原始 JSON |
+| 运行候选评估 | `tools/review_turn_lean_long.py --help`；中断后显式 `--resume` | `--help` 安全；实际启动 Isaac 子进程并写评估 JSON；`--resume` 只复用 checkpoint/evaluator/seed/env/命令/时序完整一致的结果，物理失败也复用 | checkpoint SHA、评估 log、原始 JSON |
+| 自主内倾任务重评 | `env PYTHONPATH=/home/kellen/fudan_train/plane /home/kellen/anaconda3/envs/fudan_leg/bin/python tools/summarize_turn_envelope.py --job REVIEW_DIR --cornering-task-v2-out NEW.json` | 只读已有完整 aggressive v2 原始评估，写新旁路 JSON；不仿真、不改旧 gate 或旧通过数 | `protocol.md`、旧 `long_evaluation_summary.json`、缺失的 geometry trace |
 | 降高/内倾候选筛选 | `python3 tools/screen_turn_lean_candidates.py REVIEW_DIR --out NEW_RESULT.json`；`--help` 安全 | 读取 `long_evaluation_summary.json` 与少量原始 JSON 元数据；只写全新结果，不启动仿真、不覆盖历史；单 seed probe 不能输入为完整 review | 协议/评估器/gate/hash、缺测、固定高度、保留回归和逐组失败原因 |
 | 导出 ONNX | `cd plane && python export_onnx/export_onnx.py --help` | `--help` 安全；实际加载 checkpoint 并写 ONNX | checkpoint 路径/SHA、导出 stderr |
 | 验证 ONNX | `cd plane && python export_onnx/verify_onnx.py --help` | `--help` 安全；实际加载 ONNX/运行 CPU 推理，只写 stdout | checkpoint、ONNX、batch 和误差 |
 | 完成报告 | `tools/training_completion_hook.py --help` | `--help` 安全；`--report-only` 写本地报告；普通模式可启动独立 Codex 复盘 | job 的 `completion_hook.json`、`completion_review.json` |
 | 转弯阶段 readiness 旁路报告 | `tools/generate_turn_readiness.py --job JOB --out-dir NEW_DIR` | `--help` 安全；实际命令只读既有摘要并写全新目录，不启动训练、不通知；业务规则归 `app.turn_readiness` | `status.json`、probe、protocol、缺失的 seed/group |
 | 架构审计 | `python3 tools/check_architecture.py` | 只读 AST；不导入 Isaac；`--write` 才写依赖图 | 输出中的 cycles/layer/missing imports |
+| 后台提交转弯训练 | `env PYTHONPATH=/home/kellen/fudan_train/plane LD_LIBRARY_PATH=/home/kellen/anaconda3/envs/fudan_leg/lib /home/kellen/anaconda3/envs/fudan_leg/bin/python tools/submit_turn_training.py --spec SPEC --run-name NAME --new-iterations N --output-root DIR --hapi-session SESSION --detach` | 正式训练；`OUTPUT_ROOT/budget_ledger.json` 必须预先存在。锁定预留预算，等 trainer/monitor/hook 和 PID 身份握手确认后才返回 `running`；终态才结算并报告 | `submission.json`、`orchestrator.log`、`monitor/finalization_error.json`、账本 `attempts` |
 
 ## 精确命令
 

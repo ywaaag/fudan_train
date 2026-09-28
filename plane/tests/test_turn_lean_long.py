@@ -191,6 +191,8 @@ def test_review_cli_passes_scheduled_heights_to_evaluator(tmp_path,monkeypatch):
         out=Path(argv[argv.index('--out')+1])
         out.write_text(json.dumps({'checkpoint_sha256':hashlib.sha256(checkpoint.read_bytes()).hexdigest()}))
     monkeypatch.setattr(turn_lean_review.subprocess,'run',fake_run)
+    monkeypatch.setattr(turn_lean_review,'reusable_result',lambda path,argv,sha,evaluator_sha:
+        {'checkpoint_sha256':sha})
     monkeypatch.setattr(sys,'argv',['review_turn_lean_long.py','--job',str(job),
         '--checkpoint',str(checkpoint),'--spec',str(spec_path),
         '--review-name','scheduled_height','--model-label','source',

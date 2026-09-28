@@ -7,6 +7,9 @@ from collections import defaultdict
 from pathlib import Path
 
 from wheel_legged_gym.evaluation.gates import gate
+from wheel_legged_gym.evaluation.cornering_task import (
+    PROTOCOL_ID as CORNERING_TASK_ID, turn_verdict as cornering_task_verdict,
+    transition_verdict as cornering_transition_verdict)
 
 
 def turn_checks(row):
@@ -606,6 +609,116 @@ def geometry_plot(path, audit):
     fig.tight_layout(); fig.savefig(path,dpi=150); plt.close(fig)
 
 
+def cornering_task_sidecar(job, out):
+    """Reclassify existing complete reviews without changing historical results."""
+    source = job / 'long_evaluation_summary.json'
+    old = json.loads(source.read_text())
+    if old.get('schema') != 'turn_lean_long_review_v3' or old.get('missing_files'):
+        raise ValueError('Complete v3 review is required')
+    if old.get('protocol_id') != 'aggressive_cornering_v2':
+        raise ValueError('This sidecar only covers the frozen aggressive v2 review')
+    raw_cache = {}
+    geometry_cache = {}
+    def quantiles(values):
+        ordered = sorted(values)
+        if not ordered:
+            return None
+        return {'p10':ordered[int(.10*(len(ordered)-1))],
+            'p50':ordered[int(.50*(len(ordered)-1))],
+            'p90':ordered[int(.90*(len(ordered)-1))],
+            'max':ordered[-1]}
+    def raw(path):
+        if path not in raw_cache:
+            raw_cache[path] = json.loads(Path(path).read_text())
+        return raw_cache[path]
+    rows = []
+    for prior in old['individual_rows']:
+        if prior['group'] not in ('turn_train', 'turn_holdout'):
+            continue
+        data = raw(prior['raw_json'])
+        index = next(i for i, item in enumerate(data['results'])
+            if item['command'] == prior['command'])
+        row = data['results'][index]
+        if prior['raw_json'] not in geometry_cache:
+            geometry_cache[prior['raw_json']] = (geometry_sign_audit(data)['cases']
+                if data.get('geometry_trace') and data.get('response_trace') else None)
+        geometry = (geometry_cache[prior['raw_json']][index]
+            if geometry_cache[prior['raw_json']] is not None else None)
+        verdict = cornering_task_verdict(row, geometry)
+        envs = data['envs_per_command']
+        start = index*envs
+        steady_roll = [abs(frame['roll'][env]) for frame in data.get('response_trace', [])
+            if 8. <= frame['time'] < data['seconds']
+            for env in range(start,start+envs)]
+        rows.append({'group':prior['group'], 'command':prior['command'],
+            'seed':prior['seed'], 'old_passed':prior['verdict']['passed'],
+            'new_passed':verdict['passed'],
+            'old_failed_checks':[key for key, value in prior['verdict'].get('checks', {}).items()
+                                 if value is False],
+            'new_failed_checks':[key for key, value in verdict['checks'].items()
+                                 if value is False],
+            'reference_only_reclassified':not prior['verdict']['passed'] and verdict['passed'],
+            'geometry_status':geometry['status'] if geometry else 'missing',
+            'yaw_mae_command_mean':row['metrics']['yaw_mae'],
+            'yaw_mae_worst_environment':max(row['per_env_metrics']['yaw_mae']),
+            'yaw_mae_worst_environment_index':max(range(len(row['per_env_metrics']['yaw_mae'])),
+                key=lambda i:row['per_env_metrics']['yaw_mae'][i]),
+            'slip_rms_worst_environment':max(row['per_env_metrics']['slip_rms']),
+            'min_left_contact':min(row['per_env_metrics']['left_contact']),
+            'min_right_contact':min(row['per_env_metrics']['right_contact']),
+            'reference_diagnostics':verdict['reference_diagnostics'],
+            'steady_abs_roll_rad_distribution':quantiles(steady_roll),
+            'raw_json':prior['raw_json']})
+    transitions = []
+    for prior in old['transitions']:
+        data = raw(prior['raw_json'])
+        row = next(item for item in data['results'] if item['command'] == prior['command'])
+        verdict = cornering_transition_verdict(prior, row)
+        envs = data['envs_per_command']
+        index = next(i for i, item in enumerate(data['results'])
+            if item['command'] == prior['command'])
+        start = index*envs
+        recovery_roll = [abs(frame['roll'][env])
+            for frame in data.get('response_trace', [])
+            if (16. <= frame['time'] < (18. if prior['protocol']=='entry_exit' else 19.))
+            for env in range(start,start+envs)]
+        transitions.append({'protocol':prior['protocol'], 'command':prior['command'],
+            'seed':prior['seed'], 'old_passed':prior['final_phase_passed'],
+            'new_passed':verdict['passed'], 'new_checks':verdict['checks'],
+            'recovery_abs_roll_rad_distribution':quantiles(recovery_roll),
+            'raw_json':prior['raw_json']})
+    points = []
+    for group, command in sorted({(r['group'], tuple(r['command'])) for r in rows}):
+        members = [r for r in rows if r['group'] == group and tuple(r['command']) == command]
+        points.append({'group':group, 'command':command, 'seeds':sorted(r['seed'] for r in members),
+            'old_passed':all(r['old_passed'] for r in members),
+            'new_passed':all(r['new_passed'] for r in members),
+            'reference_only_reclassified':not all(r['old_passed'] for r in members) and
+                all(r['new_passed'] for r in members),
+            'remaining_failed_checks':sorted({reason for r in members
+                for reason in r['new_failed_checks']}),
+            'worst_environment_yaw_mae':max(r['yaw_mae_worst_environment'] for r in members),
+            'worst_environment_slip_rms':max(r['slip_rms_worst_environment'] for r in members)})
+    manifest = next(job.glob('*_commands.json'))
+    identity = json.loads(manifest.read_text())
+    result = {'schema_version':1, 'protocol_id':CORNERING_TASK_ID,
+        'old_protocol_id':old['protocol_id'], 'source_summary':str(source),
+        'source_summary_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),
+        'checkpoint':identity['checkpoint'], 'checkpoint_sha256':identity['checkpoint_sha256'],
+        'evaluator_sha256':old['evaluation_records'][0]['evaluator_sha256'],
+        'gate_sha256':old['gate_sha256'],
+        'metric_definition_sha256':hashlib.sha256(
+            Path(cornering_task_verdict.__code__.co_filename).read_bytes()).hexdigest(),
+        'rows':rows, 'points':points, 'transitions':transitions,
+        'retention_points':sum(p['status']=='passed' for p in old['points']
+            if p['group']=='retention')}
+    with out.open('x') as target:
+        json.dump(result,target,indent=2)
+        target.write('\n')
+    return {'out':str(out), 'new_turn_train_passed':sum(p['new_passed'] for p in points
+        if p['group']=='turn_train')}
+
+
 def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--job', type=Path)
@@ -621,7 +734,15 @@ def main():
                         help='New JSON summary path; also writes a PNG at the same stem')
     parser.add_argument('--geometry-no-plot', action='store_true',
                         help='For repeated milestone probes, write only the geometry JSON')
+    parser.add_argument('--cornering-task-v2-out', type=Path,
+                        help='Reclassify an existing complete aggressive v2 review to a new sidecar')
     args = parser.parse_args()
+    if args.cornering_task_v2_out is not None:
+        if args.job is None:
+            parser.error('--cornering-task-v2-out requires --job')
+        print(json.dumps(cornering_task_sidecar(args.job.resolve(strict=True),
+            args.cornering_task_v2_out.resolve())))
+        return
     if args.geometry_json is not None:
         if args.geometry_out is None:
             parser.error('--geometry-json requires --geometry-out')

@@ -1,11 +1,11 @@
 # Training completion hook
 
-`train_stand_long.py` starts `training_completion_hook.py` automatically when
+Historical stand workflow: `train_stand_long.py` started `training_completion_hook.py` when
 `codex` is on PATH. The watcher reads only the small `status.json` every 30 s.
-It calls `codex exec` once on `finished_pending_review`,
+It called `codex exec` once on `finished_pending_review`,
 `paused_on_regression`, or `error`. It does not restart training.
 
-This creates an independent Codex review, not a message injected into the
+That historical mode created an independent Codex review, not a message injected into the
 current interactive conversation. Saved CLI authentication is used; the
 review consumes the configured Codex account/API quota. Desktop notification
 is best-effort and requires a working desktop notification service.
@@ -41,3 +41,29 @@ return code 0. The guard failed because leg0 difference was 0.3114 rad,
 above the supervisor threshold 0.30 rad. All checkpoints were retained.
 
 Official interface: https://developers.openai.com/codex/noninteractive
+## Detached training contract
+
+Use `tools/submit_turn_training.py` for an authorized turn run. It requires an
+existing `OUTPUT_ROOT/budget_ledger.json`, reserves the authorized iterations
+under a file lock, then writes `job_spec.json` and `submit_snapshot.json` with
+one attempt/event ID. A detached orchestrator owns trainer, monitor and one
+completion hook. The submit command returns `running` only after bounded
+startup handshake confirms all three processes and records PID start ticks.
+It redirects output to job logs. The submitting Codex must not poll TensorBoard, `summaries/`,
+`probes/`, or checkpoints while the run is active.
+
+Pass `--hapi-session` only when the current session is the intended recipient.
+The orchestrator waits for the trainer exit code, writes `trainer_exit.json`,
+settles the budget by attempt ID, and creates `terminal_summary.json`, a
+nonempty `completion_report.md` and `report_ready.json`. Only then can the
+hook use the persisted event ID and existing lock/wake protocol. The hook
+never starts training or an independent `codex exec`. Without an explicit
+`--hapi-session` on a new job it creates a local report and does not guess
+a recipient. `completion_review.json` remains the independent human review record.
+An unprovable update count retains its reservation as `unknown_consumption`.
+Do not infer budget exhaustion solely from a target checkpoint; require
+trainer return code zero and the actual update count.
+
+`tools/wait_for_completion.py` is an optional human tool, not a worker loop.
+`--once --json --quiet --no-report` reads only small marker/status files; timeout
+means the wait ended and is not itself a training failure.
