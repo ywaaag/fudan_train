@@ -1,3 +1,5 @@
+import copy
+import hashlib
 import json
 import os
 import subprocess
@@ -6,6 +8,89 @@ import time
 from pathlib import Path
 
 import pytest
+
+
+def test_ablation_plan_rejects_non_coefficient_training_differences(tmp_path):
+    from wheel_legged_gym.app.submit_turn_training import validate_ablation_plan
+    source = tmp_path/'model_38250.pt'
+    source.write_bytes(b'dummy source')
+    spec = json.loads((Path(__file__).resolve().parents[1].parent/
+        'plane/outputs/high_load_cornering_stageB_20260928/spec_stage_b.json').read_text())
+    spec['experiment_id'] = 'roll_constraint_ablation_v1'
+    spec['source_checkpoint'] = str(source)
+    spec['source_sha256'] = hashlib.sha256(source.read_bytes()).hexdigest()
+    spec['source_iteration'] = 38250
+    spec['course_plan'] = [{'phase':1,'budget_max':1}, {'phase':2,'budget_max':10000}]
+    spec['stage']['turn_roll_cost_coefficient'] = 1.
+    specs = {}
+    for name,coefficient in (('A',1.),('B',.25)):
+        item = copy.deepcopy(spec)
+        item['stage']['turn_roll_cost_coefficient'] = coefficient
+        path = tmp_path/(name+'.json')
+        path.write_text(json.dumps(item))
+        specs[name] = {'spec':str(path),'run_name':'ablation_'+name,
+                       'new_iterations':5000}
+    holdout = tmp_path/'holdout.json';holdout.write_text('{}')
+    baseline = tmp_path/'baseline.json';baseline.write_text('{}')
+    plan = {'output_root':str(tmp_path),'branches':specs,
+        'holdout_commands':str(holdout),'baseline_sidecar':str(baseline)}
+    assert validate_ablation_plan(plan)['source_sha256']==spec['source_sha256']
+    altered = json.loads((tmp_path/'B.json').read_text())
+    altered['stage']['learning_rate'] = 3e-6
+    (tmp_path/'B.json').write_text(json.dumps(altered))
+    with pytest.raises(ValueError,match='differ beyond'):
+        validate_ablation_plan(plan)
+
+
+def test_ablation_plan_submits_sequential_branches_and_one_terminal(tmp_path, monkeypatch):
+    from wheel_legged_gym.app.submit_turn_training import orchestrate_ablation_plan
+    output = tmp_path/'output';output.mkdir()
+    specs = {}
+    for name in ('A','B'):
+        spec = output/(name+'.json');spec.write_text('{}')
+        specs[name] = {'spec':str(spec),'run_name':'run_'+name,'new_iterations':5000}
+    holdout = output/'holdout.json';holdout.write_text('{}')
+    baseline = output/'baseline.json'
+    result = {'protocol_id':'cornering_task_v2','evaluator_sha256':'evaluator',
+        'gate_sha256':'gate','metric_definition_sha256':'metric',
+        'retention_points':25,'points':[{'group':'turn_train','command':[2.,.5,.4],
+                                        'new_passed':True}]}
+    baseline.write_text(json.dumps(result))
+    plan = {'output_root':str(output),'branches':specs,
+        'holdout_commands':str(holdout),'baseline_sidecar':str(baseline)}
+    plan_path = output/'plan.json';plan_path.write_text(json.dumps(plan))
+    (output/'plan_submission.json').write_text(json.dumps({'event_id':'event-plan'}))
+    monkeypatch.setattr('wheel_legged_gym.app.submit_turn_training.validate_ablation_plan',
+        lambda _plan:{'source_checkpoint':'/source/model_38250.pt'})
+    calls=[]
+    def fake_run(argv, **_kwargs):
+        if 'submit_turn_training.py' in argv[1]:
+            name = argv[argv.index('--run-name')+1]
+            calls.append(name)
+            job = output/name
+            monitor = job/'monitor';monitor.mkdir(parents=True)
+            checkpoint = job/'model_43250.pt';checkpoint.write_bytes(b'model')
+            (monitor/'report_ready.json').write_text('{}')
+            (monitor/'status.json').write_text(json.dumps({'stop_reason':'budget_exhausted'}))
+            (monitor/'terminal_summary.json').write_text(json.dumps({
+                'last_checkpoint':str(checkpoint)}))
+            return subprocess.CompletedProcess(argv,0,stdout=json.dumps({
+                'orchestrator_pid':os.getpid(),
+                'orchestrator_start_ticks':0,'trainer_pid':123,
+                'monitor_pid':124,'hook_pid':125,'event_id':'branch'}))
+        calls.append(Path(argv[1]).name)
+        if '--cornering-task-v2-out' in argv:
+            path=Path(argv[argv.index('--cornering-task-v2-out')+1])
+            path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_text(json.dumps(result))
+        return subprocess.CompletedProcess(argv,0)
+    monkeypatch.setattr('wheel_legged_gym.app.submit_turn_training.subprocess.run',fake_run)
+    orchestrate_ablation_plan(tmp_path,plan_path,None)
+    assert calls[:3] == ['run_A','review_turn_lean_long.py','run_B']
+    assert (output/'ablation_comparison.json').is_file()
+    terminal=json.loads((output/'plan_terminal/status.json').read_text())
+    assert terminal['status']=='finished_pending_review'
+    assert terminal['event_id']=='event-plan'
 
 
 @pytest.mark.parametrize(('trainer_returncode','failure_stage'),
@@ -107,4 +192,5 @@ print(p.pid)
     else:
         assert summary['status']=='error'
         assert summary['stop_reason']=='runtime_error'
-        assert budget['attempts'][0]['status']=='unknown_consumption'
+        assert budget['attempts'][0]['status']=='finalized'
+        assert budget['formal_used_iterations']==1000

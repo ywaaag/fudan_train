@@ -1468,3 +1468,6 @@ smoke verified the runtime manifest. Evidence lives in
 显式 ledger 预留/结算、持久 event ID、非空终态报告和 review `--resume` 严格复用。
 Stage A/B 旧 ledger 以独立授权额度和现有 checkpoint/TensorBoard 证据做 reconciliation；
 历史通知和 reviewed 文件保留原样，冲突 ID 仅有旁路映射。
+# 2026-09-28 roll 约束 A/B 对照
+
+新增 `roll_constraint_ablation_v1` 显式 spec 字段与 turn cohort reward 输入；旧 recipe 不传该字段时维持原 orientation 公式。后台计划入口复用现有单 run submit/monitor/budget/hook，串行 A/B，各自从同一 38250 恢复，最终再运行冻结的 `cornering_task_v2` 三 seed 评估。没有改变网络、资产、物理参数或旧评估 gate。证据与实际运行身份见 `plane/outputs/roll_constraint_ablation_20260928_110822/`；模型能力仅以终态真实评估判断。

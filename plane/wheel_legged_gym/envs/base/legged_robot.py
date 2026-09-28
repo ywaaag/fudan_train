@@ -674,6 +674,9 @@ class LeggedRobot(BaseTask):
                 hold_range=getattr(self.cfg.commands, 'turn_hold_range', (2., 5.)),
                 speed_ramp_seconds=getattr(self.cfg.commands, 'turn_speed_ramp_seconds', 2.),
                 yaw_ramp_seconds=getattr(self.cfg.commands, 'turn_yaw_ramp_seconds', 2.))
+            self.turn_cohort_mask = torch.zeros(self.num_envs, dtype=torch.bool,
+                                                device=self.device)
+            self.turn_cohort_mask[self.turn_scheduler.ids] = True
         return self.turn_scheduler
 
     def _get_height_skill_scheduler(self):
@@ -1521,6 +1524,7 @@ class LeggedRobot(BaseTask):
             wheel_body_indices=getattr(self, "wheel_body_indices", None),
             wheel_contact_history=getattr(self, "wheel_contact_history", None),
             wheel_dof_indices=getattr(self, "wheel_dof_indices", None),
+            turn_cohort_mask=getattr(self, "turn_cohort_mask", None),
         )
 
     def _method_task_gate(self):

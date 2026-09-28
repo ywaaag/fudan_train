@@ -11,7 +11,7 @@ def roll_reference(vx, yaw, max_lean_rad):
     return max_lean_rad * torch.tanh(equilibrium_hint / max_lean_rad)
 
 
-def orientation_cost(projected_gravity, vx, yaw, max_lean_rad):
+def orientation_cost(projected_gravity, vx, yaw, max_lean_rad, roll_coefficient=1.):
     roll = roll_reference(vx, yaw, max_lean_rad)
-    return projected_gravity[:, 0].square() + (
-        projected_gravity[:, 1] + torch.sin(roll)).square()
+    return (projected_gravity[:, 0].square() + roll_coefficient *
+            (projected_gravity[:, 1] + torch.sin(roll)).square())

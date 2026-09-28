@@ -142,3 +142,9 @@ checkpoint及协议同一时才允许比较候选；单seed probe不进入接受
 `plane/outputs/high_load_cornering_v3_runtime_verification_20260927_205927/` 是只读运行时证据：model_16250、seed23、8 env、1200 policy step，三个 mask 内环境的 slip reward 非零，mask 外 `(2,.30)` 为零，接触历史在真实 Isaac 环境中更新并在显式 reset 后清零。有效窗口没有自然单轮失触，故 `turn_contact_loss` 的非零值和合法差速放行仅由纯 Torch fixture 证明；不能写成真实运行时均通过。该 probe 没有 PPO 更新，不能当作转弯能力验收。
 
 错误接线的 `model_20226` 仅为失败证据，下一次训练起点仍是精确 SHA 的 `model_16250`。正式训练累计 25080/25000 iteration，剩余预算为 0；未经新授权不得续训。新训练必须使用含 `sampling_version=2` 的显式 spec，并核对新的源码 commit 或 SHA。
+
+## Roll 约束 A/B 实验入口
+
+`roll_constraint_ablation_v1` 使用 `TURN_LEAN_LONG` 和 Stage B 的 aggressive v2 采样，两个分支均从同一 checkpoint 全状态恢复。唯一训练变量是 `stage.turn_roll_cost_coefficient`：A 为 1.0，B 为 0.25。`LeggedRobot._get_turn_scheduler` 固定分配 turn mask 并经 `RewardInputs.turn_cohort_mask` 显式传给纯 reward 公式；retention 的系数始终是 1.0。实际 cost 为 `projected_gravity_x² + coefficient * (projected_gravity_y + sin(roll_ref))²`。原 orientation scale、pitch 项、roll_ref 负号、3° 上限、turn slip/contact 和策略契约不变。`turn_roll_cost_coefficient` 缺失会拒绝新实验，历史 spec 仍按旧公式运行。
+
+同一来源的 A/B spec 与后台计划在 `plane/outputs/roll_constraint_ablation_20260928_110822/`。`tools/submit_turn_training.py --plan PLAN --detach --hapi-session SESSION` 提交一个串行计划；后台计划进程分别调用已有单 run submit/orchestrator/monitor/hook。每 run 5000 更新，A 终态且无基础设施故障后从原 38250 启动 B。每个 run 独立记账；最终对两个终点使用相同三 seed、16 env 的 review 和 `cornering_task_v2` 旁路汇总。交互 worker 提交握手成功后停止读取进度；训练及最终复盘通知只绑定显式 session。若评估或身份检查失败，计划写终态错误，不宣布模型通过。

@@ -43,3 +43,4 @@ class RewardInputs:
     wheel_body_indices: Optional[torch.Tensor]
     wheel_contact_history: Optional[torch.Tensor]
     wheel_dof_indices: Optional[torch.Tensor]
+    turn_cohort_mask: Optional[torch.Tensor] = None

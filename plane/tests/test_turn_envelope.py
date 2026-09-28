@@ -32,6 +32,25 @@ def test_lean_reference_sign_cap_mirror_and_zero():
     assert gravity.shape == (6, 3)
 
 
+def test_roll_cost_coefficient_preserves_pitch_and_four_quadrant_signs():
+    vx = torch.tensor([1., 1., -1., -1., 0., 2.])
+    yaw = torch.tensor([.5, -.5, .5, -.5, 2., .5])
+    gravity = torch.tensor([[.1, .2, -.97]] * 6)
+    before = gravity.clone()
+    cap = math.radians(3.)
+    reference = roll_reference(vx, yaw, cap)
+    assert torch.equal(torch.sign(reference[:4]), torch.tensor([-1., 1., 1., -1.]))
+    old = gravity[:, 0].square() + (gravity[:, 1] + reference.sin()).square()
+    torch.testing.assert_close(orientation_cost(gravity, vx, yaw, cap), old)
+    coefficient = torch.tensor([.25, .25, .25, .25, 1., 1.])
+    observed = orientation_cost(gravity, vx, yaw, cap, coefficient)
+    expected = gravity[:, 0].square() + coefficient * (
+        gravity[:, 1] + reference.sin()).square()
+    torch.testing.assert_close(observed, expected)
+    torch.testing.assert_close(observed[4:], old[4:])
+    assert torch.equal(gravity, before)
+
+
 def test_turn_bank_and_recipe_match_except_target():
     assert len(LOW_TURNS) == 24
     assert set(LOW_TURNS) == {(sv*v, sw*w) for v in (.5, 1., 2.) for w in (.25, .5)

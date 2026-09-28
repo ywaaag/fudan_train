@@ -38,6 +38,40 @@ def spec():
                       'yaw_ramp_seconds': 2., 'hypothesis': 'test'}}
 
 
+def test_roll_ablation_spec_changes_only_turn_cohort_coefficient():
+    base = spec()
+    base['experiment_id'] = 'roll_constraint_ablation_v1'
+    base['course_plan'] = [{'phase':1,'budget_max':1},
+                           {'phase':2,'budget_max':10000}]
+    base['stage'].update(phase=2, turn_height=.4, lean_max_deg=3.,
+        inward_geometry_probe=True, turn_roll_cost_coefficient=1.,
+        pairs=[[1.,.5],[1.6,.4],[2.2,.6],[2.5,.6],[3.,.7],[3.,1.],[3.5,.8],[4.,1.]],
+        aggressive_plan={'sampling_version':2,
+            'fractions':{'anchor':.15,'regional':.225,'mid':.10,'high':.025},
+            'anchor_pairs':[[1.,.5]],'regional_pairs':[[1.6,.4],[2.2,.6]],
+            'mid_pairs':[[2.5,.6],[3.,.7]],
+            'high_pairs':[[3.,1.],[3.5,.8],[4.,1.]]})
+    alternate = copy.deepcopy(base)
+    alternate['stage']['turn_roll_cost_coefficient'] = .25
+    results = []
+    for proposal in (base,alternate):
+        cfg, train = WheelLeggedCfg(), WheelLeggedCfgPPO()
+        manifest = apply_turn_lean_long(cfg,train,spec=proposal)
+        assert cfg.rewards.scales.orientation == -100.
+        assert manifest['sampling_version'] == 2
+        assert manifest['turn_roll_cost_coefficient'] == proposal['stage']['turn_roll_cost_coefficient']
+        assert train.runner.save_interval == 250
+        results.append((cfg,train,manifest))
+    assert results[0][0].commands.cohort_cycle == results[1][0].commands.cohort_cycle == 40
+    assert results[0][0].commands.turn_slots == results[1][0].commands.turn_slots
+    assert results[0][1].algorithm.learning_rate == results[1][1].algorithm.learning_rate
+    assert results[0][2]['turning_reward'] == results[1][2]['turning_reward']
+    missing = copy.deepcopy(base)
+    del missing['stage']['turn_roll_cost_coefficient']
+    with __import__('pytest').raises(ValueError):
+        validate_spec(missing)
+
+
 def test_recipe_keeps_contract_and_retention():
     cfg, train = WheelLeggedCfg(), WheelLeggedCfgPPO()
     manifest = apply_turn_lean_long(cfg, train, spec=spec())
@@ -206,6 +240,17 @@ def test_review_cli_passes_scheduled_heights_to_evaluator(tmp_path,monkeypatch):
     assert heights('turn_train') == [.4]*4+[.38]*4+[.36]*4
     assert heights('turn_holdout') == [.36]*4
     assert heights('entry_exit') == [.38]*4+[.36]*4
+    passed.clear()
+    monkeypatch.setattr(sys,'argv',['review_turn_lean_long.py','--job',str(job),
+        '--checkpoint',str(checkpoint),'--spec',str(spec_path),
+        '--review-name','stage_only','--model-label','source',
+        '--seeds','19','--envs-per-command','1',
+        '--groups','retention','turn_train','entry_exit'])
+    turn_lean_review.main(tmp_path)
+    assert {Path(argv[argv.index('--out')+1]).stem for argv in passed} == {
+        'retention','turn_train','entry_exit'}
+    recorded=json.loads((job/'phase_reviews/stage_only/source_commands.json').read_text())
+    assert 'turn_holdout' in recorded['missing_groups']
     assert heights('height_skill') == [.38]*3
     assert heights('height_entry_exit') == [.38]*3
     assert '--height-return-at-exit' in by_name['height_entry_exit']

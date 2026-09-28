@@ -12,7 +12,9 @@ R10200_SHA = 'a8b9dc01879ddba41c54289c0367c6a3c93325bc2982357173b1899be059b790'
 def validate_spec(spec, *, historical=False):
     required = {'source_checkpoint', 'source_sha256', 'source_iteration',
                 'teacher_checkpoint', 'teacher_sha256', 'stage', 'course_plan'}
-    inward = spec.get('experiment_id') == 'inward_cornering_r10200_v1'
+    experiment_id = spec.get('experiment_id')
+    inward = experiment_id in ('inward_cornering_r10200_v1',
+                                'roll_constraint_ablation_v1')
     if (set(spec) != required | ({'experiment_id'} if inward else set())
             or not isinstance(spec['course_plan'], list)):
         raise ValueError('Turn lean requires an explicit source, teacher, stage and course plan')
@@ -36,10 +38,19 @@ def validate_spec(spec, *, historical=False):
               'entry_range', 'hold_range', 'speed_ramp_seconds', 'yaw_ramp_seconds',
               'hypothesis','turn_height_reward_scale'}
     if (not fields.issubset(stage) or
-            set(stage) - fields - {'height_schedule','cohort_plan','aggressive_plan','inward_geometry_probe'} or
+            set(stage) - fields - {'height_schedule','cohort_plan','aggressive_plan','inward_geometry_probe',
+                                   'turn_roll_cost_coefficient'} or
             stage['phase'] not in phases or
             (stage.get('inward_geometry_probe',False) and not inward)):
         raise ValueError('Unreviewed turn stage fields')
+    if experiment_id == 'roll_constraint_ablation_v1':
+        if (stage['phase'] != 2 or stage['turn_height'] != .4 or
+                stage.get('cohort_plan') is not None or
+                stage.get('aggressive_plan', {}).get('sampling_version') != 2 or
+                stage.get('turn_roll_cost_coefficient') not in (1., .25)):
+            raise ValueError('Roll ablation requires fixed-height sampling v2 and an explicit coefficient')
+    elif 'turn_roll_cost_coefficient' in stage:
+        raise ValueError('Roll coefficient is reserved for the ablation experiment')
     if not (.34 <= stage['turn_height'] <= .40 and 0. <= stage['lean_max_deg'] <= 10.
             and stage['turn_fraction'] in (.25, .5)
             and 1. <= stage['turn_height_reward_scale'] <= 10.
@@ -184,6 +195,7 @@ def apply_turn_lean_long(cfg, train, *, spec, historical=False):
     cfg.rewards.bilateral_geometry_tolerance_m = .005
     cfg.rewards.bilateral_geometry_scale_m = .10
     cfg.rewards.turn_lean_max_rad = math.radians(stage['lean_max_deg'])
+    cfg.rewards.turn_roll_cost_coefficient = stage.get('turn_roll_cost_coefficient', 1.)
     cfg.rewards.turn_height_reward_scale = stage['turn_height_reward_scale']
     if cohort is not None:
         cfg.rewards.unclipped_reward_names = tuple(sorted(
@@ -201,6 +213,7 @@ def apply_turn_lean_long(cfg, train, *, spec, historical=False):
         turn_long_spec=spec, retention_bank=retention, turn_bank=cfg.commands.turn_bank,
         turn_fraction=stage['turn_fraction'], turn_height=stage['turn_height'],
         turn_lean_max_rad=cfg.rewards.turn_lean_max_rad,
+        turn_roll_cost_coefficient=cfg.rewards.turn_roll_cost_coefficient,
         turn_protocol={key:stage[key] for key in ('entry_range','hold_range',
             'speed_ramp_seconds','yaw_ramp_seconds')},
         freeze_motion_encoder=stage['freeze_encoder'],
@@ -248,4 +261,10 @@ def apply_turn_lean_long(cfg, train, *, spec, historical=False):
                     'mask': 'abs(command_vx*command_yaw)>=1.0',
                     'formula': '1 - mean(two-wheel contact history)'}},
                 turning_reward_unclipped=False)
+    if spec.get('experiment_id') == 'roll_constraint_ablation_v1':
+        manifest.update(ablation_variable='turn_cohort_roll_error_coefficient',
+            training_change='Only turn-cohort roll reference error cost differs between A and B; pitch, orientation scale and all other training settings are fixed',
+            reference_scope='R10200 mean action/source std on odd env IDs only (50% retention)',
+            roll_cost_scope='turn slots use coefficient {}; retention uses 1.0'.format(
+                cfg.rewards.turn_roll_cost_coefficient))
     return manifest

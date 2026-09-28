@@ -9,11 +9,31 @@ from wheel_legged_gym.domain.rewards.terms import (
     wheel_rolling_terms,
 )
 from wheel_legged_gym.domain.rewards.equations import (
+    _reward_orientation,
     _reward_turn_contact_loss,
     _reward_turn_wheel_slip,
 )
 from wheel_legged_gym.domain.rewards.inputs import RewardInputs
 from wheel_legged_gym.envs.base.legged_robot import LeggedRobot
+
+
+def test_orientation_reward_uses_explicit_turn_cohort_only():
+    from wheel_legged_gym.domain.rewards.turn_lean import orientation_cost
+    commands = torch.tensor([[2., .5, .4], [2., .5, .4], [-2., -.5, .4]])
+    gravity = torch.tensor([[.1, .2, -.97]] * 3)
+    fields = {name: None for name in RewardInputs.__dataclass_fields__}
+    fields.update(_method_v1=False,
+        cfg=SimpleNamespace(rewards=SimpleNamespace(turn_lean_max_rad=.05,
+            turn_roll_cost_coefficient=.25)), commands=commands,
+        projected_gravity=gravity,
+        turn_cohort_mask=torch.tensor([True, False, True]))
+    result = _reward_orientation(RewardInputs(**fields))
+    expected = orientation_cost(gravity, commands[:, 0], commands[:, 1], .05,
+                                torch.tensor([.25, 1., .25]))
+    torch.testing.assert_close(result, expected)
+    fields['turn_cohort_mask'] = None
+    with __import__('pytest').raises(ValueError):
+        _reward_orientation(RewardInputs(**fields))
 
 
 def test_capped_tracking_keeps_a_gap_gradient_outside_cap():

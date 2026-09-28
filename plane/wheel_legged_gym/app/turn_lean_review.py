@@ -49,12 +49,14 @@ def command(root, checkpoint, out, speeds, yaws, heights, seed, envs, *,
                '--profile', 'method_v1', '--randomization-level', '1',
                '--envs-per-command', str(envs), '--seed', str(seed),
                '--trace-stride', '10' if exit_at is not None or
-               (spec is not None and spec.get('experiment_id') == 'inward_cornering_r10200_v1')
+               (spec is not None and spec.get('experiment_id') in (
+                   'inward_cornering_r10200_v1', 'roll_constraint_ablation_v1'))
                else '50']
     if spec is None:
         return options + ['--seconds','25','--warmup','5']
     stage = spec['stage']
-    if spec.get('experiment_id') == 'inward_cornering_r10200_v1':
+    if spec.get('experiment_id') in ('inward_cornering_r10200_v1',
+                                     'roll_constraint_ablation_v1'):
         options += ['--geometry-trace']
     options += ['--initial-commands', *(['0']*len(speeds)),
                 '--initial-height-commands', *(['0.4']*len(speeds)),
@@ -139,6 +141,10 @@ def main(root):
     parser.add_argument('--model-label',required=True)
     parser.add_argument('--seeds',type=int,nargs='+',default=[19])
     parser.add_argument('--envs-per-command',type=int,default=8)
+    parser.add_argument('--groups',nargs='+',choices=(
+        'retention','turn_train','turn_holdout','entry_exit','slow_reverse',
+        'height_skill','height_entry_exit'),
+        help='Evaluate only these groups; omitted groups remain not_evaluated')
     parser.add_argument('--resume',action='store_true',
                         help='Reuse only complete outputs with matching checkpoint and protocol identity')
     args = parser.parse_args()
@@ -175,6 +181,10 @@ def main(root):
         height_pairs = [(vx,0.) for vx, _ in height_bank]
         configurations['height_skill'] = (height_pairs,spec,None)
         configurations['height_entry_exit'] = (height_pairs,spec,12)
+    if args.groups is not None:
+        if len(set(args.groups)) != len(args.groups) or not set(args.groups).issubset(configurations):
+            parser.error('Requested review groups are duplicated or unavailable')
+        configurations = {name:configurations[name] for name in args.groups}
     commands = []
     for seed in args.seeds:
         folder = review / 'acceptance' / args.model_label / ('seed'+str(seed))
@@ -204,6 +214,9 @@ def main(root):
     content={
         'checkpoint':str(checkpoint),'checkpoint_sha256':source_sha,
         'spec':str(args.spec.resolve()),'commands':commands,
+        'requested_groups':list(configurations),
+        'missing_groups':sorted(set(('retention','turn_train','turn_holdout',
+            'entry_exit','slow_reverse'))-set(configurations)),
         'expected_files':[argv[argv.index('--out')+1] for argv in commands]}
     if manifest.exists() and json.loads(manifest.read_text()) != content:
         legacy=json.loads(manifest.read_text())
