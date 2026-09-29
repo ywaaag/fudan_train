@@ -90,6 +90,41 @@ def test_review_checkpoint_prefers_screened_candidate_over_last(tmp_path):
         review_checkpoint(summary)
 
 
+def test_yaw_width_plan_uses_fixed_budget_endpoint(tmp_path):
+    from wheel_legged_gym.app.submit_turn_training import (
+        validate_ablation_plan, plan_review_checkpoint,
+    )
+    source=tmp_path/'model_47250.pt';source.write_bytes(b'source')
+    old=(Path(__file__).resolve().parents[1].parent/
+        'plane/outputs/sampling_ablation_20260929_100205/spec_B.json')
+    base=json.loads(old.read_text())
+    base['experiment_id']='yaw_width_ablation_v1'
+    base['source_checkpoint']=str(source)
+    base['source_sha256']=hashlib.sha256(source.read_bytes()).hexdigest()
+    base['source_iteration']=47250
+    branches={}
+    for name,width in (('A',.25),('B',.125)):
+        spec=copy.deepcopy(base)
+        spec['stage']['turn_high_load_yaw_denominator']=width
+        path=tmp_path/(name+'.json');path.write_text(json.dumps(spec))
+        branches[name]={'spec':str(path),'run_name':'yaw_'+name,'new_iterations':5000}
+    holdout=tmp_path/'holdout.json';holdout.write_text('{}')
+    baseline=tmp_path/'baseline.json';baseline.write_text('{}')
+    plan={'output_root':str(tmp_path),'branches':branches,
+          'holdout_commands':str(holdout),'baseline_sidecar':str(baseline)}
+    assert validate_ablation_plan(plan)['source_iteration']==47250
+    endpoint=tmp_path/'model_52250.pt';endpoint.write_bytes(b'endpoint')
+    early=tmp_path/'model_51250.pt';early.write_bytes(b'early')
+    terminal={'last_checkpoint':str(endpoint),
+              'last_checkpoint_sha256':hashlib.sha256(endpoint.read_bytes()).hexdigest(),
+              'actual_update_count':5000,
+              'best_candidate':{'checkpoint':str(early)}}
+    assert plan_review_checkpoint(terminal,'yaw_width_ablation_v1')==str(endpoint)
+    terminal['actual_update_count']=4000
+    with pytest.raises(ValueError,match='5000'):
+        plan_review_checkpoint(terminal,'yaw_width_ablation_v1')
+
+
 def test_ablation_plan_submits_sequential_branches_and_one_terminal(tmp_path, monkeypatch):
     from wheel_legged_gym.app.submit_turn_training import orchestrate_ablation_plan
     output = tmp_path/'output';output.mkdir()
@@ -109,7 +144,8 @@ def test_ablation_plan_submits_sequential_branches_and_one_terminal(tmp_path, mo
     plan_path = output/'plan.json';plan_path.write_text(json.dumps(plan))
     (output/'plan_submission.json').write_text(json.dumps({'event_id':'event-plan'}))
     monkeypatch.setattr('wheel_legged_gym.app.submit_turn_training.validate_ablation_plan',
-        lambda _plan:{'source_checkpoint':'/source/model_38250.pt'})
+        lambda _plan:{'source_checkpoint':'/source/model_38250.pt',
+                      'experiment_id':'roll_constraint_ablation_v1'})
     calls=[]
     def fake_run(argv, **_kwargs):
         if 'submit_turn_training.py' in argv[1]:

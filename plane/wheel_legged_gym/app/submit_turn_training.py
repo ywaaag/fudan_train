@@ -179,7 +179,8 @@ def validate_ablation_plan(plan):
         validate_spec(data)
         current_id = data.get('experiment_id')
         if current_id not in ('roll_constraint_ablation_v1',
-                              'cornering_sampling_ablation_v1'):
+                              'cornering_sampling_ablation_v1',
+                              'yaw_width_ablation_v1'):
             raise ValueError('Ablation experiment identity differs')
         if experiment_id is None:
             experiment_id = current_id
@@ -188,6 +189,9 @@ def validate_ablation_plan(plan):
         if current_id == 'roll_constraint_ablation_v1':
             if data['stage']['turn_roll_cost_coefficient'] != (1. if name == 'A' else .25):
                 raise ValueError('Branch roll coefficient differs')
+        elif current_id == 'yaw_width_ablation_v1':
+            if data['stage']['turn_high_load_yaw_denominator'] != (.25 if name == 'A' else .125):
+                raise ValueError('Branch yaw width differs')
         elif (data['stage'].get('sampling_ablation') is None) != (name == 'A'):
             raise ValueError('Branch sampling distribution differs')
         source = Path(data['source_checkpoint']).resolve(strict=True)
@@ -196,6 +200,8 @@ def validate_ablation_plan(plan):
         comparable = copy.deepcopy(data)
         if current_id == 'roll_constraint_ablation_v1':
             del comparable['stage']['turn_roll_cost_coefficient']
+        elif current_id == 'yaw_width_ablation_v1':
+            del comparable['stage']['turn_high_load_yaw_denominator']
         else:
             comparable['stage'].pop('sampling_ablation', None)
         normalized.append(comparable)
@@ -219,9 +225,23 @@ def review_checkpoint(terminal):
     return checkpoint
 
 
+def plan_review_checkpoint(terminal, experiment_id):
+    if experiment_id != 'yaw_width_ablation_v1':
+        return review_checkpoint(terminal)
+    checkpoint = terminal.get('last_checkpoint')
+    if not checkpoint or not Path(checkpoint).is_file():
+        raise RuntimeError('No saved fixed-budget endpoint checkpoint')
+    if digest(checkpoint) != terminal.get('last_checkpoint_sha256'):
+        raise ValueError('Fixed-budget endpoint SHA differs from terminal summary')
+    if terminal.get('actual_update_count') != 5000:
+        raise ValueError('Yaw width endpoint lacks 5000 actual updates')
+    return checkpoint
+
+
 def orchestrate_ablation_plan(root, plan_path, session):
     plan = json.loads(plan_path.read_text())
     comparable = validate_ablation_plan(plan)
+    experiment_id = comparable['experiment_id']
     output = Path(plan['output_root']).resolve(strict=True)
     event = json.loads((output/'plan_submission.json').read_text())['event_id']
     jobs = {}
@@ -255,7 +275,8 @@ def orchestrate_ablation_plan(root, plan_path, session):
             status = json.loads((job/'monitor/status.json').read_text())
             if status.get('stop_reason') in ('runtime_error','exit_status_unknown'):
                 raise RuntimeError('{} ended with infrastructure error'.format(name))
-            endpoint = review_checkpoint(json.loads((job/'monitor/terminal_summary.json').read_text()))
+            endpoint = plan_review_checkpoint(json.loads(
+                (job/'monitor/terminal_summary.json').read_text()), experiment_id)
             (job/'holdout_commands.json').write_bytes(Path(plan['holdout_commands']).read_bytes())
             stage_review = [sys.executable,str(root/'tools/review_turn_lean_long.py'),
                 '--job',str(job),'--checkpoint',endpoint,'--spec',branch['spec'],
@@ -273,7 +294,7 @@ def orchestrate_ablation_plan(root, plan_path, session):
             branch = plan['branches'][name]
             job = output/branch['run_name']
             summary = json.loads((job/'monitor/terminal_summary.json').read_text())
-            checkpoint = review_checkpoint(summary)
+            checkpoint = plan_review_checkpoint(summary, experiment_id)
             (job/'holdout_commands.json').write_bytes(holdout)
             review = job/'phase_reviews'/'endpoint'
             commands = [
@@ -301,8 +322,9 @@ def orchestrate_ablation_plan(root, plan_path, session):
         comparison = {'event_id':event,'protocol_id':baseline['protocol_id'],
             'baseline':plan['baseline_sidecar'],'branches':review_results,
             'source_checkpoint':comparable['source_checkpoint'],
-            'selected_checkpoints':{name:review_checkpoint(json.loads(
-                (output/plan['branches'][name]['run_name']/'monitor/terminal_summary.json').read_text()))
+            'selected_checkpoints':{name:plan_review_checkpoint(json.loads(
+                (output/plan['branches'][name]['run_name']/'monitor/terminal_summary.json').read_text()),
+                experiment_id)
                 for name in ('A','B')},
             'turn_train_passed':{name:sum(point['new_passed'] for point in row['points']
                 if point['group']=='turn_train') for name,row in results.items()},
@@ -324,12 +346,15 @@ def orchestrate_ablation_plan(root, plan_path, session):
     atomic_json(terminal/'terminal_summary.json',state)
     experiment_id = comparable.get('experiment_id')
     lines=['# A/B '+('sampling distribution' if experiment_id ==
-            'cornering_sampling_ablation_v1' else 'roll constraint')+' experiment','',
+            'cornering_sampling_ablation_v1' else 'yaw reward width' if experiment_id ==
+            'yaw_width_ablation_v1' else 'roll constraint')+' experiment','',
         'event_id: '+event,'status: '+state['status'],
         'stop_reason: '+state['stop_reason'],
         'A and B start from the same '+comparable['source_checkpoint']+'; neither starts from the other.',
         ('A uses source v2 sampling; B targets the frozen failure neighborhoods.'
          if experiment_id == 'cornering_sampling_ablation_v1' else
+         'A uses yaw denominator 0.25; B uses 0.125 only on high-load turn commands.'
+         if experiment_id == 'yaw_width_ablation_v1' else
          'A uses roll coefficient 1.0; B uses 0.25 on turn slots only.'),
         'Report generation is not model acceptance.']
     if state.get('comparison'):

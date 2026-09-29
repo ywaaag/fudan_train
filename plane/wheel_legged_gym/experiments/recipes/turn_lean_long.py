@@ -15,7 +15,8 @@ def validate_spec(spec, *, historical=False):
     experiment_id = spec.get('experiment_id')
     inward = experiment_id in ('inward_cornering_r10200_v1',
                                 'roll_constraint_ablation_v1',
-                                'cornering_sampling_ablation_v1')
+                                'cornering_sampling_ablation_v1',
+                                'yaw_width_ablation_v1')
     if (set(spec) != required | ({'experiment_id'} if inward else set())
             or not isinstance(spec['course_plan'], list)):
         raise ValueError('Turn lean requires an explicit source, teacher, stage and course plan')
@@ -40,7 +41,8 @@ def validate_spec(spec, *, historical=False):
               'hypothesis','turn_height_reward_scale'}
     if (not fields.issubset(stage) or
             set(stage) - fields - {'height_schedule','cohort_plan','aggressive_plan','inward_geometry_probe',
-                                   'turn_roll_cost_coefficient','sampling_ablation'} or
+                                   'turn_roll_cost_coefficient','sampling_ablation',
+                                   'turn_high_load_yaw_denominator'} or
             stage['phase'] not in phases or
             (stage.get('inward_geometry_probe',False) and not inward)):
         raise ValueError('Unreviewed turn stage fields')
@@ -71,12 +73,24 @@ def validate_spec(spec, *, historical=False):
             if ({tuple(row) for row in sampling['failed_centers']} != allowed or
                     {tuple(row) for row in sampling['other_centers']} != others):
                 raise ValueError('Sampling ablation centers must match frozen failure and complement points')
+    if experiment_id == 'yaw_width_ablation_v1':
+        if (stage['phase'] != 2 or stage['turn_height'] != .4 or
+                stage.get('cohort_plan') is not None or
+                stage.get('aggressive_plan', {}).get('sampling_version') != 2 or
+                stage.get('turn_roll_cost_coefficient') != 1. or
+                stage.get('sampling_ablation', {}).get('version') != 1 or
+                stage.get('turn_high_load_yaw_denominator') not in (.25, .125)):
+            raise ValueError('Yaw width ablation requires source sampling and explicit denominator')
     if (experiment_id not in ('roll_constraint_ablation_v1',
-                              'cornering_sampling_ablation_v1') and
+                              'cornering_sampling_ablation_v1',
+                              'yaw_width_ablation_v1') and
             'turn_roll_cost_coefficient' in stage):
         raise ValueError('Roll coefficient is reserved for the ablation experiment')
-    if experiment_id != 'cornering_sampling_ablation_v1' and 'sampling_ablation' in stage:
+    if experiment_id not in ('cornering_sampling_ablation_v1',
+                             'yaw_width_ablation_v1') and 'sampling_ablation' in stage:
         raise ValueError('Targeted sampling is reserved for its explicit experiment')
+    if experiment_id != 'yaw_width_ablation_v1' and 'turn_high_load_yaw_denominator' in stage:
+        raise ValueError('Yaw denominator is reserved for its explicit experiment')
     if not (.34 <= stage['turn_height'] <= .40 and 0. <= stage['lean_max_deg'] <= 10.
             and stage['turn_fraction'] in (.25, .5)
             and 1. <= stage['turn_height_reward_scale'] <= 10.
@@ -149,6 +163,7 @@ def validate_spec(spec, *, historical=False):
 
 def apply_turn_lean_long(cfg, train, *, spec, historical=False):
     spec = validate_spec(spec, historical=historical)
+    experiment_id = spec.get('experiment_id')
     stage = spec['stage']
     manifest = apply_legacy_speed2_stop(cfg, train)
     retention = stage_bank('basic_motion')
@@ -231,6 +246,8 @@ def apply_turn_lean_long(cfg, train, *, spec, historical=False):
     cfg.rewards.bilateral_geometry_scale_m = .10
     cfg.rewards.turn_lean_max_rad = math.radians(stage['lean_max_deg'])
     cfg.rewards.turn_roll_cost_coefficient = stage.get('turn_roll_cost_coefficient', 1.)
+    if experiment_id == 'yaw_width_ablation_v1':
+        cfg.rewards.turn_high_load_yaw_denominator = stage['turn_high_load_yaw_denominator']
     cfg.rewards.turn_height_reward_scale = stage['turn_height_reward_scale']
     if cohort is not None:
         cfg.rewards.unclipped_reward_names = tuple(sorted(
@@ -325,4 +342,11 @@ def apply_turn_lean_long(cfg, train, *, spec, historical=False):
                     'mid':.20,'high':.05},
                 targeted_command_limits={'abs_vx_max':4.,'abs_yaw_max':1.,
                     'abs_vx_times_yaw_max':4.})
+    if spec.get('experiment_id') == 'yaw_width_ablation_v1':
+        manifest.update(ablation_variable='turn_high_load_yaw_denominator',
+            training_change='Only the main yaw tracking denominator differs in high-load turn cohort',
+            turn_high_load_yaw_denominator=cfg.rewards.turn_high_load_yaw_denominator,
+            turn_high_load_condition='turn cohort and abs(executed_command_vx * executed_command_yaw) >= 2.5',
+            yaw_reward_raw_scale=cfg.rewards.scales.tracking_ang_vel,
+            yaw_reward_formula='exp(-(command_yaw-base_yaw_rate)^2/denominator)')
     return manifest

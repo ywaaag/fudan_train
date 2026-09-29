@@ -154,3 +154,9 @@ checkpoint及协议同一时才允许比较候选；单seed probe不进入接受
 入口 `plane/outputs/sampling_ablation_20260929_100205/experiment_plan.json`。`cornering_sampling_ablation_v1` 的 A 仍用 aggressive v2 的 40 槽和原 roll 系数 1；B 仅改命令分布，40 槽中奇数 20 槽为原 basic-motion retention，偶数 8 槽从八个失败点的有界连续邻域采样，8 槽按原转弯 cohort 的条件权重 30/45/20/5% 随机选 anchor/regional/mid/high，4 槽从成功的互补符号组合采样。邻域半宽为 vx 0.15m/s、yaw 0.05rad/s，并截到既有 `|vx|<=4`、`|yaw|<=1`、`|vx*yaw|<=4`。该模式由 `sampling_ablation` 显式启用，不修改历史 v2 语义。有限 env 的槽数与原分布随机抽样的实际占比必须分别记录。
 
 两个分支都从 SHA `5db5ad41ef735092e30301cb01b17d560951606b4f0b89e5e5a8bb4ff224c61d` 的 model_43250 全状态恢复；smoke/验证 checkpoint 不是正式起点。`targeted_cornering` 与 aggressive v2 共用 `TurnEnvelope` 每步推进，R10200 reference 只作用 retention，turn slip/contact reward 不变。后台计划 review 优先选 terminal summary 中有 SHA 身份的 screening 候选，另保留最后 checkpoint；若候选训练更新数不同，不能称为等预算终点对照。正式训练只在新 ledger 的 10000 次额度内提交，20 次 smoke/运行验证单列。
+
+## 2026-09-29 高负荷 yaw 宽度 A/B
+
+新实验入口 `plane/outputs/yaw_width_ablation_20260929_145248/experiment_plan.json`。两组从同一 SHA `61d319100885dcbc0e8574986e6fa56e828608f54dcaedb6fb23abf68d6c550a` 的 model_47250 完整恢复，继续使用前轮 B 的 targeted sampling。`yaw_width_ablation_v1` 只改变主 yaw 正奖励 `exp(-e²/d)` 的分母：A `d=.25`，B 仅当 `turn_cohort_mask` 且公开执行命令 `abs(vx*yaw)>=2.5` 时用 `d=.125`。边界包含等号，四象限同一规则；其余命令及增强 yaw 项仍用 `.25`，raw scale `+1`、policy dt 和单项裁剪不变。这个条件是连续负荷分类，不依赖实测速率、失触或逐个失败点。离线尺度证据见 `plane/outputs/yaw_reward_ablation_20260929_143915/offline_width_analysis.md`。
+
+计划主对照固定两个 run 各新增 5000 次更新的最后 checkpoint，要求来源及 SHA 与实际更新计数均吻合；screening 最佳另列，不代替等预算终点。两组最多 10000 次正式更新，最多 20 次验证更新，使用新的独立 ledger；不训练降高或修改旧验收门槛。

@@ -45,3 +45,5 @@ reference 仅作用奇数 ID 保留 cohort。实际有效量级须读本轮 Tens
 reset 清零证据见 `plane/outputs/high_load_cornering_v3_runtime_verification_20260927_205927/`；
 该窗口未自然失触，contact-loss 非零只在独立 fixture 中验证，不能当作
 Isaac 失触案例已验收。
+
+`yaw_width_ablation_v1` 只在显式 spec 中修改 `_reward_tracking_ang_vel` 的高负荷 turn cohort 分母；历史默认 `.25` 不变。B 在 `abs(executed_command_vx*executed_command_yaw)>=2.5` 使用 `.125`；retention 与低中负荷仍为 `.25`。该判断用命令和明确的 turn cohort mask，不用实测速率或接触状态关闭 yaw 目标。raw scale、dt、单项裁剪和独立 `_reward_tracking_ang_vel_enhance` 不变。源码与尺度推导见 `plane/outputs/yaw_reward_ablation_20260929_143915/offline_width_analysis.md`；fixture/smoke 不等于能力验收。

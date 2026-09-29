@@ -1474,3 +1474,7 @@ Stage A/B 旧 ledger 以独立授权额度和现有 checkpoint/TensorBoard 证�
 # 2026-09-29 高负荷采样 A/B 直接路径
 
 `experiments.recipes.turn_lean_long` 为新实验显式配置采样模式；`domain.commands.resampling` 计算有界连续邻域和原分布条件抽样；`envs.base.legged_robot` 仅将新模式交给既有 `TurnEnvelope`。`app.submit_turn_training` 复用原串行后台计划并验证同源 A/B 仅采样不同，`app.turn_lean_review` 保持独立几何 trace。没有新增反向依赖、第二个 supervisor、reward、物理或策略接口。对应 fixture 见 `test_turn_lean_long.py`、`test_detached_turn_submission.py`；运行身份和验证证据见 `plane/outputs/sampling_ablation_20260929_100205/`。
+
+# 2026-09-29 高负荷 yaw 宽度 A/B 直接路径
+
+`experiments.recipes.turn_lean_long` 仅为显式 `yaw_width_ablation_v1` 配置高负荷 yaw 分母；`domain.rewards.equations` 读取已传入的执行命令、turn cohort mask 与配置，对历史配置继续走原公式。`app.submit_turn_training` 保留原串行 owner/ledger/hook，仅让本实验的正式完整评估固定选 5000-update 终点；screening 候选身份仍保留。`app.turn_lean_review` 为该 spec 保留独立几何 trace。未改策略契约、物理或旧验收；测试和运行身份见 `plane/outputs/yaw_width_ablation_20260929_145248/`。

@@ -400,7 +400,14 @@ def _reward_high_speed_slip(state: RewardInputs):
 def _reward_tracking_ang_vel(state: RewardInputs):
     # Tracking of angular velocity commands (yaw)
     ang_vel_error = torch.square(state.commands[:, 1] - state.base_ang_vel[:, 2])
-    return torch.exp(-ang_vel_error / state.cfg.rewards.tracking_sigma)
+    denominator = state.cfg.rewards.tracking_sigma
+    turn_denominator = getattr(state.cfg.rewards, 'turn_high_load_yaw_denominator', None)
+    if turn_denominator is not None and turn_denominator != denominator:
+        high_load = torch.abs(state.commands[:, 0] * state.commands[:, 1]) >= 2.5
+        high_load = high_load & state.turn_cohort_mask
+        denominator = torch.where(high_load,
+            torch.full_like(ang_vel_error, turn_denominator), denominator)
+    return torch.exp(-ang_vel_error / denominator)
 
 
 def _reward_tracking_ang_vel_enhance(state: RewardInputs):

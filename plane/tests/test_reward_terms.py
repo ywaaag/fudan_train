@@ -10,11 +10,38 @@ from wheel_legged_gym.domain.rewards.terms import (
 )
 from wheel_legged_gym.domain.rewards.equations import (
     _reward_orientation,
+    _reward_tracking_ang_vel,
+    _reward_tracking_ang_vel_enhance,
     _reward_turn_contact_loss,
     _reward_turn_wheel_slip,
 )
 from wheel_legged_gym.domain.rewards.inputs import RewardInputs
 from wheel_legged_gym.envs.base.legged_robot import LeggedRobot
+
+
+def test_yaw_width_changes_only_high_load_turn_cohort():
+    commands = torch.tensor([[4.,1.,.4],[-4.,-1.,.4],[4.,-1.,.4],
+                             [-4.,1.,.4],[2.5,1.,.4],[2.49,1.,.4],
+                             [4.,1.,.4],[4.,0.,.4]])
+    angular = torch.zeros((8,3))
+    angular[:,2] = commands[:,1] - .1
+    mask = torch.tensor([True]*6+[False,True])
+    fields = {name:None for name in RewardInputs.__dataclass_fields__}
+    fields.update(commands=commands,base_ang_vel=angular,turn_cohort_mask=mask,
+        cfg=SimpleNamespace(rewards=SimpleNamespace(tracking_sigma=.25)))
+    before_commands, before_angular = commands.clone(), angular.clone()
+    a = _reward_tracking_ang_vel(RewardInputs(**fields))
+    torch.testing.assert_close(a,torch.full((8,),float(torch.exp(torch.tensor(-.01/.25)))))
+    old_enhance = _reward_tracking_ang_vel_enhance(RewardInputs(**fields))
+    fields['cfg'].rewards.turn_high_load_yaw_denominator = .125
+    b = _reward_tracking_ang_vel(RewardInputs(**fields))
+    expected = torch.exp(torch.tensor(-.01/.125))
+    torch.testing.assert_close(b[:5],torch.full((5,),float(expected)))
+    torch.testing.assert_close(b[5:],a[5:])
+    torch.testing.assert_close(_reward_tracking_ang_vel_enhance(RewardInputs(**fields)),old_enhance)
+    torch.testing.assert_close(commands,before_commands)
+    torch.testing.assert_close(angular,before_angular)
+    assert abs(float(b[0])*.01) < .01
 
 
 def test_orientation_reward_uses_explicit_turn_cohort_only():
