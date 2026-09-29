@@ -169,6 +169,7 @@ def validate_ablation_plan(plan):
     if set(branches) != {'A','B'}:
         raise ValueError('Ablation requires exactly A and B')
     normalized = []
+    experiment_id = None
     for name in ('A','B'):
         branch = branches[name]
         if set(branch) != {'spec','run_name','new_iterations'} or branch['new_iterations'] != 5000:
@@ -176,23 +177,46 @@ def validate_ablation_plan(plan):
         data = json.loads(Path(branch['spec']).read_text())
         from wheel_legged_gym.experiments.recipes.turn_lean_long import validate_spec
         validate_spec(data)
-        if data.get('experiment_id') != 'roll_constraint_ablation_v1':
+        current_id = data.get('experiment_id')
+        if current_id not in ('roll_constraint_ablation_v1',
+                              'cornering_sampling_ablation_v1'):
             raise ValueError('Ablation experiment identity differs')
-        if data['stage']['turn_roll_cost_coefficient'] != (1. if name == 'A' else .25):
-            raise ValueError('Branch roll coefficient differs')
+        if experiment_id is None:
+            experiment_id = current_id
+        elif current_id != experiment_id:
+            raise ValueError('A/B experiment identities differ')
+        if current_id == 'roll_constraint_ablation_v1':
+            if data['stage']['turn_roll_cost_coefficient'] != (1. if name == 'A' else .25):
+                raise ValueError('Branch roll coefficient differs')
+        elif (data['stage'].get('sampling_ablation') is None) != (name == 'A'):
+            raise ValueError('Branch sampling distribution differs')
         source = Path(data['source_checkpoint']).resolve(strict=True)
         if digest(source) != data['source_sha256']:
             raise ValueError('Ablation source SHA differs')
         comparable = copy.deepcopy(data)
-        del comparable['stage']['turn_roll_cost_coefficient']
+        if current_id == 'roll_constraint_ablation_v1':
+            del comparable['stage']['turn_roll_cost_coefficient']
+        else:
+            comparable['stage'].pop('sampling_ablation', None)
         normalized.append(comparable)
     if normalized[0] != normalized[1]:
-        raise ValueError('A/B training specs differ beyond turn roll coefficient')
+        raise ValueError('A/B training specs differ beyond ablation variable')
     if branches['A']['run_name'] == branches['B']['run_name']:
         raise ValueError('A/B run names must be distinct')
     if not Path(plan['holdout_commands']).is_file() or not Path(plan['baseline_sidecar']).is_file():
         raise ValueError('Frozen holdout or baseline result is missing')
     return normalized[0]
+
+
+def review_checkpoint(terminal):
+    candidate = terminal.get('best_candidate') or {}
+    checkpoint = candidate.get('checkpoint') or terminal.get('last_checkpoint')
+    if not checkpoint or not Path(checkpoint).is_file():
+        raise RuntimeError('No saved checkpoint for stage review')
+    expected = candidate.get('checkpoint_sha256') if candidate.get('checkpoint') else terminal.get('last_checkpoint_sha256')
+    if expected and digest(checkpoint) != expected:
+        raise ValueError('Selected checkpoint SHA differs from terminal summary')
+    return checkpoint
 
 
 def orchestrate_ablation_plan(root, plan_path, session):
@@ -231,9 +255,7 @@ def orchestrate_ablation_plan(root, plan_path, session):
             status = json.loads((job/'monitor/status.json').read_text())
             if status.get('stop_reason') in ('runtime_error','exit_status_unknown'):
                 raise RuntimeError('{} ended with infrastructure error'.format(name))
-            endpoint = json.loads((job/'monitor/terminal_summary.json').read_text()).get('last_checkpoint')
-            if not endpoint or not Path(endpoint).is_file():
-                raise RuntimeError('{} has no endpoint for stage screening'.format(name))
+            endpoint = review_checkpoint(json.loads((job/'monitor/terminal_summary.json').read_text()))
             (job/'holdout_commands.json').write_bytes(Path(plan['holdout_commands']).read_bytes())
             stage_review = [sys.executable,str(root/'tools/review_turn_lean_long.py'),
                 '--job',str(job),'--checkpoint',endpoint,'--spec',branch['spec'],
@@ -251,9 +273,7 @@ def orchestrate_ablation_plan(root, plan_path, session):
             branch = plan['branches'][name]
             job = output/branch['run_name']
             summary = json.loads((job/'monitor/terminal_summary.json').read_text())
-            checkpoint = summary.get('last_checkpoint')
-            if not checkpoint or not Path(checkpoint).is_file():
-                raise RuntimeError('{} has no saved endpoint checkpoint for comparison'.format(name))
+            checkpoint = review_checkpoint(summary)
             (job/'holdout_commands.json').write_bytes(holdout)
             review = job/'phase_reviews'/'endpoint'
             commands = [
@@ -281,6 +301,9 @@ def orchestrate_ablation_plan(root, plan_path, session):
         comparison = {'event_id':event,'protocol_id':baseline['protocol_id'],
             'baseline':plan['baseline_sidecar'],'branches':review_results,
             'source_checkpoint':comparable['source_checkpoint'],
+            'selected_checkpoints':{name:review_checkpoint(json.loads(
+                (output/plan['branches'][name]['run_name']/'monitor/terminal_summary.json').read_text()))
+                for name in ('A','B')},
             'turn_train_passed':{name:sum(point['new_passed'] for point in row['points']
                 if point['group']=='turn_train') for name,row in results.items()},
             'retention_passed':{name:row['retention_points'] for name,row in results.items()},
@@ -299,11 +322,15 @@ def orchestrate_ablation_plan(root, plan_path, session):
     terminal.mkdir(exist_ok=True)
     atomic_json(terminal/'status.json',state)
     atomic_json(terminal/'terminal_summary.json',state)
-    lines=['# A/B roll constraint experiment','',
+    experiment_id = comparable.get('experiment_id')
+    lines=['# A/B '+('sampling distribution' if experiment_id ==
+            'cornering_sampling_ablation_v1' else 'roll constraint')+' experiment','',
         'event_id: '+event,'status: '+state['status'],
         'stop_reason: '+state['stop_reason'],
-        'A and B start from the same model_38250 checkpoint; neither starts from the other.',
-        'A uses roll coefficient 1.0; B uses 0.25 on turn slots only.',
+        'A and B start from the same '+comparable['source_checkpoint']+'; neither starts from the other.',
+        ('A uses source v2 sampling; B targets the frozen failure neighborhoods.'
+         if experiment_id == 'cornering_sampling_ablation_v1' else
+         'A uses roll coefficient 1.0; B uses 0.25 on turn slots only.'),
         'Report generation is not model acceptance.']
     if state.get('comparison'):
         lines += ['comparison: '+state['comparison'],
@@ -330,7 +357,7 @@ def submit_ablation_plan(root, plan_path, session):
             ledger.get('formal_used_iterations') != 0 or
             ledger.get('source_checkpoint_sha256') != comparable['source_sha256']):
         raise ValueError('Ablation budget ledger identity differs')
-    event = hashlib.sha256(('roll-ablation-v1:'+uuid.uuid4().hex).encode()).hexdigest()[:24]
+    event = hashlib.sha256((comparable['experiment_id']+':'+uuid.uuid4().hex).encode()).hexdigest()[:24]
     atomic_json(output/'plan_submission.json',{'status':'starting','event_id':event,
         'plan':str(plan_path),'plan_sha256':digest(plan_path),'hapi_session':session})
     env=dict(os.environ,PYTHONPATH=str(root/'plane')+os.pathsep+os.environ.get('PYTHONPATH',''))

@@ -1471,3 +1471,6 @@ Stage A/B 旧 ledger 以独立授权额度和现有 checkpoint/TensorBoard 证�
 # 2026-09-28 roll 约束 A/B 对照
 
 新增 `roll_constraint_ablation_v1` 显式 spec 字段与 turn cohort reward 输入；旧 recipe 不传该字段时维持原 orientation 公式。后台计划入口复用现有单 run submit/monitor/budget/hook，串行 A/B，各自从同一 38250 恢复，最终再运行冻结的 `cornering_task_v2` 三 seed 评估。没有改变网络、资产、物理参数或旧评估 gate。证据与实际运行身份见 `plane/outputs/roll_constraint_ablation_20260928_110822/`；模型能力仅以终态真实评估判断。
+# 2026-09-29 高负荷采样 A/B 直接路径
+
+`experiments.recipes.turn_lean_long` 为新实验显式配置采样模式；`domain.commands.resampling` 计算有界连续邻域和原分布条件抽样；`envs.base.legged_robot` 仅将新模式交给既有 `TurnEnvelope`。`app.submit_turn_training` 复用原串行后台计划并验证同源 A/B 仅采样不同，`app.turn_lean_review` 保持独立几何 trace。没有新增反向依赖、第二个 supervisor、reward、物理或策略接口。对应 fixture 见 `test_turn_lean_long.py`、`test_detached_turn_submission.py`；运行身份和验证证据见 `plane/outputs/sampling_ablation_20260929_100205/`。

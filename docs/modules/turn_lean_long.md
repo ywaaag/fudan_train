@@ -148,3 +148,9 @@ checkpoint及协议同一时才允许比较候选；单seed probe不进入接受
 `roll_constraint_ablation_v1` 使用 `TURN_LEAN_LONG` 和 Stage B 的 aggressive v2 采样，两个分支均从同一 checkpoint 全状态恢复。唯一训练变量是 `stage.turn_roll_cost_coefficient`：A 为 1.0，B 为 0.25。`LeggedRobot._get_turn_scheduler` 固定分配 turn mask 并经 `RewardInputs.turn_cohort_mask` 显式传给纯 reward 公式；retention 的系数始终是 1.0。实际 cost 为 `projected_gravity_x² + coefficient * (projected_gravity_y + sin(roll_ref))²`。原 orientation scale、pitch 项、roll_ref 负号、3° 上限、turn slip/contact 和策略契约不变。`turn_roll_cost_coefficient` 缺失会拒绝新实验，历史 spec 仍按旧公式运行。
 
 同一来源的 A/B spec 与后台计划在 `plane/outputs/roll_constraint_ablation_20260928_110822/`。`tools/submit_turn_training.py --plan PLAN --detach --hapi-session SESSION` 提交一个串行计划；后台计划进程分别调用已有单 run submit/orchestrator/monitor/hook。每 run 5000 更新，A 终态且无基础设施故障后从原 38250 启动 B。每个 run 独立记账；最终对两个终点使用相同三 seed、16 env 的 review 和 `cornering_task_v2` 旁路汇总。交互 worker 提交握手成功后停止读取进度；训练及最终复盘通知只绑定显式 session。若评估或身份检查失败，计划写终态错误，不宣布模型通过。
+
+## 2026-09-29 高负荷采样 A/B
+
+入口 `plane/outputs/sampling_ablation_20260929_100205/experiment_plan.json`。`cornering_sampling_ablation_v1` 的 A 仍用 aggressive v2 的 40 槽和原 roll 系数 1；B 仅改命令分布，40 槽中奇数 20 槽为原 basic-motion retention，偶数 8 槽从八个失败点的有界连续邻域采样，8 槽按原转弯 cohort 的条件权重 30/45/20/5% 随机选 anchor/regional/mid/high，4 槽从成功的互补符号组合采样。邻域半宽为 vx 0.15m/s、yaw 0.05rad/s，并截到既有 `|vx|<=4`、`|yaw|<=1`、`|vx*yaw|<=4`。该模式由 `sampling_ablation` 显式启用，不修改历史 v2 语义。有限 env 的槽数与原分布随机抽样的实际占比必须分别记录。
+
+两个分支都从 SHA `5db5ad41ef735092e30301cb01b17d560951606b4f0b89e5e5a8bb4ff224c61d` 的 model_43250 全状态恢复；smoke/验证 checkpoint 不是正式起点。`targeted_cornering` 与 aggressive v2 共用 `TurnEnvelope` 每步推进，R10200 reference 只作用 retention，turn slip/contact reward 不变。后台计划 review 优先选 terminal summary 中有 SHA 身份的 screening 候选，另保留最后 checkpoint；若候选训练更新数不同，不能称为等预算终点对照。正式训练只在新 ledger 的 10000 次额度内提交，20 次 smoke/运行验证单列。

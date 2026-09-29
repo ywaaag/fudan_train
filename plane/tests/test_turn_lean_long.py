@@ -580,6 +580,66 @@ def test_aggressive_callback_advances_all_turn_slots_after_real_resample():
                                prior[turn_ids[turn_ids != 12]])
 
 
+def test_targeted_sampling_preserves_retention_and_advances_partial_resets():
+    proposal = spec()
+    proposal['experiment_id'] = 'cornering_sampling_ablation_v1'
+    proposal['course_plan'] = [{'phase':1,'budget_max':1},
+                               {'phase':2,'budget_max':10000}]
+    aggressive = {'sampling_version':2,
+        'fractions':{'anchor':.15,'regional':.225,'mid':.10,'high':.025},
+        'anchor_pairs':[[1.,.5]],'regional_pairs':[[1.6,.4],[2.2,.6]],
+        'mid_pairs':[[2.5,.6],[3.,.7]],
+        'high_pairs':[[3.,1.],[3.5,.8],[4.,1.]]}
+    sampling = {'version':1,'failed_centers':[
+        [-4.,-1.],[-4.,1.],[-3.5,-.8],[-3.,-1.],[-3.,1.],
+        [3.,-1.],[3.5,-.8],[4.,-1.]],
+        'other_centers':[[3.,1.],[-3.5,.8],[3.5,.8],[4.,1.]],
+        'vx_half_width':.15,'yaw_half_width':.05}
+    proposal['stage'].update(phase=2,turn_height=.4,lean_max_deg=3.,
+        turn_roll_cost_coefficient=1.,inward_geometry_probe=True,
+        pairs=[[.5,.25],[1.,.5],[1.6,.4],[1.8,.45],[2.,.45],[2.,.5],
+               [2.2,.6],[2.5,.6],[3.,.7],[3.,1.],[3.5,.8],[4.,1.]],
+        aggressive_plan=aggressive,sampling_ablation=sampling)
+    cfg, train = WheelLeggedCfg(), WheelLeggedCfgPPO()
+    manifest = apply_turn_lean_long(cfg,train,spec=proposal)
+    assert cfg.commands.sampling_strategy == 'targeted_cornering'
+    assert manifest['effective_command_fractions'] == {
+        'failed':.2,'original':.2,'other':.1}
+    assert cfg.rewards.scales.turn_wheel_slip == -2.
+    assert cfg.rewards.scales.turn_contact_loss == -.5
+    ids = torch.tensor([0,1,2,3,14,15,16,17,18,19,30,31,32,33,38,39,
+                        40,41,56,57,72,73])
+    commands = torch.zeros(80,4)
+    state = CommandBuffers(commands,torch.zeros(80,dtype=torch.long),
+                           torch.zeros(80,dtype=torch.long))
+    ranges = {key:torch.tensor([[lo,hi]]*80,dtype=torch.float)
+              for key,lo,hi in (('lin_vel_x',-4.,4.),
+                                ('ang_vel_yaw',-4.,4.),('height',.4,.4))}
+    scheduler = TurnEnvelope(80,'cpu',.01,slots=cfg.commands.turn_slots,
+        cycle=40,entry_range=(.01,.01),hold_range=(.04,.04),
+        speed_ramp_seconds=.02,yaw_ramp_seconds=.02)
+    torch.manual_seed(23)
+    for _ in range(20):
+        resample(ids,state=state,ranges=ranges,config=cfg.commands,
+            device='cpu',reset_start_stop=lambda *_:None,sample_heading=None,
+            reset_turn=scheduler.reset)
+        assert scheduler.target[ids[ids.remainder(2)==1]].eq(0).all()
+        assert (scheduler.target[ids[ids.remainder(2)==0],0].abs() <= 4.).all()
+        assert (scheduler.target[ids[ids.remainder(2)==0],1].abs() <= 1.).all()
+        assert ((scheduler.target[:,0]*scheduler.target[:,1]).abs() <= 4.).all()
+    assert set(scheduler.ids.tolist()) == set(range(0,80,2))
+    assert state.segment_counter[ids].eq(20).all()
+    before = scheduler.target.clone()
+    resample(torch.tensor([14]),state=state,ranges=ranges,config=cfg.commands,
+        device='cpu',reset_start_stop=lambda *_:None,sample_heading=None,
+        reset_turn=scheduler.reset)
+    torch.testing.assert_close(scheduler.target[0],before[0])
+    for _ in range(6):
+        scheduler.advance(commands)
+    assert commands[14,0].abs() > 0.
+    assert commands[14,1].abs() > 0.
+
+
 def test_height_probe_uses_spec_bank_and_does_not_invent_036():
     stage = spec()['stage']
     stage.update(cohort_plan={

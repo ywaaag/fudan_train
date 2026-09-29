@@ -42,6 +42,54 @@ def test_ablation_plan_rejects_non_coefficient_training_differences(tmp_path):
         validate_ablation_plan(plan)
 
 
+def test_sampling_plan_keeps_same_source_and_only_sampling_changes(tmp_path):
+    from wheel_legged_gym.app.submit_turn_training import validate_ablation_plan
+    source = tmp_path/'model_43250.pt';source.write_bytes(b'source')
+    old = (Path(__file__).resolve().parents[1].parent/
+        'plane/outputs/roll_constraint_ablation_20260928_110822/spec_A.json')
+    spec = json.loads(old.read_text())
+    spec['experiment_id'] = 'cornering_sampling_ablation_v1'
+    spec['source_checkpoint'] = str(source)
+    spec['source_sha256'] = hashlib.sha256(source.read_bytes()).hexdigest()
+    spec['source_iteration'] = 43250
+    sampling = {'version':1,'failed_centers':[
+        [-4.,-1.],[-4.,1.],[-3.5,-.8],[-3.,-1.],[-3.,1.],
+        [3.,-1.],[3.5,-.8],[4.,-1.]],
+        'other_centers':[[3.,1.],[-3.5,.8],[3.5,.8],[4.,1.]],
+        'vx_half_width':.15,'yaw_half_width':.05}
+    branches = {}
+    for name in ('A','B'):
+        item = copy.deepcopy(spec)
+        if name == 'B':
+            item['stage']['sampling_ablation'] = sampling
+        path = tmp_path/(name+'.json');path.write_text(json.dumps(item))
+        branches[name] = {'spec':str(path),'run_name':'sampling_'+name,
+                          'new_iterations':5000}
+    holdout = tmp_path/'holdout.json';holdout.write_text('{}')
+    baseline = tmp_path/'baseline.json';baseline.write_text('{}')
+    plan = {'output_root':str(tmp_path),'branches':branches,
+        'holdout_commands':str(holdout),'baseline_sidecar':str(baseline)}
+    assert validate_ablation_plan(plan)['source_iteration'] == 43250
+    altered = json.loads((tmp_path/'B.json').read_text())
+    altered['stage']['learning_rate'] = 3e-6
+    (tmp_path/'B.json').write_text(json.dumps(altered))
+    with pytest.raises(ValueError,match='differ beyond'):
+        validate_ablation_plan(plan)
+
+
+def test_review_checkpoint_prefers_screened_candidate_over_last(tmp_path):
+    from wheel_legged_gym.app.submit_turn_training import review_checkpoint
+    early = tmp_path/'model_44250.pt';early.write_bytes(b'best')
+    last = tmp_path/'model_48250.pt';last.write_bytes(b'last')
+    summary = {'last_checkpoint':str(last),
+        'best_candidate':{'checkpoint':str(early),
+            'checkpoint_sha256':hashlib.sha256(early.read_bytes()).hexdigest()}}
+    assert review_checkpoint(summary) == str(early)
+    summary['best_candidate']['checkpoint_sha256'] = 'bad'
+    with pytest.raises(ValueError,match='SHA'):
+        review_checkpoint(summary)
+
+
 def test_ablation_plan_submits_sequential_branches_and_one_terminal(tmp_path, monkeypatch):
     from wheel_legged_gym.app.submit_turn_training import orchestrate_ablation_plan
     output = tmp_path/'output';output.mkdir()

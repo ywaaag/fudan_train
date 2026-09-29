@@ -50,13 +50,15 @@ def command(root, checkpoint, out, speeds, yaws, heights, seed, envs, *,
                '--envs-per-command', str(envs), '--seed', str(seed),
                '--trace-stride', '10' if exit_at is not None or
                (spec is not None and spec.get('experiment_id') in (
-                   'inward_cornering_r10200_v1', 'roll_constraint_ablation_v1'))
+                   'inward_cornering_r10200_v1', 'roll_constraint_ablation_v1',
+                   'cornering_sampling_ablation_v1'))
                else '50']
     if spec is None:
         return options + ['--seconds','25','--warmup','5']
     stage = spec['stage']
     if spec.get('experiment_id') in ('inward_cornering_r10200_v1',
-                                     'roll_constraint_ablation_v1'):
+                                     'roll_constraint_ablation_v1',
+                                     'cornering_sampling_ablation_v1'):
         options += ['--geometry-trace']
     options += ['--initial-commands', *(['0']*len(speeds)),
                 '--initial-height-commands', *(['0.4']*len(speeds)),

@@ -46,6 +46,62 @@ def resample(env_ids, *, state: CommandBuffers, ranges, config, device,
                 state.segment_counter[high_ids] + high_ids // config.cohort_cycle, config.high_turn_bank)
         state.sample_mode[env_ids] = -1
         state.segment_counter[env_ids] += 1
+    elif strategy == "targeted_cornering":
+        from wheel_legged_gym.domain.commands.command_sampling import sample_fixed_bank
+        slots = env_ids.remainder(config.cohort_cycle)
+        retained = env_ids[slots.remainder(2) == 1]
+        if len(retained):
+            state.commands[retained, :2] = sample_fixed_bank(
+                ranges['lin_vel_x'][retained], ranges['ang_vel_yaw'][retained],
+                state.segment_counter[retained], config.retention_bank)
+
+        def neighborhood(selected, centers):
+            if not len(selected):
+                return
+            table = state.commands.new_tensor(centers)
+            chosen = table[torch.randint(len(table), (len(selected),), device=device)]
+            half = state.commands.new_tensor(config.targeted_half_widths)
+            targets = chosen + (2 * torch.rand_like(chosen) - 1) * half
+            targets[:, 0] = targets[:, 0].clamp(-4., 4.)
+            targets[:, 1] = targets[:, 1].clamp(-1., 1.)
+            # The frozen source bank has maximum |vx*yaw| = 4.
+            excessive = (targets[:, 0] * targets[:, 1]).abs() > 4.
+            targets[excessive, 1] = targets[excessive, 1].sign() * (
+                4. / targets[excessive, 0].abs())
+            reset_turn(state.commands, selected, targets)
+
+        for selected_slots, centers in ((config.failed_slots, config.failed_centers),
+                                         (config.other_slots, config.other_centers)):
+            selected = env_ids[torch.isin(slots, torch.as_tensor(selected_slots, device=device))]
+            neighborhood(selected, centers)
+
+        original = env_ids[torch.isin(slots, torch.as_tensor(config.original_slots, device=device))]
+        if len(original):
+            draws = torch.rand(len(original), device=device)
+            # Conditional weights of the original 50% turn cohort.
+            groups = ((draws < .30, config.anchor_bank),
+                      ((draws >= .30) & (draws < .75), config.regional_bank),
+                      ((draws >= .75) & (draws < .95), config.mid_bank),
+                      (draws >= .95, config.high_bank))
+            for group_index, (mask, bank) in enumerate(groups):
+                selected = original[mask]
+                if not len(selected):
+                    continue
+                if group_index == 1:
+                    v_min, v_max, w_min, w_max = config.regional_range
+                    quadrant = (selected // 2) % 4
+                    magnitude_v = v_min + (v_max-v_min)*torch.rand(len(selected), device=device)
+                    magnitude_w = w_min + (w_max-w_min)*torch.rand(len(selected), device=device)
+                    targets = torch.stack((
+                        magnitude_v * torch.where(quadrant < 2, -1., 1.),
+                        magnitude_w * torch.where(quadrant.remainder(2) == 0, -1., 1.)),dim=1)
+                else:
+                    targets = sample_fixed_bank(ranges['lin_vel_x'][selected],
+                        ranges['ang_vel_yaw'][selected],
+                        state.segment_counter[selected] + selected // config.cohort_cycle, bank)
+                reset_turn(state.commands, selected, targets)
+        state.sample_mode[env_ids] = -1
+        state.segment_counter[env_ids] += 1
     elif strategy == "aggressive_cornering":
         from wheel_legged_gym.domain.commands.command_sampling import sample_fixed_bank
         slots = env_ids.remainder(config.cohort_cycle)

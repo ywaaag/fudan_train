@@ -14,7 +14,8 @@ def validate_spec(spec, *, historical=False):
                 'teacher_checkpoint', 'teacher_sha256', 'stage', 'course_plan'}
     experiment_id = spec.get('experiment_id')
     inward = experiment_id in ('inward_cornering_r10200_v1',
-                                'roll_constraint_ablation_v1')
+                                'roll_constraint_ablation_v1',
+                                'cornering_sampling_ablation_v1')
     if (set(spec) != required | ({'experiment_id'} if inward else set())
             or not isinstance(spec['course_plan'], list)):
         raise ValueError('Turn lean requires an explicit source, teacher, stage and course plan')
@@ -39,7 +40,7 @@ def validate_spec(spec, *, historical=False):
               'hypothesis','turn_height_reward_scale'}
     if (not fields.issubset(stage) or
             set(stage) - fields - {'height_schedule','cohort_plan','aggressive_plan','inward_geometry_probe',
-                                   'turn_roll_cost_coefficient'} or
+                                   'turn_roll_cost_coefficient','sampling_ablation'} or
             stage['phase'] not in phases or
             (stage.get('inward_geometry_probe',False) and not inward)):
         raise ValueError('Unreviewed turn stage fields')
@@ -49,8 +50,33 @@ def validate_spec(spec, *, historical=False):
                 stage.get('aggressive_plan', {}).get('sampling_version') != 2 or
                 stage.get('turn_roll_cost_coefficient') not in (1., .25)):
             raise ValueError('Roll ablation requires fixed-height sampling v2 and an explicit coefficient')
-    elif 'turn_roll_cost_coefficient' in stage:
+    if experiment_id == 'cornering_sampling_ablation_v1':
+        sampling = stage.get('sampling_ablation')
+        if (stage['phase'] != 2 or stage['turn_height'] != .4 or
+                stage.get('cohort_plan') is not None or
+                stage.get('aggressive_plan', {}).get('sampling_version') != 2 or
+                stage.get('turn_roll_cost_coefficient') != 1. or
+                (sampling is not None and (
+                    set(sampling) != {'version','failed_centers','other_centers','vx_half_width','yaw_half_width'}
+                    or sampling['version'] != 1
+                    or sampling['vx_half_width'] != .15
+                    or sampling['yaw_half_width'] != .05
+                    or len(sampling['failed_centers']) != 8
+                    or len(sampling['other_centers']) != 4))):
+            raise ValueError('Sampling ablation requires fixed-height v2 source settings')
+        if sampling is not None:
+            allowed = {(-4.,-1.),(-4.,1.),(-3.5,-.8),(-3.,-1.),(-3.,1.),
+                       (3.,-1.),(3.5,-.8),(4.,-1.)}
+            others = {(3.,1.),(-3.5,.8),(3.5,.8),(4.,1.)}
+            if ({tuple(row) for row in sampling['failed_centers']} != allowed or
+                    {tuple(row) for row in sampling['other_centers']} != others):
+                raise ValueError('Sampling ablation centers must match frozen failure and complement points')
+    if (experiment_id not in ('roll_constraint_ablation_v1',
+                              'cornering_sampling_ablation_v1') and
+            'turn_roll_cost_coefficient' in stage):
         raise ValueError('Roll coefficient is reserved for the ablation experiment')
+    if experiment_id != 'cornering_sampling_ablation_v1' and 'sampling_ablation' in stage:
+        raise ValueError('Targeted sampling is reserved for its explicit experiment')
     if not (.34 <= stage['turn_height'] <= .40 and 0. <= stage['lean_max_deg'] <= 10.
             and stage['turn_fraction'] in (.25, .5)
             and 1. <= stage['turn_height_reward_scale'] <= 10.
@@ -175,6 +201,15 @@ def apply_turn_lean_long(cfg, train, *, spec, historical=False):
         cfg.commands.regional_bank = [(sv*v,sw*w) for v,w in aggressive['regional_pairs'] for sv in (-1.,1.) for sw in (-1.,1.)]
         cfg.commands.mid_bank = [(sv*v,sw*w) for v,w in aggressive['mid_pairs'] for sv in (-1.,1.) for sw in (-1.,1.)]
         cfg.commands.high_bank = [(sv*v,sw*w) for v,w in aggressive['high_pairs'] for sv in (-1.,1.) for sw in (-1.,1.)]
+        if stage.get('sampling_ablation') is not None:
+            sampling = stage['sampling_ablation']
+            cfg.commands.sampling_strategy = 'targeted_cornering'
+            cfg.commands.failed_slots = tuple(range(0,16,2))
+            cfg.commands.original_slots = tuple(range(16,32,2))
+            cfg.commands.other_slots = tuple(range(32,40,2))
+            cfg.commands.failed_centers = tuple(tuple(row) for row in sampling['failed_centers'])
+            cfg.commands.other_centers = tuple(tuple(row) for row in sampling['other_centers'])
+            cfg.commands.targeted_half_widths = (sampling['vx_half_width'],sampling['yaw_half_width'])
     cfg.commands.turn_height = stage['turn_height']
     if stage.get('height_schedule') is not None:
         cfg.commands.turn_height_schedule = tuple(tuple(item) for item in stage['height_schedule'])
@@ -267,4 +302,27 @@ def apply_turn_lean_long(cfg, train, *, spec, historical=False):
             reference_scope='R10200 mean action/source std on odd env IDs only (50% retention)',
             roll_cost_scope='turn slots use coefficient {}; retention uses 1.0'.format(
                 cfg.rewards.turn_roll_cost_coefficient))
+    if spec.get('experiment_id') == 'cornering_sampling_ablation_v1':
+        sampling = stage.get('sampling_ablation')
+        manifest.update(ablation_variable='turn_command_sampling_distribution',
+            training_change='Only command sampling distribution differs between A and B',
+            sampling_ablation=sampling,
+            declared_sampling_fractions=({'retention':.5,'failed':.2,'original':.2,'other':.1}
+                if sampling is not None else {'retention':.5,'anchor':.15,
+                    'regional':.225,'mid':.1,'high':.025}),
+            cohort_slots=({'retention':'odd modulo 40',
+                'failed':cfg.commands.failed_slots,'original':cfg.commands.original_slots,
+                'other':cfg.commands.other_slots} if sampling is not None else manifest['cohort_slots']))
+        if sampling is not None:
+            manifest.update(effective_command_fractions={
+                'failed':len(cfg.commands.failed_slots)/40,
+                'original':len(cfg.commands.original_slots)/40,
+                'other':len(cfg.commands.other_slots)/40},
+                aggressive_slots={'failed':cfg.commands.failed_slots,
+                    'original':cfg.commands.original_slots,
+                    'other':cfg.commands.other_slots},
+                original_turn_conditional_weights={'anchor':.30,'regional':.45,
+                    'mid':.20,'high':.05},
+                targeted_command_limits={'abs_vx_max':4.,'abs_yaw_max':1.,
+                    'abs_vx_times_yaw_max':4.})
     return manifest

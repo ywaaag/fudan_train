@@ -608,7 +608,7 @@ class LeggedRobot(BaseTask):
             self._resample_commands(env_ids)
         if getattr(self.cfg.commands,'start_stop_ramp_seconds',0.)>0:
             self._get_start_stop_scheduler().advance(self.commands)
-        if getattr(self.cfg.commands,'sampling_strategy',None) in ('turn_envelope','cornering_height_skill','aggressive_cornering'):
+        if getattr(self.cfg.commands,'sampling_strategy',None) in ('turn_envelope','cornering_height_skill','aggressive_cornering','targeted_cornering'):
             self._get_turn_scheduler().advance(self.commands)
         if getattr(self.cfg.commands,'sampling_strategy',None)=='cornering_height_skill':
             self._get_height_skill_scheduler().advance(self.commands)
