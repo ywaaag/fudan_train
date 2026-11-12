@@ -66,3 +66,6 @@ LD_LIBRARY_PATH=/home/kellen/anaconda3/envs/fudan_leg/lib \
 [README原文归档](docs/history/README_before_architecture_20260923.md)。
 [原AGENTS交接快照](docs/history/AGENTS_before_architecture_20260923.md)保留历史上下文。
 历史文件里的“当前/最新”只代表当时记录；以当前源码、配置和具体run manifest为准。
+
+2026-11-01 用户授权的历史产物精简及评估 JSON 无损归档见
+[清理记录与恢复方法](docs/history/disk_cleanup_20261101.md)。原配置、奖励实现和选定完整checkpoint保留；部分大评估原路径需先从索引恢复后再交给旧工具读取。

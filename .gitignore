@@ -1,7 +1,7 @@
 # Generated training artifacts; keep them on disk, but do not version them.
 plane/logs/
 plane/outputs/
-
+日记.md
 # Python caches and local build metadata.
 **/__pycache__/
 **/*.py[cod]
@@ -13,3 +13,6 @@ plane/outputs/
 .idea/
 .vscode/
 .deep-copilot/
+.agents/
+.codex/
+.trellis/
